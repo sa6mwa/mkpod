@@ -1,0 +1,9 @@
+baseURL: https://mypod.domain.tld
+image: https://mypod.domain.tld/artwork/mypod-1600x1600.jpeg
+aws:
+  profile: default
+  region: eu-west-1
+  buckets:
+    input: assetbucket
+    output: mypodbucket
+localStorageDir: ~/mypod

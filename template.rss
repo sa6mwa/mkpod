@@ -1,0 +1,52 @@
+{{ with .atom -}}
+<?xml version='1.0' encoding='UTF-8'?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <atom:link href="{{$.private.BaseURL}}/{{.Atom}}" rel="self" type="application/rss+xml"/>
+    <title>{{.Title}}</title>
+    <link>{{.Link}}</link>
+    <pubDate>{{.PubDate}}</pubDate>
+    <lastBuildDate>{{.LastBuildDate}}</lastBuildDate>
+    <ttl>{{.TTL}}</ttl>
+    <language>{{.Language}}</language>
+    <copyright>{{.Copyright}}</copyright>
+    <webMaster>{{.WebMaster}}</webMaster>
+    <description>{{.Description}}</description>
+{{- if ne .Subtitle "" }}
+    <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
+{{- end }}
+    <itunes:owner>
+      <itunes:name>{{.OwnerName}}</itunes:name>
+      <itunes:email>{{.OwnerEmail}}</itunes:email>
+    </itunes:owner>
+    <itunes:author>{{.Author}}</itunes:author>
+    <itunes:explicit>{{.Explicit}}</itunes:explicit>
+    <itunes:keywords>{{.Keywords}}</itunes:keywords>
+    <itunes:image href="{{$.private.Image}}"/>
+    <image>
+      <url>{{$.private.Image}}</url>
+      <title>{{.Title}}</title>
+      <link>{{.Link}}</link>
+    </image>
+    <itunes:category text="{{.Category}}"/>
+{{- range .Episodes }}
+    <item>
+      <guid isPermaLink="true">{{$.private.BaseURL}}/{{.Output}}</guid>
+      <title>{{.Title}}</title>
+      <pubDate>{{.PubDate}}</pubDate>
+      <link>{{.Link}}</link>
+      <itunes:duration>{{.Duration}}</itunes:duration>
+      <itunes:author>{{.Author}}</itunes:author>
+      <itunes:explicit>{{.Explicit}}</itunes:explicit>
+      <itunes:summary>{{.Description}}</itunes:summary>
+{{- if ne .Subtitle "" }}
+      <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
+{{- end }}
+      <description>{{.Description}}</description>
+      <enclosure type="{{.Type}}" url="{{$.private.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
+      <itunes:image href="{{$.private.BaseURL}}/{{.Image}}"/>
+    </item>
+{{- end }}
+  </channel>
+</rss>
+{{- end }}
