@@ -10,22 +10,38 @@ webMaster: sa6mwa@gmail.com
 description: |-
   QZJ är en podd om radiokommunikation ur ett beredskaps- och totalförsvarsperspektiv mot bakgrund av nuvarande så kallade kortvågsrenässans och tillhörande uppdragstaktik.
 
-  Podden behandlar ämnen som amatörradio, fjärrspaning, CW (Morsekod) med utbildningsmaterial, kryptering, men även överlevnad och hemberedskap samt erfarenheter från verkligheten med tankar kring tele- eller cyberkrig i det moderna sårbara samhället.
+  Podden behandlar ämnen som amatörradio, fjärrspaning, CW (Morsekod) med utbildningsmaterial, kryptering, men även överlevnad, friluftsliv och hemberedskap samt erfarenheter från verkligheten med tankar kring tele- eller cyberkrig i det moderna sårbara samhället.
 subtitle: Om radiokommunikation i kris och krig
 ownerName: QZJ
 ownerEmail: sa6mwa@gmail.com
 author: SA6MWA
 explicit: "no"
-keywords: amatörradio,kortvåg,hf,telegrafi,cw,överlevnad,totalförsvar,prepping,hemberedskap
+keywords: amatörradio,kortvåg,hf,telegrafi,cw,överlevnad,totalförsvar,prepping,hemberedskap,friluftsliv,uteliv
 category: Technology
 encoding:
   bitrate: 128
   lamepath: /usr/bin/lame
-	ffmpegpath: ~/bin/ffmpeg
+  ffmpegpath: ~/bin/ffmpeg
   coverfront: artwork/qzj-1000x1000.jpeg
   genre: Podcast
   language: SWE
 episodes:
+- uid: 16
+  title: Bröstväskan Numbat från Helikon-Tex med prylar
+  link: https://www.patreon.com/outsender
+  description: |-
+    Hur bra funkar det att bära sina mer väsentliga prylar hängandes från bröstet likt hur ett myrpungdjur (numbat) bär sina ungar? Avsnittet går igenom innehållet i mitt senaste sätt att bära småprylar samt en ytlig recension av bröstväskan Numbat från Helikon-Tex.
+
+    I detta avsnittet provar jag formatet videopod där bilden fungerar som presentationsmaterial till pratet. Videoströmmen är enklare än rörlig bild och något av ett mellanting mellan video och pod, men där man ändå kan visuellt illustrera det som beskrivs i tal. Fungerar formatet i olika podspelare så kommer det troligen bli fler sådana avsnitt, speciellt när endast tal inte räcker.
+
+    Chest Pack Numbat:
+    https://www.helikon-tex.com/en_eur/tb-nmb-cd-chest-pack-numbat.html
+
+    Stöd QZJ Utesändaren på Patreon:
+    https://www.patreon.com/outsender
+  author: SA6MWA
+  explicit: "no"
+  subtitle: Helikon-Tex Chest Pack Numbat med väsentliga prylar för uteliv, m.m
 - uid: 15
   title: 015 Planering Under Tidspress
   pubDate: Fri, 25 Mar 2022 16:00:13 +0000
