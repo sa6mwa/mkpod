@@ -13,9 +13,13 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/hexops/gotextdiff"
+	"github.com/hexops/gotextdiff/myers"
+	"github.com/hexops/gotextdiff/span"
 	"github.com/sa6mwa/mp3duration"
 	"gopkg.in/yaml.v2"
 )
@@ -35,6 +39,31 @@ func (s *AwsHandler) NewSession() {
 		},
 	}))
 	s.S3 = s3.New(s.Session)
+}
+
+// Diff file by downloading from the bucket and compare it to file.
+func (s *AwsHandler) Diff(bucket string, key string, file string) error {
+	fileContent, err := os.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	downloader := s3manager.NewDownloader(s.Session)
+	buf := aws.NewWriteAtBuffer([]byte{})
+	n, err := downloader.Download(buf, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return err
+	}
+	log.Printf("Downloaded %d bytes from s3://%s into buffer", n, path.Join(bucket, key))
+
+	log.Printf("Diff between %s and s3://%s follows...", file, path.Join(bucket, key))
+	edits := myers.ComputeEdits(span.URIFromPath("s3://"+path.Join(bucket, key)), string(buf.Bytes()), string(fileContent))
+	diff := fmt.Sprint(gotextdiff.ToUnified("s3://"+path.Join(bucket, key), file, string(buf.Bytes()), edits))
+	fmt.Println(diff)
+
+	return nil
 }
 
 // Upload file as key to S3 bucket.
@@ -91,7 +120,17 @@ func (s *AwsHandler) Download(bucket string, key string) error {
 		// on disk, do not download if they match.
 		size, err := awsHandler.GetSize(bucket, key)
 		if err != nil {
-			return err
+			if awsErr, ok := err.(awserr.Error); ok {
+				switch awsErr.Code() {
+				case "NotFound":
+					log.Printf("s3://%s does not exist, will use local file %s only", path.Join(bucket, key), completePath)
+					return nil
+				default:
+					return err
+				}
+			} else {
+				return err
+			}
 		}
 		if size != fi.Size() {
 			// size does not match, download file (truncate file and fall through)
@@ -245,6 +284,7 @@ func (d ItunesDuration) String() string {
 type PrivateConfig struct {
 	BaseURL         string    `yaml:"baseURL"`
 	Image           string    `yaml:"image"`
+	DefaultPodImage string    `yaml:"defaultPodImage"`
 	Aws             AwsConfig `yaml:"aws"`
 	LocalStorageDir string    `yaml:"localStorageDir"`
 }
@@ -283,7 +323,7 @@ type Atom struct {
 		Lamepath   string `yaml:"lamepath"`
 		Ffmpegpath string `yaml:"ffmpegpath"`
 		CRF        int    `yaml:"crf"`
-		ABR        int    `yaml:"abr"`
+		ABR        string `yaml:"abr"`
 		Coverfront string `yaml:"coverfront"`
 		Genre      string `yaml:"genre"`
 		Language   string `yaml:"language"`

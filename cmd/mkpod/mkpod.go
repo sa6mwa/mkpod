@@ -37,8 +37,11 @@ const (
 	// .atom is the full atom, .private is the private.yaml config and .episode is
 	// the episode currently being processed (current item in the Episodes struct
 	// slice).
-	defaultLameCommandTemplate   string = `{{ $PRE := "" }}{{ if ne .private.LocalStorageDir "" }}{{ $PRE = print .private.LocalStorageDir "/" }}{{ end }}{{ .atom.Encoding.Lamepath }} -b {{ .atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .atom.Encoding.Language }}" --tt "{{ .episode.Title }}" --ta "{{ .atom.Author }}" --tl "{{ .atom.Title }}" --ty "{{ .episode.PubDate.Format "2006" }}" --tc "{{ .episode.Description }}" --tn "{{ .episode.UID }}" --tg "{{ .atom.Encoding.Genre }}" --ti "{{ print $PRE .atom.Encoding.Coverfront }}" --tv WOAR="{{ .atom.Link }}" "{{ print $PRE .episode.Input }}" "{{ print $PRE .episode.Output }}"`
-	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -r 25 -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -g 12 -bf 2 -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
+	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .private.LocalStorageDir "" }}{{ $PRE = print .private.LocalStorageDir "/" }}{{ end }}{{ .atom.Encoding.Lamepath }} -b {{ .atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .atom.Encoding.Language }}" --tt "{{ .episode.Title }}" --ta "{{ .atom.Author }}" --tl "{{ .atom.Title }}" --ty "{{ .episode.PubDate.Format "2006" }}" --tc "{{ .episode.Description }}" --tn "{{ .episode.UID }}" --tg "{{ .atom.Encoding.Genre }}" --ti "{{ print $PRE .atom.Encoding.Coverfront }}" --tv WOAR="{{ .atom.Link }}" "{{ print $PRE .episode.Input }}" "{{ print $PRE .episode.Output }}"`
+
+	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
+
+	//		defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -r 25 -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -g 12 -bf 2 -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -123,18 +126,6 @@ func main() {
 						Aliases: []string{"t"},
 						Value:   defaultTemplate,
 						Usage:   "File to use as the Go template to render the atom rss+xml output",
-					},
-					&cli.StringFlag{
-						Name:    "atom",
-						Aliases: []string{"o"},
-						Value:   defaultPodcastRSS,
-						Usage:   fmt.Sprintf("Atom RSS file to write under the localStorageDir specified in %s", defaultPrivate),
-					},
-					&cli.BoolFlag{
-						Name:    "upload",
-						Aliases: []string{"u"},
-						Value:   false,
-						Usage:   fmt.Sprintf("Upload the encoded output file to Amazon AWS S3 \"output\" bucket defined in %s", defaultPrivate),
 					},
 					&cli.BoolFlag{
 						Name:    "all",
@@ -233,15 +224,21 @@ func parser(c *cli.Context) error {
 		log.Printf("Successfully generated %s", path.Join(private.LocalStorageDir, atom.Atom))
 	}
 
+	if err := awsHandler.Diff(private.Aws.Buckets.Output, atom.Atom, path.Join(private.LocalStorageDir, atom.Atom)); err != nil {
+		return err
+	}
+
 	// Upload atom file to output S3 bucket.
 	if c.Bool("upload") {
-		if !dryRun {
-			err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Atom, "text/xml", path.Join(private.LocalStorageDir, atom.Atom))
-			if err != nil {
-				return err
+		if doAction("Upload new %s?", atom.Atom) {
+			if !dryRun {
+				err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Atom, "text/xml", path.Join(private.LocalStorageDir, atom.Atom))
+				if err != nil {
+					return err
+				}
+			} else {
+				log.Printf("Uploading %s to s3://%s", path.Join(private.LocalStorageDir, atom.Atom), path.Join(private.Aws.Buckets.Output, atom.Atom))
 			}
-		} else {
-			log.Printf("Uploading %s to s3://%s", path.Join(private.LocalStorageDir, atom.Atom), path.Join(private.Aws.Buckets.Output, atom.Atom))
 		}
 	}
 	return nil

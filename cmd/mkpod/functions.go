@@ -79,6 +79,15 @@ func loadConfig() error {
 		atom.Encoding.Ffmpegpath = filepath.Join(dirname, atom.Encoding.Ffmpegpath[2:])
 	}
 
+	// Set defaults
+
+	if atom.Encoding.CRF == 0 {
+		atom.Encoding.CRF = 28
+	}
+	if atom.Encoding.ABR == "" {
+		atom.Encoding.ABR = "196k"
+	}
+
 	return nil
 }
 
@@ -200,14 +209,32 @@ func validateAtom() error {
 				if err != nil {
 					return err
 				}
-				di, err := mp3duration.ReadFile(path.Join(private.LocalStorageDir, e.Output))
+
+				contentType, err := GetFileContentType(path.Join(private.LocalStorageDir, e.Output))
 				if err != nil {
 					return err
 				}
-				log.Printf("%s is %s (HH:MM:SS) long and %d bytes (updating %s).", e.Output, di.Duration, di.Length, specFile)
-				atom.Episodes[i].Length = di.Length
-				atom.Episodes[i].Duration.Duration = di.TimeDuration
-				updateAtom = true
+				if strings.HasPrefix(contentType, "video/") {
+					// Assume it's an mp4
+					l, d, err := Mp4Duration(path.Join(private.LocalStorageDir, e.Output))
+					if err != nil {
+						return err
+					}
+					log.Printf("%s is %s long and %d bytes (updating %s).", e.Output, d, l, specFile)
+					atom.Episodes[i].Length = l
+					atom.Episodes[i].Duration.Duration = d
+					updateAtom = true
+				} else {
+					// Assume it's an mp3
+					di, err := mp3duration.ReadFile(path.Join(private.LocalStorageDir, e.Output))
+					if err != nil {
+						return err
+					}
+					log.Printf("%s is %s long and %d bytes (updating %s).", e.Output, di.Duration, di.Length, specFile)
+					atom.Episodes[i].Length = di.Length
+					atom.Episodes[i].Duration.Duration = di.TimeDuration
+					updateAtom = true
+				}
 			}
 		}
 	}
@@ -229,10 +256,21 @@ func getCombined(episode Episode) map[string]interface{} {
 // to the output S3 bucket.
 func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *template.Template, uid int64, force bool) error {
 	if idx := atom.ContainsEpisode(uid); idx >= 0 {
+		if strings.TrimSpace(atom.Episodes[idx].Input) == "" {
+			return fmt.Errorf("input is missing for UID %d (%s)", atom.Episodes[idx].UID, atom.Episodes[idx].Title)
+		}
 		if len(atom.Episodes[idx].Output) < 3 || force {
 			// Download input file, encode it and upload the output file.
-			if doAction("Download s3://%s, encode and upload s3://%s?", path.Join(private.Aws.Buckets.Input, atom.Episodes[idx].Input), path.Join(private.Aws.Buckets.Output, ExtensionToBaseMp3(atom.Episodes[idx].Input))) {
+			if doAction("Download s3://%s, encode and upload to s3://%s?", path.Join(private.Aws.Buckets.Input, atom.Episodes[idx].Input), private.Aws.Buckets.Output) {
 				// Start by downloading the artwork.
+				if strings.TrimSpace(atom.Episodes[idx].Image) == "" {
+					if strings.TrimSpace(private.DefaultPodImage) == "" {
+						return fmt.Errorf("no image defined for UID %d and defaultPodImage is empty in %s", atom.Episodes[idx].UID, privateFile)
+					}
+					log.Printf("Using %s as default episode image", private.DefaultPodImage)
+					atom.Episodes[idx].Image = private.DefaultPodImage
+					updateAtom = true
+				}
 				err := awsHandler.Download(private.Aws.Buckets.Input, atom.Episodes[idx].Image)
 				if err != nil {
 					return err
@@ -272,7 +310,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					if err != nil {
 						return err
 					}
-					log.Printf("%s is %s (HH:MM:SS) long and %d bytes (updating %s)", atom.Episodes[idx].Output, duration, size, specFile)
+					log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, duration, size, specFile)
 					atom.Episodes[idx].Length = size
 					atom.Episodes[idx].Duration.Duration = duration
 					// Upload output mp4 to output S3 bucket.
@@ -281,6 +319,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(private.LocalStorageDir, atom.Episodes[idx].Output), err)
 					}
 					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
+					atom.Episodes[idx].Type = contentType
 					err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
 					if err != nil {
 						return err
@@ -312,7 +351,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					if err != nil {
 						return err
 					}
-					log.Printf("%s is %s (HH:MM:SS) long and %d bytes (updating %s)", atom.Episodes[idx].Output, di.Duration, di.Length, specFile)
+					log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, di.Duration, di.Length, specFile)
 					atom.Episodes[idx].Length = di.Length
 					atom.Episodes[idx].Duration.Duration = di.TimeDuration
 					// Upload output mp3 to output S3 bucket.
@@ -321,10 +360,18 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(private.LocalStorageDir, atom.Episodes[idx].Output), err)
 					}
 					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
+					atom.Episodes[idx].Type = contentType
 					err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
 					if err != nil {
 						return err
 					}
+				}
+
+				// Ensure there is a pubDate set
+				if atom.Episodes[idx].PubDate.IsZero() {
+					log.Printf("UID %d (%s) pubDate is zero, setting to time.Now().UTC()", atom.Episodes[idx].UID, atom.Episodes[idx].Title)
+					atom.Episodes[idx].PubDate.Time = time.Now().UTC()
+					updateAtom = true
 				}
 
 				// Upload artwork (data-in is free, so I did not bother making a smart upload function)
@@ -354,7 +401,7 @@ func processAllEpisodes(lameTemplate *template.Template, ffmpegTemplate *templat
 	if err != nil {
 		return err
 	}
-	for idx, _ := range atom.Episodes {
+	for idx := range atom.Episodes {
 		err := downloadEncodeUpload(lameTemplate, ffmpegTemplate, atom.Episodes[idx].UID, force)
 		if err != nil {
 			return err
@@ -384,7 +431,7 @@ func processEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.T
 
 // Returns true if string is in string slice
 func strSliceContains(slice []string, str string) bool {
-	for idx, _ := range slice {
+	for idx := range slice {
 		if slice[idx] == str {
 			return true
 		}
@@ -457,5 +504,9 @@ func Mp4Duration(filename string) (int64, time.Duration, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	return info.Size(), time.Duration(mp4.Moov.Mvhd.Duration), nil
+	if mp4 != nil && mp4.Moov != nil && mp4.Moov.Mvhd != nil {
+		return info.Size(), time.Duration(mp4.Moov.Mvhd.Duration) * time.Millisecond, nil
+	} else {
+		return 0, 0, fmt.Errorf("%s does not contain a Moov Mvhd box (maybe not an mp4?)", filename)
+	}
 }

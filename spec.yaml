@@ -2,7 +2,7 @@ atom: podcast.rss
 title: QZJ
 link: https://www.patreon.com/outsender
 pubDate: Mon, 21 Mar 2022 22:37:44 +0000
-lastBuildDate: Wed, 16 Nov 2022 23:07:02 +0000
+lastBuildDate: Fri, 25 Aug 2023 21:43:38 +0000
 ttl: 60
 language: sv
 copyright: Copyright SA6MWA 2020-2023 All Rights Reserved.
@@ -21,27 +21,63 @@ category: Technology
 encoding:
   bitrate: 128
   lamepath: /usr/bin/lame
-  ffmpegpath: ~/bin/ffmpeg
+  ffmpegpath: /home/sa6mwa/bin/ffmpeg
+  crf: 38
+  abr: 196k
   coverfront: artwork/qzj-1000x1000.jpeg
   genre: Podcast
   language: SWE
 episodes:
-- uid: 16
-  title: Bröstväskan Numbat från Helikon-Tex med prylar
+- uid: 17
+  title: Zenitkonceptet (video)
+  pubDate: Fri, 25 Aug 2023 21:43:21 +0000
   link: https://www.patreon.com/outsender
+  duration: "00:19:34"
+  author: SA6MWA
+  explicit: "no"
+  subtitle: Zenitkonceptet
   description: |-
-    Hur bra funkar det att bära sina mer väsentliga prylar hängandes från bröstet likt hur ett myrpungdjur (numbat) bär sina ungar? Avsnittet går igenom innehållet i mitt senaste sätt att bära småprylar samt en ytlig recension av bröstväskan Numbat från Helikon-Tex.
+    Zenitkonceptet är ett förslag hur man kan upprätta robust regional kortvågsförbindelse när det (t.ex redan idag) finns ett överhängande hot om telekrigföring.
 
-    I detta avsnittet provar jag formatet videopod där bilden fungerar som presentationsmaterial till pratet. Videoströmmen är enklare än rörlig bild och något av ett mellanting mellan video och pod, men där man ändå kan visuellt illustrera det som beskrivs i tal. Fungerar formatet i olika podspelare så kommer det troligen bli fler sådana avsnitt, speciellt när endast tal inte räcker.
+    Konceptet bygger på 3 punkter: Att kunna tolka jonogram, dalgång som antennplats och lågt hängade horisontell antenn. Det är NVIS - Near Vertical Incidence Skywave - i en förpackad version.
 
-    Chest Pack Numbat:
-    https://www.helikon-tex.com/en_eur/tb-nmb-cd-chest-pack-numbat.html
+    Videon går igenom hur man tolkar ett jonogram på ett mycket bättre sätt än jag gått igenom tidigare, vilket är grundläggande för att öva konceptet. Därtill upprättas en antenn och jag förevisar hur man kan testa teorin praktiskt med hjälp av en KiwiSDR-mottagare på internet utan att ha en motstation.
+
+    Samtliga försvarsmakter satsar idag mer och mer på kortvåg, speciellt de som tidigare förlitat sig på satellit- och repeaterlösningar. Många anser att dom förlorat kompetensen när man ersatta kortvåg med satellit- eller repeaterbaserade system. Zenitkonceptet är ämnat att erbjuda denna färdighet på ett förenklat, men ändå användbart sätt. Anledningen varför man satsar på kortvåg idag är att satellit- och repeater- eller basstationssystem är mycket mer sårbara för störning än kortvåg. Markbaserade system på UKV (VHF och UHF, etc) är av dess natur dessutom mer känsliga för pejling.
+
+    Stöd QZJ / Utesändaren på Patreon...
+    https://www.patreon.com/outsender
+
+    Musik under upprättandet av antennen: Rafael Krux - Guerilla Tactics
+    https://open.spotify.com/album/0L5oIKNyQ6SUQ5xYB2yfiu
+  type: video/mp4
+  length: 91786002
+  image: artwork/zenitkonceptet.jpeg
+  input: masters/outsender53-zenitkonceptet.mp4
+  output: outsender53-zenitkonceptet.mp4
+- uid: 16
+  title: Planering Under Tidspress (med video)
+  pubDate: Fri, 25 Aug 2023 17:21:32 +0000
+  link: https://www.patreon.com/outsender
+  duration: "00:20:12"
+  author: SA6MWA
+  explicit: "no"
+  subtitle: Podvideoformat av avsnitt 15 Planering Under Tidspress (PUT)
+  description: |-
+    Detta är avsnitt 15 av QZJ i podvideoformat och ett test inför kommande avsnitt att ha med en videoström som presentationsmaterial när talat inte räcker för att illustrera något.
+    ---
+
+    Grundläggande om metoden Planering Under Tidspress (PUT) av Peter Thunholm, originalet Recognitional Planning Model (RPM) samt Recognition-primed Decision Model (RPD) av Gary Klein och John F Schmitt.
+
+    Planering kan vara frustrerande och man vill bara ut och verkställa, men även de mest ivriga praktikerna inser att planering behövs. För oss som hatar långa planeringsmöten och planer som aldrig håller i verkligheten så är det fantastiskt att Planering Under Tidspress finns. Detta avsnittet går kortfattat igenom metoden, dess värde och underförstått varför Svenska Försvarsmakten använder metoden nästan uteslutande från åtminstone bataljon och nedåt - den är helt enkelt grym för otåliga taktiker. Jag utgår ifrån ett mer generellt tillämpningsperspektiv och menar att metoden går att utnyttja i all verksamhet man vill planera.
 
     Stöd QZJ Utesändaren på Patreon:
     https://www.patreon.com/outsender
-  author: SA6MWA
-  explicit: "no"
-  subtitle: Helikon-Tex Chest Pack Numbat med väsentliga prylar för uteliv, m.m
+  type: video/mp4
+  length: 53409017
+  image: artwork/qzj-3000x3000.jpeg
+  input: masters/qzj015-planering-under-tidspress-video.mp4
+  output: qzj015-planering-under-tidspress-video.mp4
 - uid: 15
   title: 015 Planering Under Tidspress
   pubDate: Fri, 25 Mar 2022 16:00:13 +0000
