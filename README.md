@@ -33,6 +33,25 @@ will be an audio-only episode).
 $ ls
 podspec.yaml
 
+$ mkpod -h
+NAME:
+   mkpod - Tool to render a podcast rss feed from spec, automate mp3/mp4 encoding and publish to Amazon S3.
+
+USAGE:
+   mkpod [global options] command [command options] [arguments...]
+
+COMMANDS:
+   parse, p   Parse Go template using public and private specification yaml
+   encode, e  Encode and upload single or all output files in podspec.yaml
+   help, h    Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --help, -h  show help
+
+COPYRIGHT:
+   Copyright SA6MWA 2022-2023 sa6mwa@gmail.com, https://github.com/sa6mwa/mkpod
+
+
 # Encode all episodes in podspec.yaml
 $ mkpod e -a
 
