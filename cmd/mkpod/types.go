@@ -10,6 +10,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -23,6 +24,12 @@ import (
 	"github.com/sa6mwa/mp3duration"
 	"gopkg.in/yaml.v2"
 )
+
+type Templates struct {
+	Lame         *template.Template
+	Ffmpeg       *template.Template
+	FfmpegToLame *template.Template
+}
 
 type AwsHandler struct {
 	Session *session.Session
@@ -405,6 +412,7 @@ type Episode struct {
 	Image       string         `yaml:"image"`
 	Input       string         `yaml:"input"`
 	Output      string         `yaml:"output"`
+	Format      string         `yaml:"format"`
 }
 
 type Rss struct {

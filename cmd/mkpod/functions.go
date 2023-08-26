@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -231,7 +230,7 @@ func getCombined(episode Episode) Combined {
 // This function downloads a single episode's (selected by UID) input file,
 // encodes it to mp3, resolves the mp3 files length and duration, and uploads it
 // to the output S3 bucket.
-func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *template.Template, uid int64, force bool) error {
+func downloadEncodeUpload(tmpl *Templates, uid int64, force bool) error {
 	if idx := atom.ContainsEpisode(uid); idx >= 0 {
 		if strings.TrimSpace(atom.Episodes[idx].Input) == "" {
 			return fmt.Errorf("input is missing for UID %d (%s)", atom.Episodes[idx].UID, atom.Episodes[idx].Title)
@@ -263,33 +262,67 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					return err
 				}
 
-				// if input content type is video/*, we are to encode it using ffmpeg to an mp4.
+				// if input content type is video/* and format is not "audio",
+				// we are to encode it using ffmpeg to an mp4. If format is
+				// "audio", drop the video stream and encode an mp3 (audio
+				// only).
 				if strings.HasPrefix(inputContentType, "video/") {
-					atom.Episodes[idx].Output = ExtensionToBaseMp4(atom.Episodes[idx].Input)
-					updateAtom = true
-					combined := getCombined(atom.Episodes[idx])
-					buf := &bytes.Buffer{}
-					err = ffmpegTemplate.Execute(buf, combined)
-					if err != nil {
-						return err
+					format := strings.TrimSpace(strings.ToLower(atom.Episodes[idx].Format))
+					if format == "" || format == "video" || format == "mp4" {
+						atom.Episodes[idx].Output = ExtensionToBaseMp4(atom.Episodes[idx].Input)
+						updateAtom = true
+						combined := getCombined(atom.Episodes[idx])
+						buf := &bytes.Buffer{}
+						err = tmpl.Ffmpeg.Execute(buf, combined)
+						if err != nil {
+							return err
+						}
+						log.Printf("Executing: %s", buf.String())
+						cmd := exec.Command(shell, shellCommandOption, buf.String())
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						err = cmd.Run()
+						if err != nil {
+							return fmt.Errorf("unable to encode using external encoder (ffmpeg): %w", err)
+						}
+						// Update atom with the length and duration of the encoded mp4.
+						size, duration, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
+						if err != nil {
+							return err
+						}
+						log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, duration, size, specFile)
+						atom.Episodes[idx].Length = size
+						atom.Episodes[idx].Duration.Duration = duration
+					} else if format == "audio" || format == "mp3" {
+						atom.Episodes[idx].Output = ExtensionToBaseMp3(atom.Episodes[idx].Input)
+						updateAtom = true
+						combined := getCombined(atom.Episodes[idx])
+						buf := &bytes.Buffer{}
+						err = tmpl.FfmpegToLame.Execute(buf, combined)
+						if err != nil {
+							return err
+						}
+						log.Printf("Executing: %s", buf.String())
+						cmd := exec.Command(shell, shellCommandOption, buf.String())
+						cmd.Stdin = os.Stdin
+						cmd.Stdout = os.Stdout
+						cmd.Stderr = os.Stderr
+						err = cmd.Run()
+						if err != nil {
+							return fmt.Errorf("unable to encode to audio using extern encoders (ffmpeg and lame): %w", err)
+						}
+						// Update atom with the length and duration of the encoded mp3.
+						di, err := mp3duration.ReadFile(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
+						if err != nil {
+							return err
+						}
+						log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, di.Duration, di.Length, specFile)
+						atom.Episodes[idx].Length = di.Length
+						atom.Episodes[idx].Duration.Duration = di.TimeDuration
+					} else {
+						return fmt.Errorf("unknown format %q, possibly values: video (default), audio", format)
 					}
-					log.Printf("Executing: %s", buf.String())
-					cmd := exec.Command(shell, shellCommandOption, buf.String())
-					cmd.Stdin = os.Stdin
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					err = cmd.Run()
-					if err != nil {
-						return fmt.Errorf("unable to encode using external encoder (ffmpeg): %w", err)
-					}
-					// Update atom with the length and duration of the encoded mp4.
-					size, duration, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return err
-					}
-					log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, duration, size, specFile)
-					atom.Episodes[idx].Length = size
-					atom.Episodes[idx].Duration.Duration = duration
 					// Upload output mp4 to output S3 bucket.
 					contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
@@ -310,7 +343,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					updateAtom = true
 					combined := getCombined(atom.Episodes[idx])
 					buf := &bytes.Buffer{}
-					err = lameTemplate.Execute(buf, combined)
+					err = tmpl.Lame.Execute(buf, combined)
 					if err != nil {
 						return err
 					}
@@ -372,14 +405,14 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 
 // Function will iterate all episodes and download, encode, upload any episode
 // with an empty output filename.
-func processAllEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.Template, force bool) error {
+func processAllEpisodes(tmpl *Templates, force bool) error {
 	// We need to download the coverfront image in order to encode anything.
 	err := awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Encoding.Coverfront)
 	if err != nil {
 		return err
 	}
 	for idx := range atom.Episodes {
-		err := downloadEncodeUpload(lameTemplate, ffmpegTemplate, atom.Episodes[idx].UID, force)
+		err := downloadEncodeUpload(tmpl, atom.Episodes[idx].UID, force)
 		if err != nil {
 			return err
 		}
@@ -387,7 +420,7 @@ func processAllEpisodes(lameTemplate *template.Template, ffmpegTemplate *templat
 	return nil
 }
 
-func processEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.Template, uidStrings []string, force bool) error {
+func processEpisodes(tmpl *Templates, uidStrings []string, force bool) error {
 	// We need to download the coverfront image in order to encode anything.
 	err := awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Encoding.Coverfront)
 	if err != nil {
@@ -398,7 +431,7 @@ func processEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.T
 		if err != nil {
 			return fmt.Errorf("must specify the UID integer of the episode to process: %w", err)
 		}
-		err = downloadEncodeUpload(lameTemplate, ffmpegTemplate, uid, force)
+		err = downloadEncodeUpload(tmpl, uid, force)
 		if err != nil {
 			return fmt.Errorf("error processing episode with UID %d: %w", uid, err)
 		}

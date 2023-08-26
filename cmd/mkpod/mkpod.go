@@ -17,17 +17,17 @@ import (
 var rssTemplate string
 
 var (
-	atom Atom
-	//origAtom       Rss
-	//templateFile          string
-	specFile              string
-	awsHandler            AwsHandler
-	askNoQuestions        bool   = false
-	dryRun                bool   = false
-	lameCommandTemplate   string = defaultLameCommandTemplate
-	ffmpegCommandTemplate string = defaultFfmpegCommandTemplate
-	updateAtom            bool   = false
-	processCounter        int    = 0
+	atom                         Atom
+	specFile                     string
+	awsHandler                   AwsHandler
+	askNoQuestions               bool       = false
+	dryRun                       bool       = false
+	lameCommandTemplate          string     = defaultLameCommandTemplate
+	ffmpegCommandTemplate        string     = defaultFfmpegCommandTemplate
+	ffmpegToAudioCommandTemplate string     = defaultFfmpegToAudioCommandTemplate
+	templates                    *Templates = &Templates{}
+	updateAtom                   bool       = false
+	processCounter               int        = 0
 )
 
 const (
@@ -44,6 +44,8 @@ const (
 	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i "{{ print $PRE .Episode.Input }}" -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} "{{ print $PRE .Episode.Output }}"`
 
 	//		defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -r 25 -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -g 12 -bf 2 -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
+
+	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i "{{ print $PRE .Episode.Input }}" -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .Atom.Encoding.Language }}" --tt "{{ .Episode.Title }}" --ta "{{ .Atom.Author }}" --tl "{{ .Atom.Title }}" --ty "{{ .Episode.PubDate.Format "2006" }}" --tc "{{ .Episode.Description }}" --tn "{{ .Episode.UID }}" --tg "{{ .Atom.Encoding.Genre }}" --ti "{{ print $PRE .Atom.Encoding.Coverfront }}" --tv WOAR="{{ .Atom.Link }}" - "{{ print $PRE .Episode.Output }}"`
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -271,23 +273,27 @@ func encoder(c *cli.Context) error {
 		return err
 	}
 
-	lameTemplate, err := template.New("lame").Parse(lameCommandTemplate)
+	// Parse Go templates.
+	templates.Lame, err = template.New("lame").Parse(lameCommandTemplate)
 	if err != nil {
 		return err
 	}
-
-	ffmpegTemplate, err := template.New("ffmpeg").Parse(ffmpegCommandTemplate)
+	templates.Ffmpeg, err = template.New("ffmpeg").Parse(ffmpegCommandTemplate)
+	if err != nil {
+		return err
+	}
+	templates.FfmpegToLame, err = template.New("ffmpegToLame").Parse(ffmpegToAudioCommandTemplate)
 	if err != nil {
 		return err
 	}
 
 	if c.Bool("all") {
-		err = processAllEpisodes(lameTemplate, ffmpegTemplate, askNoQuestions)
+		err = processAllEpisodes(templates, askNoQuestions)
 		if err != nil {
 			return err
 		}
 	} else {
-		err = processEpisodes(lameTemplate, ffmpegTemplate, c.Args().Slice(), askNoQuestions)
+		err = processEpisodes(templates, c.Args().Slice(), askNoQuestions)
 		if err != nil {
 			return err
 		}
