@@ -39,14 +39,14 @@ encoding:
   genre: Podcast
   language: SWE
 episodes:
-- uid: 17
-  title: Zenitkonceptet (video)
-  pubDate: Fri, 25 Aug 2023 21:43:21 +0000
+- uid: 16
+  title: Zenitkonceptet
+  pubDate: Fri, 20 Mar 2020 18:00:00 +0000
   link: https://www.patreon.com/outsender
   duration: "00:19:34"
   author: SA6MWA
   explicit: "no"
-  subtitle: Zenitkonceptet
+  subtitle: Kortvågskommunikation i en omstridd miljö
   description: |-
     Zenitkonceptet är ett förslag hur man kan upprätta robust regional kortvågsförbindelse när det (t.ex redan idag) finns ett överhängande hot om telekrigföring.
 
@@ -56,39 +56,24 @@ episodes:
 
     Samtliga försvarsmakter satsar idag mer och mer på kortvåg, speciellt de som tidigare förlitat sig på satellit- och repeaterlösningar. Många anser att dom förlorat kompetensen när man ersatta kortvåg med satellit- eller repeaterbaserade system. Zenitkonceptet är ämnat att erbjuda denna färdighet på ett förenklat, men ändå användbart sätt. Anledningen varför man satsar på kortvåg idag är att satellit- och repeater- eller basstationssystem är mycket mer sårbara för störning än kortvåg. Markbaserade system på UKV (VHF och UHF, etc) är av dess natur dessutom mer känsliga för pejling.
 
-    Stöd QZJ / Utesändaren på Patreon...
+    Se video om Zenitkonceptet på YouTube eller på QZJ Video:
+    https://youtu.be/CsXpRmljY94
+    https://podcasts.apple.com/us/podcast/qzj-video/id1704487610?i=1000625769395
+
+    QZJ Video RSS:
+    https://qzjvideo.s3.eu-west-1.amazonaws.com/videopod.rss
+
+    Stöd QZJ / Utesändaren på Patreon:
     https://www.patreon.com/outsender
 
     Musik under upprättandet av antennen: Rafael Krux - Guerilla Tactics
     https://open.spotify.com/album/0L5oIKNyQ6SUQ5xYB2yfiu
-  type: video/mp4
-  length: 91786002
-  image: artwork/zenitkonceptet.jpeg
-  input: masters/outsender53-zenitkonceptet.mp4
-  output: outsender53-zenitkonceptet.mp4
-- uid: 16
-  title: Planering Under Tidspress (med video)
-  pubDate: Fri, 25 Aug 2023 17:21:32 +0000
-  link: https://www.patreon.com/outsender
-  duration: "00:20:12"
-  author: SA6MWA
-  explicit: "no"
-  subtitle: Podvideoformat av avsnitt 15 Planering Under Tidspress (PUT)
-  description: |-
-    Detta är avsnitt 15 av QZJ i podvideoformat och ett test inför kommande avsnitt att ha med en videoström som presentationsmaterial när talat inte räcker för att illustrera något.
-    ---
-
-    Grundläggande om metoden Planering Under Tidspress (PUT) av Peter Thunholm, originalet Recognitional Planning Model (RPM) samt Recognition-primed Decision Model (RPD) av Gary Klein och John F Schmitt.
-
-    Planering kan vara frustrerande och man vill bara ut och verkställa, men även de mest ivriga praktikerna inser att planering behövs. För oss som hatar långa planeringsmöten och planer som aldrig håller i verkligheten så är det fantastiskt att Planering Under Tidspress finns. Detta avsnittet går kortfattat igenom metoden, dess värde och underförstått varför Svenska Försvarsmakten använder metoden nästan uteslutande från åtminstone bataljon och nedåt - den är helt enkelt grym för otåliga taktiker. Jag utgår ifrån ett mer generellt tillämpningsperspektiv och menar att metoden går att utnyttja i all verksamhet man vill planera.
-
-    Stöd QZJ Utesändaren på Patreon:
-    https://www.patreon.com/outsender
-  type: video/mp4
-  length: 53409017
+  type: audio/mpeg
+  length: 18902992
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj015-planering-under-tidspress-video.mp4
-  output: qzj015-planering-under-tidspress-video.mp4
+  input: videopod/masters/outsender53-zenitkonceptet.mp4
+  output: outsender53-zenitkonceptet.mp3
+  format: audio
 - uid: 15
   title: 015 Planering Under Tidspress
   pubDate: Fri, 25 Mar 2022 16:00:13 +0000
@@ -107,8 +92,9 @@ episodes:
   type: audio/mpeg
   length: 19509907
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj015.flac
+  input: audiopod/masters/qzj015.flac
   output: qzj015.mp3
+  format: ""
 - uid: 14
   title: 014 Arke
   pubDate: Fri, 15 Oct 2021 10:00:20 +0000
@@ -134,8 +120,9 @@ episodes:
   type: audio/mpeg
   length: 41189607
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj014.flac
+  input: audiopod/masters/qzj014.flac
   output: qzj014.mp3
+  format: ""
 - uid: 13
   title: 013 Normaltaktikens nya kläder
   pubDate: Fri, 24 Sep 2021 10:00:09 +0000
@@ -159,8 +146,9 @@ episodes:
   type: audio/mpeg
   length: 35301615
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj013.flac
+  input: audiopod/masters/qzj013.flac
   output: qzj013.mp3
+  format: ""
 - uid: 12
   title: 012 Scrum och Uppdragstaktik
   pubDate: Fri, 13 Aug 2021 10:00:06 +0000
@@ -180,8 +168,9 @@ episodes:
   type: audio/mpeg
   length: 54245343
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj012.flac
+  input: audiopod/masters/qzj012.flac
   output: qzj012.mp3
+  format: ""
 - uid: 11
   title: 011 Så lär du dig Morsekod
   pubDate: Fri, 02 Jul 2021 13:00:00 +0000
@@ -198,8 +187,9 @@ episodes:
   type: audio/mpeg
   length: 36597033
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj011.flac
+  input: audiopod/masters/qzj011.flac
   output: qzj011.mp3
+  format: ""
 - uid: 10
   title: 010 HF Non-Cooperative Target Recognition (HFNCTR)
   pubDate: Fri, 05 Mar 2021 16:00:02 +0000
@@ -221,8 +211,9 @@ episodes:
   type: audio/mpeg
   length: 15156624
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj010.flac
+  input: audiopod/masters/qzj010.flac
   output: qzj010.mp3
+  format: ""
 - uid: 9
   title: 009 Utesändaren blickar bakåt och framåt
   pubDate: Fri, 19 Feb 2021 17:00:25 +0000
@@ -243,8 +234,9 @@ episodes:
   type: audio/mpeg
   length: 24901245
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj009.flac
+  input: audiopod/masters/qzj009.flac
   output: qzj009.mp3
+  format: ""
 - uid: 8
   title: 008 Genomgång CW QSO och förkortningar
   pubDate: Sat, 30 Jan 2021 14:42:05 +0000
@@ -260,8 +252,9 @@ episodes:
   type: audio/mpeg
   length: 51396959
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj008.flac
+  input: audiopod/masters/qzj008.flac
   output: qzj008.mp3
+  format: ""
 - uid: 7
   title: 007 Morsealfabetet
   pubDate: Mon, 01 Mar 2021 17:00:12 +0000
@@ -277,8 +270,9 @@ episodes:
   type: audio/mpeg
   length: 23604161
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj007.flac
+  input: audiopod/masters/qzj007.flac
   output: qzj007.mp3
+  format: ""
 - uid: 6
   title: 006 HNY Introduktion till Morsekod
   pubDate: Sat, 23 Jan 2021 10:06:39 +0000
@@ -297,8 +291,9 @@ episodes:
   type: audio/mpeg
   length: 26676407
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj006.flac
+  input: audiopod/masters/qzj006.flac
   output: qzj006.mp3
+  format: ""
 - uid: 5
   title: 005 Eftersnack QZJ003
   pubDate: Sat, 06 Mar 2021 08:00:02 +0000
@@ -313,8 +308,9 @@ episodes:
   type: audio/mpeg
   length: 41508889
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj005eftersnack003.flac
+  input: audiopod/masters/qzj005eftersnack003.flac
   output: qzj005eftersnack003.mp3
+  format: ""
 - uid: 4
   title: 004 7S
   pubDate: Sun, 29 Nov 2020 01:08:03 +0000
@@ -332,8 +328,9 @@ episodes:
   type: audio/mpeg
   length: 33316835
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj004.flac
+  input: audiopod/masters/qzj004.flac
   output: qzj004.mp3
+  format: ""
 - uid: 3
   title: 003 Radiokommunikation för effektiv ledning och komplexa system
   pubDate: Wed, 25 Nov 2020 23:59:47 +0000
@@ -353,8 +350,9 @@ episodes:
   type: audio/mpeg
   length: 34533217
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj003.flac
+  input: audiopod/masters/qzj003.flac
   output: qzj003.mp3
+  format: ""
 - uid: 2
   title: 002 Erfarenheter från en framskjuten ledningsplats
   pubDate: Wed, 25 Nov 2020 23:58:24 +0000
@@ -375,8 +373,9 @@ episodes:
   type: audio/mpeg
   length: 30965363
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj002.flac
+  input: audiopod/masters/qzj002.flac
   output: qzj002.mp3
+  format: ""
 - uid: 1
   title: 001 Utesändaren blir också en podcast
   pubDate: Mon, 23 Nov 2020 00:36:03 +0000
@@ -393,5 +392,6 @@ episodes:
   type: audio/mpeg
   length: 15413570
   image: artwork/qzj-3000x3000.jpeg
-  input: masters/qzj001.flac
+  input: audiopod/masters/qzj001.flac
   output: qzj001.mp3
+  format: ""
