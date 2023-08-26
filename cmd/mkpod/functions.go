@@ -24,59 +24,33 @@ import (
 
 // Generic functions used in more than one cli command of mkpod.go.
 
+// resolvetilde returns path where initial tilde (~) is replaced by
+// os.UserHomeDir().
+func resolvetilde(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		dirname, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		return filepath.Join(dirname, path[2:])
+	}
+	return path
+}
+
 func loadConfig() error {
 	sf, err := os.Open(specFile)
 	if err != nil {
 		return err
 	}
 	atomYaml, err := ioutil.ReadAll(sf)
-	if err != nil {
-		return err
-	}
 	sf.Close()
-	pcf, err := os.Open(privateFile)
 	if err != nil {
 		return err
 	}
-	privateYaml, err := ioutil.ReadAll(pcf)
-	if err != nil {
-		return err
-	}
-	pcf.Close()
+
 	err = yaml.Unmarshal(atomYaml, &atom)
 	if err != nil {
 		return err
-	}
-	err = yaml.Unmarshal(privateYaml, &private)
-	if err != nil {
-		return err
-	}
-
-	// Resolve initial tilde in localStorageDir property.
-	if strings.HasPrefix(private.LocalStorageDir, "~/") {
-		dirname, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		private.LocalStorageDir = filepath.Join(dirname, private.LocalStorageDir[2:])
-	}
-
-	// Resolve tilde in lamepath.
-	if strings.HasPrefix(atom.Encoding.Lamepath, "~/") {
-		dirname, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		atom.Encoding.Lamepath = filepath.Join(dirname, atom.Encoding.Lamepath[2:])
-	}
-
-	// Resolve tilde in ffmpegpath.
-	if strings.HasPrefix(atom.Encoding.Ffmpegpath, "~/") {
-		dirname, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		atom.Encoding.Ffmpegpath = filepath.Join(dirname, atom.Encoding.Ffmpegpath[2:])
 	}
 
 	// Set defaults
@@ -84,7 +58,7 @@ func loadConfig() error {
 	if atom.Encoding.CRF == 0 {
 		atom.Encoding.CRF = 28
 	}
-	if atom.Encoding.ABR == "" {
+	if strings.TrimSpace(atom.Encoding.ABR) == "" {
 		atom.Encoding.ABR = "196k"
 	}
 
@@ -159,15 +133,19 @@ func basicAtomValidation() error {
 	if len(atom.Description) < 1 || len(atom.Title) < 1 {
 		return fmt.Errorf("title and description must not be empty in %s", specFile)
 	}
-	fs, err := os.Stat(atom.Encoding.Lamepath)
-	if err != nil {
-		return fmt.Errorf("unable to stat %s: %v", atom.Encoding.Lamepath, err)
-	}
-	if fs.IsDir() {
-		return fmt.Errorf("%s is a directory, should be path to the lame audio encoder", atom.Encoding.Lamepath)
-	}
-	if !(fs.Mode()&0111 != 0) { // !IsExecAny
-		return fmt.Errorf("%s is not an executable", atom.Encoding.Lamepath)
+	// Validate executables
+	executables := []string{atom.LamepathExpanded(), atom.FfmpegpathExpanded()}
+	for _, e := range executables {
+		fs, err := os.Stat(e)
+		if err != nil {
+			return fmt.Errorf("unable to stat %s: %v", e, err)
+		}
+		if fs.IsDir() {
+			return fmt.Errorf("%s is a directory, should be path to executable", e)
+		}
+		if !(fs.Mode()&0111 != 0) { // !IsExecAny
+			return fmt.Errorf("%s is not an executable", e)
+		}
 	}
 	return nil
 }
@@ -192,31 +170,31 @@ func validateAtom() error {
 		}
 		if e.Length < 1 {
 			log.Printf("WARNING: length field (%s size in bytes) of episode with uid %d (%s) is zero.", e.Output, e.UID, e.Title)
-			if doAction("Ask AWS for the ContentLength of s3://%s?", path.Join(private.Aws.Buckets.Output, e.Output)) {
-				size, err := awsHandler.GetSize(private.Aws.Buckets.Output, e.Output)
+			if doAction("Ask AWS for the ContentLength of s3://%s?", path.Join(atom.Config.Aws.Buckets.Output, e.Output)) {
+				size, err := awsHandler.GetSize(atom.Config.Aws.Buckets.Output, e.Output)
 				if err != nil {
 					return err
 				}
-				log.Printf("Size of s3://%s is %d (%s will be updated)", path.Join(private.Aws.Buckets.Output, e.Output), size, specFile)
+				log.Printf("Size of s3://%s is %d (%s will be updated)", path.Join(atom.Config.Aws.Buckets.Output, e.Output), size, specFile)
 				atom.Episodes[i].Length = size
 				updateAtom = true
 			}
 		}
 		if e.Duration.Duration < (time.Duration(1) * time.Second) {
 			log.Printf("WARNING: duration is too short for episode with uid %d (%s).", e.UID, e.Title)
-			if doAction("Download s3://%s and resolve duration?", path.Join(private.Aws.Buckets.Output, e.Output)) {
-				err := awsHandler.Download(private.Aws.Buckets.Output, e.Output)
+			if doAction("Download s3://%s and resolve duration?", path.Join(atom.Config.Aws.Buckets.Output, e.Output)) {
+				err := awsHandler.Download(atom.Config.Aws.Buckets.Output, e.Output)
 				if err != nil {
 					return err
 				}
 
-				contentType, err := GetFileContentType(path.Join(private.LocalStorageDir, e.Output))
+				contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), e.Output))
 				if err != nil {
 					return err
 				}
 				if strings.HasPrefix(contentType, "video/") {
 					// Assume it's an mp4
-					l, d, err := Mp4Duration(path.Join(private.LocalStorageDir, e.Output))
+					l, d, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), e.Output))
 					if err != nil {
 						return err
 					}
@@ -226,7 +204,7 @@ func validateAtom() error {
 					updateAtom = true
 				} else {
 					// Assume it's an mp3
-					di, err := mp3duration.ReadFile(path.Join(private.LocalStorageDir, e.Output))
+					di, err := mp3duration.ReadFile(path.Join(atom.LocalStorageDirExpanded(), e.Output))
 					if err != nil {
 						return err
 					}
@@ -243,11 +221,10 @@ func validateAtom() error {
 
 // Returns a struct combining full atom, private and the episode (for use with
 // the lameCommandTemplate or ffmpegCommandTemplate).
-func getCombined(episode Episode) map[string]interface{} {
-	return map[string]interface{}{
-		"atom":    atom,
-		"private": private,
-		"episode": episode,
+func getCombined(episode Episode) Combined {
+	return Combined{
+		Atom:    &atom,
+		Episode: &episode,
 	}
 }
 
@@ -261,26 +238,26 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 		}
 		if len(atom.Episodes[idx].Output) < 3 || force {
 			// Download input file, encode it and upload the output file.
-			if doAction("Download s3://%s, encode and upload to s3://%s?", path.Join(private.Aws.Buckets.Input, atom.Episodes[idx].Input), private.Aws.Buckets.Output) {
+			if doAction("Download s3://%s, encode and upload to s3://%s?", path.Join(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Input), atom.Config.Aws.Buckets.Output) {
 				// Start by downloading the artwork.
 				if strings.TrimSpace(atom.Episodes[idx].Image) == "" {
-					if strings.TrimSpace(private.DefaultPodImage) == "" {
-						return fmt.Errorf("no image defined for UID %d and defaultPodImage is empty in %s", atom.Episodes[idx].UID, privateFile)
+					if strings.TrimSpace(atom.Config.DefaultPodImage) == "" {
+						return fmt.Errorf("no image defined for UID %d and defaultPodImage is empty in %s", atom.Episodes[idx].UID, specFile)
 					}
-					log.Printf("Using %s as default episode image", private.DefaultPodImage)
-					atom.Episodes[idx].Image = private.DefaultPodImage
+					log.Printf("Using %s as default episode image", atom.Config.DefaultPodImage)
+					atom.Episodes[idx].Image = atom.Config.DefaultPodImage
 					updateAtom = true
 				}
-				err := awsHandler.Download(private.Aws.Buckets.Input, atom.Episodes[idx].Image)
+				err := awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Image)
 				if err != nil {
 					return err
 				}
-				err = awsHandler.Download(private.Aws.Buckets.Input, atom.Episodes[idx].Input)
+				err = awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Input)
 				if err != nil {
 					return err
 				}
 
-				inputPath := path.Join(private.LocalStorageDir, atom.Episodes[idx].Input)
+				inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Input)
 				inputContentType, err := GetFileContentType(inputPath)
 				if err != nil {
 					return err
@@ -306,7 +283,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 						return fmt.Errorf("unable to encode using external encoder (ffmpeg): %w", err)
 					}
 					// Update atom with the length and duration of the encoded mp4.
-					size, duration, err := Mp4Duration(path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					size, duration, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
 						return err
 					}
@@ -314,13 +291,13 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					atom.Episodes[idx].Length = size
 					atom.Episodes[idx].Duration.Duration = duration
 					// Upload output mp4 to output S3 bucket.
-					contentType, err := GetFileContentType(path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
-						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(private.LocalStorageDir, atom.Episodes[idx].Output), err)
+						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output), err)
 					}
 					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
 					atom.Episodes[idx].Type = contentType
-					err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
 						return err
 					}
@@ -347,7 +324,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 						return fmt.Errorf("unable to encode using external encoder (lame): %w", err)
 					}
 					// Update atom with the length and duration of the encoded mp3.
-					di, err := mp3duration.ReadFile(path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					di, err := mp3duration.ReadFile(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
 						return err
 					}
@@ -355,13 +332,13 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 					atom.Episodes[idx].Length = di.Length
 					atom.Episodes[idx].Duration.Duration = di.TimeDuration
 					// Upload output mp3 to output S3 bucket.
-					contentType, err := GetFileContentType(path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
-						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(private.LocalStorageDir, atom.Episodes[idx].Output), err)
+						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output), err)
 					}
 					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
 					atom.Episodes[idx].Type = contentType
-					err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(private.LocalStorageDir, atom.Episodes[idx].Output))
+					err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
 					if err != nil {
 						return err
 					}
@@ -375,12 +352,12 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 				}
 
 				// Upload artwork (data-in is free, so I did not bother making a smart upload function)
-				contentType, err := GetFileContentType(path.Join(private.LocalStorageDir, atom.Episodes[idx].Image))
+				contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image))
 				if err != nil {
-					return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(private.LocalStorageDir, atom.Episodes[idx].Image), err)
+					return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image), err)
 				}
 				log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Image, contentType)
-				err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Episodes[idx].Image, contentType, path.Join(private.LocalStorageDir, atom.Episodes[idx].Image))
+				err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Image, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image))
 				if err != nil {
 					return err
 				}
@@ -397,7 +374,7 @@ func downloadEncodeUpload(lameTemplate *template.Template, ffmpegTemplate *templ
 // with an empty output filename.
 func processAllEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.Template, force bool) error {
 	// We need to download the coverfront image in order to encode anything.
-	err := awsHandler.Download(private.Aws.Buckets.Input, atom.Encoding.Coverfront)
+	err := awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Encoding.Coverfront)
 	if err != nil {
 		return err
 	}
@@ -412,7 +389,7 @@ func processAllEpisodes(lameTemplate *template.Template, ffmpegTemplate *templat
 
 func processEpisodes(lameTemplate *template.Template, ffmpegTemplate *template.Template, uidStrings []string, force bool) error {
 	// We need to download the coverfront image in order to encode anything.
-	err := awsHandler.Download(private.Aws.Buckets.Input, atom.Encoding.Coverfront)
+	err := awsHandler.Download(atom.Config.Aws.Buckets.Input, atom.Encoding.Coverfront)
 	if err != nil {
 		return err
 	}
@@ -440,19 +417,19 @@ func strSliceContains(slice []string, str string) bool {
 }
 
 func createLocalStorageDir() error {
-	dirPaths := []string{path.Dir(path.Join(private.LocalStorageDir, atom.Atom))}
+	dirPaths := []string{atom.LocalStorageDirExpanded()}
 	if len(atom.Encoding.Coverfront) > 0 {
-		dirPaths = append(dirPaths, path.Dir(path.Join(private.LocalStorageDir, atom.Encoding.Coverfront)))
+		dirPaths = append(dirPaths, path.Dir(path.Join(atom.LocalStorageDirExpanded(), atom.Encoding.Coverfront)))
 	}
 	for _, e := range atom.Episodes {
 		if len(e.Output) != 0 {
-			dirToAdd := path.Dir(path.Join(private.LocalStorageDir, e.Output))
+			dirToAdd := path.Dir(path.Join(atom.LocalStorageDirExpanded(), e.Output))
 			if !strSliceContains(dirPaths, dirToAdd) {
 				dirPaths = append(dirPaths, dirToAdd)
 			}
 		}
 		if len(e.Input) != 0 {
-			dirToAdd := path.Dir(path.Join(private.LocalStorageDir, e.Input))
+			dirToAdd := path.Dir(path.Join(atom.LocalStorageDirExpanded(), e.Input))
 			if !strSliceContains(dirPaths, dirToAdd) {
 				dirPaths = append(dirPaths, dirToAdd)
 			}

@@ -33,9 +33,9 @@ type AwsHandler struct {
 // (loadConfig() is required before calling this function).
 func (s *AwsHandler) NewSession() {
 	s.Session = session.Must(session.NewSessionWithOptions(session.Options{
-		Profile: private.Aws.Profile,
+		Profile: atom.Config.Aws.Profile,
 		Config: aws.Config{
-			Region: aws.String(private.Aws.Region),
+			Region: aws.String(atom.Config.Aws.Region),
 		},
 	}))
 	s.S3 = s3.New(s.Session)
@@ -54,7 +54,17 @@ func (s *AwsHandler) Diff(bucket string, key string, file string) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return err
+		if awsErr, ok := err.(awserr.Error); ok {
+			switch awsErr.Code() {
+			case "NotFound", "NoSuchKey":
+				log.Printf("Skipping diff of %s: s3://%s: %v", file, path.Join(bucket, key), err)
+				return nil
+			default:
+				return err
+			}
+		} else {
+			return err
+		}
 	}
 	log.Printf("Downloaded %d bytes from s3://%s into buffer", n, path.Join(bucket, key))
 
@@ -92,9 +102,9 @@ func (s *AwsHandler) Upload(bucket string, key string, contentType string, file 
 // property in private.yaml (running loadConfig() prior to calling this function
 // is required).
 func (s *AwsHandler) Download(bucket string, key string) error {
-	log.Printf("Downloading s3://%s to %s", path.Join(bucket, key), path.Join(private.LocalStorageDir, key))
+	log.Printf("Downloading s3://%s to %s", path.Join(bucket, key), path.Join(atom.LocalStorageDirExpanded(), key))
 	downloader := s3manager.NewDownloader(s.Session)
-	completePath := path.Join(private.LocalStorageDir, key)
+	completePath := path.Join(atom.LocalStorageDirExpanded(), key)
 	dirPath := path.Dir(completePath)
 	err := os.MkdirAll(dirPath, 0755)
 	if err != nil {
@@ -122,7 +132,7 @@ func (s *AwsHandler) Download(bucket string, key string) error {
 		if err != nil {
 			if awsErr, ok := err.(awserr.Error); ok {
 				switch awsErr.Code() {
-				case "NotFound":
+				case "NotFound", "NoSuchKey":
 					log.Printf("s3://%s does not exist, will use local file %s only", path.Join(bucket, key), completePath)
 					return nil
 				default:
@@ -281,12 +291,16 @@ func (d ItunesDuration) String() string {
 	return mp3duration.FormatDuration(d.Duration)
 }
 
-type PrivateConfig struct {
+type Config struct {
 	BaseURL         string    `yaml:"baseURL"`
 	Image           string    `yaml:"image"`
 	DefaultPodImage string    `yaml:"defaultPodImage"`
 	Aws             AwsConfig `yaml:"aws"`
 	LocalStorageDir string    `yaml:"localStorageDir"`
+}
+
+func (c *Config) LocalStorageDirExpanded() string {
+	return resolvetilde(c.LocalStorageDir)
 }
 
 type AwsConfig struct {
@@ -301,6 +315,7 @@ type Buckets struct {
 }
 
 type Atom struct {
+	Config        Config         `yaml:"config"`
 	Atom          string         `yaml:"atom"`
 	Title         string         `yaml:"title"`
 	Link          string         `yaml:"link"`
@@ -331,10 +346,25 @@ type Atom struct {
 	Episodes []Episode `yaml:"episodes"`
 }
 
+type Combined struct {
+	Atom    *Atom
+	Episode *Episode
+}
+
+func (a *Atom) LocalStorageDirExpanded() string {
+	return a.Config.LocalStorageDirExpanded()
+}
+func (a *Atom) LamepathExpanded() string {
+	return resolvetilde(a.Encoding.Lamepath)
+}
+func (a *Atom) FfmpegpathExpanded() string {
+	return resolvetilde(a.Encoding.Ffmpegpath)
+}
+
 // Returns index of episode in Episodes slice based on UID or -1 if UID does not
 // exist.
 func (a *Atom) ContainsEpisode(uid int64) int {
-	for idx, _ := range a.Episodes {
+	for idx := range a.Episodes {
 		if a.Episodes[idx].UID == uid {
 			return idx
 		}

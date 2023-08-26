@@ -1,8 +1,8 @@
-{{ with .atom -}}
+{{ with .Atom -}}
 <?xml version='1.0' encoding='UTF-8'?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <atom:link href="{{$.private.BaseURL}}/{{.Atom}}" rel="self" type="application/rss+xml"/>
+    <atom:link href="{{$.Atom.Config.BaseURL}}/{{.Atom}}" rel="self" type="application/rss+xml"/>
     <title>{{.Title}}</title>
     <link>{{.Link}}</link>
     <pubDate>{{.PubDate}}</pubDate>
@@ -22,16 +22,16 @@
     <itunes:author>{{.Author}}</itunes:author>
     <itunes:explicit>{{.Explicit}}</itunes:explicit>
     <itunes:keywords>{{.Keywords}}</itunes:keywords>
-    <itunes:image href="{{$.private.Image}}"/>
+    <itunes:image href="{{$.Atom.Config.Image}}"/>
     <image>
-      <url>{{$.private.Image}}</url>
+      <url>{{$.Atom.Config.Image}}</url>
       <title>{{.Title}}</title>
       <link>{{.Link}}</link>
     </image>
     <itunes:category text="{{.Category}}"/>
 {{- range .Episodes }}
     <item>
-      <guid isPermaLink="true">{{$.private.BaseURL}}/{{.Output}}</guid>
+      <guid isPermaLink="true">{{$.Atom.Config.BaseURL}}/{{.Output}}</guid>
       <title>{{.Title}}</title>
       <pubDate>{{.PubDate}}</pubDate>
       <link>{{.Link}}</link>
@@ -43,8 +43,8 @@
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
       <description>{{.Description}}</description>
-      <enclosure type="{{.Type}}" url="{{$.private.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
-      <itunes:image href="{{$.private.BaseURL}}/{{.Image}}"/>
+      <enclosure type="{{.Type}}" url="{{$.Atom.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
+      <itunes:image href="{{$.Atom.Config.BaseURL}}/{{.Image}}"/>
     </item>
 {{- end }}
   </channel>

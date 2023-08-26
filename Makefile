@@ -7,7 +7,7 @@ GOOS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 GOARCH = amd64
 GO = CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go
 
-.PHONY: all clean build test
+.PHONY: all clean build test install
 
 all: clean build
 
@@ -25,3 +25,6 @@ $(NAME):
 go.mod:
 	go mod init $(MODULE)
 	go mod tidy
+
+install: $(NAME)
+	install $(NAME) $(DESTDIR)/$(NAME)

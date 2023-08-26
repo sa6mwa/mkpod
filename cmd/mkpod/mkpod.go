@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
@@ -12,13 +13,14 @@ import (
 	//"github.com/logrusorgru/aurora"
 )
 
+//go:embed template.rss
+var rssTemplate string
+
 var (
-	atom    Atom
-	private PrivateConfig
+	atom Atom
 	//origAtom       Rss
-	templateFile          string
+	//templateFile          string
 	specFile              string
-	privateFile           string
 	awsHandler            AwsHandler
 	askNoQuestions        bool   = false
 	dryRun                bool   = false
@@ -29,17 +31,17 @@ var (
 )
 
 const (
-	defaultTemplate   string = "template.rss"
-	defaultSpec       string = "spec.yaml"
-	defaultPrivate    string = "private.yaml"
+	//defaultTemplate   string = "template.rss"
+	defaultSpec string = "podspec.yaml"
+	//defaultPrivate    string = "private.yaml"
 	defaultPodcastRSS string = "podcast.rss"
-	// The lame command template is parsed for each episode being encoded where
-	// .atom is the full atom, .private is the private.yaml config and .episode is
-	// the episode currently being processed (current item in the Episodes struct
+	// The lame command template is parsed for each episode being
+	// encoded where .Atom is the full atom and .Episode is the episode
+	// currently being processed (current item in the Episodes struct
 	// slice).
-	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .private.LocalStorageDir "" }}{{ $PRE = print .private.LocalStorageDir "/" }}{{ end }}{{ .atom.Encoding.Lamepath }} -b {{ .atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .atom.Encoding.Language }}" --tt "{{ .episode.Title }}" --ta "{{ .atom.Author }}" --tl "{{ .atom.Title }}" --ty "{{ .episode.PubDate.Format "2006" }}" --tc "{{ .episode.Description }}" --tn "{{ .episode.UID }}" --tg "{{ .atom.Encoding.Genre }}" --ti "{{ print $PRE .atom.Encoding.Coverfront }}" --tv WOAR="{{ .atom.Link }}" "{{ print $PRE .episode.Input }}" "{{ print $PRE .episode.Output }}"`
+	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .Atom.Encoding.Language }}" --tt "{{ .Episode.Title }}" --ta "{{ .Atom.Author }}" --tl "{{ .Atom.Title }}" --ty "{{ .Episode.PubDate.Format "2006" }}" --tc "{{ .Episode.Description }}" --tn "{{ .Episode.UID }}" --tg "{{ .Atom.Encoding.Genre }}" --ti "{{ print $PRE .Atom.Encoding.Coverfront }}" --tv WOAR="{{ .Atom.Link }}" "{{ print $PRE .Episode.Input }}" "{{ print $PRE .Episode.Output }}"`
 
-	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
+	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i "{{ print $PRE .Episode.Input }}" -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} "{{ print $PRE .Episode.Output }}"`
 
 	//		defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -r 25 -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -g 12 -bf 2 -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
 
@@ -65,29 +67,29 @@ func main() {
 						Value:   defaultSpec,
 						Usage:   "Main configuration file for generating the atom RSS",
 					},
-					&cli.StringFlag{
-						Name:    "private",
-						Aliases: []string{"p"},
-						Value:   defaultPrivate,
-						Usage:   "Secondary configuration file that can be used in the template (usually not publicly checked in)",
-					},
-					&cli.StringFlag{
-						Name:    "template",
-						Aliases: []string{"t"},
-						Value:   defaultTemplate,
-						Usage:   "File to use as the Go template to render the atom rss+xml output",
-					},
+					// &cli.StringFlag{
+					// 	Name:    "private",
+					// 	Aliases: []string{"p"},
+					// 	Value:   defaultPrivate,
+					// 	Usage:   "Secondary configuration file that can be used in the template (usually not publicly checked in)",
+					// },
+					// &cli.StringFlag{
+					// 	Name:    "template",
+					// 	Aliases: []string{"t"},
+					// 	Value:   defaultTemplate,
+					// 	Usage:   "File to use as the Go template to render the atom rss+xml output",
+					// },
 					&cli.StringFlag{
 						Name:    "atom",
 						Aliases: []string{"o"},
 						Value:   defaultPodcastRSS,
-						Usage:   fmt.Sprintf("Atom RSS file to write under the localStorageDir specified in %s", defaultPrivate),
+						Usage:   fmt.Sprintf("Atom RSS file to write under the localStorageDir specified in %s", defaultSpec),
 					},
 					&cli.BoolFlag{
 						Name:    "upload",
 						Aliases: []string{"u"},
 						Value:   false,
-						Usage:   fmt.Sprintf("Upload %s to \"output\" Amazon AWS S3 bucket defined in %s", defaultPodcastRSS, defaultPrivate),
+						Usage:   fmt.Sprintf("Upload %s to \"output\" Amazon AWS S3 bucket defined in %s", defaultPodcastRSS, defaultSpec),
 					},
 					&cli.BoolFlag{
 						Name:    "force",
@@ -115,18 +117,18 @@ func main() {
 						Value:   defaultSpec,
 						Usage:   "Main configuration file for generating the atom RSS",
 					},
-					&cli.StringFlag{
-						Name:    "private",
-						Aliases: []string{"p"},
-						Value:   defaultPrivate,
-						Usage:   "Secondary configuration file that can be used in the template (usually not publicly checked in)",
-					},
-					&cli.StringFlag{
-						Name:    "template",
-						Aliases: []string{"t"},
-						Value:   defaultTemplate,
-						Usage:   "File to use as the Go template to render the atom rss+xml output",
-					},
+					// &cli.StringFlag{
+					// 	Name:    "private",
+					// 	Aliases: []string{"p"},
+					// 	Value:   defaultPrivate,
+					// 	Usage:   "Secondary configuration file that can be used in the template (usually not publicly checked in)",
+					// },
+					// &cli.StringFlag{
+					// 	Name:    "template",
+					// 	Aliases: []string{"t"},
+					// 	Value:   defaultTemplate,
+					// 	Usage:   "File to use as the Go template to render the atom rss+xml output",
+					// },
 					&cli.BoolFlag{
 						Name:    "all",
 						Aliases: []string{"a"},
@@ -153,8 +155,8 @@ func parser(c *cli.Context) error {
 	var err error
 
 	specFile = c.String("spec")
-	privateFile = c.String("private")
-	templateFile = c.String("template")
+	//privateFile = c.String("private")
+	//templateFile = c.String("template")
 	askNoQuestions = c.Bool("force")
 	dryRun = c.Bool("dry-run")
 
@@ -164,12 +166,13 @@ func parser(c *cli.Context) error {
 	}
 
 	if c.Bool("upload") {
-		log.Printf("About to generate %s and upload to S3 bucket %s", path.Join(private.LocalStorageDir, atom.Atom), private.Aws.Buckets.Output)
+		log.Printf("About to generate %s and upload to S3 bucket %s", atom.Atom, atom.Config.Aws.Buckets.Output)
 	} else {
-		log.Printf("About to generate %s", path.Join(private.LocalStorageDir, atom.Atom))
+		log.Printf("About to generate %s", atom.Atom)
 	}
 
-	t, err := template.ParseFiles(templateFile)
+	//t, err := template.ParseFiles(templateFile)
+	t, err := template.New("template.rss").Parse(rssTemplate)
 	if err != nil {
 		return err
 	}
@@ -185,13 +188,8 @@ func parser(c *cli.Context) error {
 		return err
 	}
 
-	if doAction("Refresh lastBuildDate of atom (%s)?", atom.Atom) {
+	if doAction("Refresh lastBuildDate of atom (%s, will not update %s)?", atom.Atom, specFile) {
 		atom.LastBuildDate.Time = time.Now().UTC()
-	}
-
-	combined := map[string]interface{}{
-		"atom":    atom,
-		"private": private,
 	}
 
 	switch {
@@ -202,13 +200,14 @@ func parser(c *cli.Context) error {
 	case !dryRun:
 		f := os.Stdout
 		if !dryRun {
-			f, err = os.Create(path.Join(private.LocalStorageDir, atom.Atom))
+			f, err = os.Create(atom.Atom)
 			if err != nil {
 				return err
 			}
 		}
-		log.Printf("Parsing template %s to %s", templateFile, f.Name())
-		err = t.Execute(f, combined)
+		//log.Printf("Parsing template %s to %s", templateFile, f.Name())
+		log.Printf("Parsing rss template to %s", f.Name())
+		err = t.Execute(f, Combined{Atom: &atom})
 		if err != nil {
 			if !dryRun {
 				f.Close()
@@ -221,10 +220,10 @@ func parser(c *cli.Context) error {
 				return err
 			}
 		}
-		log.Printf("Successfully generated %s", path.Join(private.LocalStorageDir, atom.Atom))
+		log.Printf("Successfully generated %s", atom.Atom)
 	}
 
-	if err := awsHandler.Diff(private.Aws.Buckets.Output, atom.Atom, path.Join(private.LocalStorageDir, atom.Atom)); err != nil {
+	if err := awsHandler.Diff(atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
 		return err
 	}
 
@@ -232,12 +231,12 @@ func parser(c *cli.Context) error {
 	if c.Bool("upload") {
 		if doAction("Upload new %s?", atom.Atom) {
 			if !dryRun {
-				err = awsHandler.Upload(private.Aws.Buckets.Output, atom.Atom, "text/xml", path.Join(private.LocalStorageDir, atom.Atom))
+				err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Atom, "text/xml", atom.Atom)
 				if err != nil {
 					return err
 				}
 			} else {
-				log.Printf("Uploading %s to s3://%s", path.Join(private.LocalStorageDir, atom.Atom), path.Join(private.Aws.Buckets.Output, atom.Atom))
+				log.Printf("Uploading %s to s3://%s", atom.Atom, path.Join(atom.Config.Aws.Buckets.Output, atom.Atom))
 			}
 		}
 	}
@@ -252,8 +251,8 @@ func encoder(c *cli.Context) error {
 	}
 
 	specFile = c.String("spec")
-	privateFile = c.String("private")
-	templateFile = c.String("template")
+	//privateFile = c.String("private")
+	//templateFile = c.String("template")
 	askNoQuestions = c.Bool("force")
 
 	err = loadConfig()
@@ -262,6 +261,7 @@ func encoder(c *cli.Context) error {
 	}
 
 	awsHandler.NewSession()
+
 	err = createLocalStorageDir()
 	if err != nil {
 		return err

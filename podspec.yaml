@@ -1,3 +1,14 @@
+config:
+  baseURL: https://mypod.domain.tld
+  image: https://mypod.domain.tld/artwork/mypod-1600x1600.jpeg
+  defaultPodImage: artwork/mypod-3000x3000.jpeg
+  aws:
+    profile: default
+    region: eu-west-1
+    buckets:
+      input: assetbucket
+      output: mypodbucket
+  localStorageDir: ~/mypod
 atom: podcast.rss
 title: QZJ
 link: https://www.patreon.com/outsender
@@ -21,7 +32,7 @@ category: Technology
 encoding:
   bitrate: 128
   lamepath: /usr/bin/lame
-  ffmpegpath: /home/sa6mwa/bin/ffmpeg
+  ffmpegpath: ~/bin/ffmpeg
   crf: 38
   abr: 196k
   coverfront: artwork/qzj-1000x1000.jpeg
