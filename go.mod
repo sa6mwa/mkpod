@@ -10,11 +10,13 @@ require (
 	github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e
 	github.com/urfave/cli/v2 v2.25.7
 	golang.org/x/crypto v0.12.0
+	gopkg.in/alessio/shellescape.v1 v1.0.0-20170105083845-52074bc9df61
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/alessio/shellescape v1.4.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect

@@ -11,6 +11,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	//"github.com/logrusorgru/aurora"
+	"gopkg.in/alessio/shellescape.v1"
 )
 
 //go:embed template.rss
@@ -39,13 +40,11 @@ const (
 	// encoded where .Atom is the full atom and .Episode is the episode
 	// currently being processed (current item in the Episodes struct
 	// slice).
-	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .Atom.Encoding.Language }}" --tt "{{ .Episode.Title }}" --ta "{{ .Atom.Author }}" --tl "{{ .Atom.Title }}" --ty "{{ .Episode.PubDate.Format "2006" }}" --tc "{{ .Episode.Description }}" --tn "{{ .Episode.UID }}" --tg "{{ .Atom.Encoding.Genre }}" --ti "{{ print $PRE .Atom.Encoding.Coverfront }}" --tv WOAR="{{ .Atom.Link }}" "{{ print $PRE .Episode.Input }}" "{{ print $PRE .Episode.Output }}"`
+	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ escape .Atom.Encoding.Language }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Description }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} {{ escape (print $PRE .Episode.Input) }} {{ escape (print $PRE .Episode.Output) }}`
 
-	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i "{{ print $PRE .Episode.Input }}" -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} "{{ print $PRE .Episode.Output }}"`
+	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} {{ escape (print $PRE .Episode.Output) }}`
 
-	//		defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .private.LocalStorageDir ""}}{{ $PRE = print .private.LocalStorageDir "/"}}{{ end }}{{ .atom.Encoding.Ffmpegpath }} -y -i "{{ print $PRE .episode.Input }}" -r 25 -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .atom.Encoding.CRF }} -g 12 -bf 2 -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .atom.Encoding.ABR }} "{{ print $PRE .episode.Output }}"`
-
-	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i "{{ print $PRE .Episode.Input }}" -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN="{{ .Atom.Encoding.Language }}" --tt "{{ .Episode.Title }}" --ta "{{ .Atom.Author }}" --tl "{{ .Atom.Title }}" --ty "{{ .Episode.PubDate.Format "2006" }}" --tc "{{ .Episode.Description }}" --tn "{{ .Episode.UID }}" --tg "{{ .Atom.Encoding.Genre }}" --ti "{{ print $PRE .Atom.Encoding.Coverfront }}" --tv WOAR="{{ .Atom.Link }}" - "{{ print $PRE .Episode.Output }}"`
+	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ escape .Atom.Encoding.Language }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Description }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} - {{ escape (print $PRE .Episode.Output) }}`
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -273,16 +272,24 @@ func encoder(c *cli.Context) error {
 		return err
 	}
 
+	// Go template FuncMap, add escape function using
+	// gopkg.in/alessio/shellescape.v1.
+	funcMap := template.FuncMap{
+		"escape": func(s string) string {
+			return shellescape.Quote(s)
+		},
+	}
+
 	// Parse Go templates.
-	templates.Lame, err = template.New("lame").Parse(lameCommandTemplate)
+	templates.Lame, err = template.New("lame").Funcs(funcMap).Parse(lameCommandTemplate)
 	if err != nil {
 		return err
 	}
-	templates.Ffmpeg, err = template.New("ffmpeg").Parse(ffmpegCommandTemplate)
+	templates.Ffmpeg, err = template.New("ffmpeg").Funcs(funcMap).Parse(ffmpegCommandTemplate)
 	if err != nil {
 		return err
 	}
-	templates.FfmpegToLame, err = template.New("ffmpegToLame").Parse(ffmpegToAudioCommandTemplate)
+	templates.FfmpegToLame, err = template.New("ffmpegToLame").Funcs(funcMap).Parse(ffmpegToAudioCommandTemplate)
 	if err != nil {
 		return err
 	}

@@ -412,7 +412,7 @@ type Episode struct {
 	Image       string         `yaml:"image"`
 	Input       string         `yaml:"input"`
 	Output      string         `yaml:"output"`
-	Format      string         `yaml:"format"`
+	Format      string         `yaml:"format,omitempty"`
 }
 
 type Rss struct {

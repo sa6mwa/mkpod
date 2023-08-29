@@ -146,6 +146,33 @@ func basicAtomValidation() error {
 			return fmt.Errorf("%s is not an executable", e)
 		}
 	}
+
+	// Ensure all episodes have at least a title, description, and pubDate.
+	for i, e := range atom.Episodes {
+		if e.UID < 1 {
+			return fmt.Errorf("uid must be above 0 in %s, in episode with output=%s", specFile, e.Output)
+		}
+		if len(e.Title) < 1 || len(e.Description) < 1 {
+			return fmt.Errorf("title and description for episode with uid %d must not be empty in %s", e.UID, specFile)
+		}
+		if len(e.Author) < 1 {
+			if len(atom.Author) < 1 {
+				return fmt.Errorf("author must not be empty in atom, check %s", specFile)
+			}
+			atom.Episodes[i].Author = atom.Author
+			updateAtom = true
+		}
+		if e.PubDate.IsZero() {
+			log.Printf("UID %d (%s) pubDate is zero, setting to time.Now().UTC()", atom.Episodes[i].UID, atom.Episodes[i].Title)
+			atom.Episodes[i].PubDate.Time = time.Now().UTC()
+			updateAtom = true
+		}
+		if len(e.Link) < 1 {
+			atom.Episodes[i].Link = atom.Link
+			updateAtom = true
+		}
+	}
+
 	return nil
 }
 
@@ -155,15 +182,6 @@ func validateAtom() error {
 		return err
 	}
 	for i, e := range atom.Episodes {
-		if e.UID < 1 {
-			return fmt.Errorf("uid must be above 0 in %s, in episode with output=%s", specFile, e.Output)
-		}
-		if len(e.Title) < 1 || len(e.Description) < 1 {
-			return fmt.Errorf("title and description for episode with uid %d must not be empty in %s", e.UID, specFile)
-		}
-		if len(e.Author) < 1 {
-			return fmt.Errorf("author must not be empty in episode with uid %d (%s)", e.UID, e.Title)
-		}
 		if len(e.Output) < 3 {
 			return fmt.Errorf("episode with uid %d (%s) does not have an output file, maybe you need to encode one?", e.UID, e.Title)
 		}
