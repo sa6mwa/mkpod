@@ -38,6 +38,7 @@
       <itunes:duration>{{.Duration}}</itunes:duration>
       <itunes:author>{{.Author}}</itunes:author>
       <itunes:explicit>{{.Explicit}}</itunes:explicit>
+      <itunes:summary>{{.Description}}</itunes:summary>
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
