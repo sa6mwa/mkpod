@@ -30,6 +30,7 @@
     </image>
     <itunes:category text="{{.Category}}"/>
 {{- range .Episodes }}
+{{- if isAfter timeNow .PubDate.Time }}
     <item>
       <guid isPermaLink="true">{{$.Atom.Config.BaseURL}}/{{.Output}}</guid>
       <title>{{.Title}}</title>
@@ -45,6 +46,7 @@
       <enclosure type="{{.Type}}" url="{{$.Atom.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
       <itunes:image href="{{$.Atom.Config.BaseURL}}/{{.Image}}"/>
     </item>
+{{- end }}
 {{- end }}
   </channel>
 </rss>

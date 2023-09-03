@@ -337,7 +337,7 @@ type Atom struct {
 	OwnerName     string         `yaml:"ownerName"`
 	OwnerEmail    string         `yaml:"ownerEmail"`
 	Author        string         `yaml:"author"`
-	Explicit      ItunesExplicit `yaml:"explicit"`
+	Explicit      ItunesExplicit `yaml:"explicit,omitempty"`
 	Keywords      string         `yaml:"keywords"`
 	Category      string         `yaml:"category"`
 	Encoding      struct {
@@ -404,7 +404,7 @@ type Episode struct {
 	Link        string         `yaml:"link"`
 	Duration    ItunesDuration `yaml:"duration"`
 	Author      string         `yaml:"author"`
-	Explicit    ItunesExplicit `yaml:"explicit"`
+	Explicit    ItunesExplicit `yaml:"explicit,omitempty"`
 	Subtitle    string         `yaml:"subtitle"`
 	Description string         `yaml:"description"`
 	Type        string         `yaml:"type"`

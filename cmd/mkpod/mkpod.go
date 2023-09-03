@@ -172,8 +172,23 @@ func parser(c *cli.Context) error {
 		log.Printf("About to generate %s", atom.Atom)
 	}
 
+	funcMap := template.FuncMap{
+		"escape": func(s string) string {
+			return shellescape.Quote(s)
+		},
+		"timeNow": func() time.Time {
+			return time.Now()
+		},
+		"isAfter": func(t1 time.Time, t2 time.Time) bool {
+			if t1.IsZero() || t2.IsZero() {
+				return false
+			}
+			return (t1 == t2 || t1.After(t2))
+		},
+	}
+
 	//t, err := template.ParseFiles(templateFile)
-	t, err := template.New("template.rss").Parse(rssTemplate)
+	t, err := template.New("template.rss").Funcs(funcMap).Parse(rssTemplate)
 	if err != nil {
 		return err
 	}
