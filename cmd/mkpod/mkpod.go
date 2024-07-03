@@ -59,7 +59,7 @@ func main() {
 			{
 				Name:    "parse",
 				Aliases: []string{"p"},
-				Usage:   "Parse Go template using public and private specification yaml",
+				Usage:   "Parse Go template using specification yaml",
 				Action:  parser,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
@@ -206,6 +206,25 @@ func parser(c *cli.Context) error {
 
 	if doAction("Refresh lastBuildDate of atom (%s, will not update %s)?", atom.Atom, specFile) {
 		atom.LastBuildDate.Time = time.Now().UTC()
+	}
+
+	if updateAtom {
+		if doAction("Fields in the atom has changed, re-write %s?", specFile) {
+			atom.LastBuildDate.Time = time.Now().UTC()
+			f, err := os.Create(specFile)
+			if err != nil {
+				return fmt.Errorf("unable to re-write %s: %w", specFile, err)
+			}
+			defer f.Close()
+			b, err := atom.Yaml()
+			if err != nil {
+				return fmt.Errorf("unable to marshall yaml: %w", err)
+			}
+			_, err = f.Write(b)
+			if err != nil {
+				return fmt.Errorf("unable to re-write %s: %w", specFile, err)
+			}
+		}
 	}
 
 	switch {

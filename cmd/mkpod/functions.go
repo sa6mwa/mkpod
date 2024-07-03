@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -17,7 +17,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alfg/mp4"
 	"github.com/sa6mwa/mp3duration"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,7 +41,7 @@ func loadConfig() error {
 	if err != nil {
 		return err
 	}
-	atomYaml, err := ioutil.ReadAll(sf)
+	atomYaml, err := io.ReadAll(sf)
 	sf.Close()
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func doAction(format string, a ...any) bool {
 }
 
 func isTerminal() bool {
-	return terminal.IsTerminal(int(os.Stdout.Fd()))
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 func yes(format string, a ...any) bool {
