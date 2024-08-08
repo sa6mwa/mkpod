@@ -141,6 +141,28 @@ func (s *AwsHandler) Download(bucket string, key string) error {
 				switch awsErr.Code() {
 				case "NotFound", "NoSuchKey":
 					log.Printf("s3://%s does not exist, will use local file %s only", path.Join(bucket, key), completePath)
+
+					// Upload local file to bucket with key?
+					if doAction("Upload %s to s3://%s?", completePath, path.Join(bucket, key)) {
+						// Upload...
+						uf, err := os.Open(completePath)
+						if err != nil {
+							return err
+						}
+						defer uf.Close()
+						log.Printf("Uploading %s to s3://%s", completePath, path.Join(bucket, key))
+						uploader := s3manager.NewUploader(s.Session)
+						uRes, err := uploader.Upload(&s3manager.UploadInput{
+							Bucket:       aws.String(bucket),
+							Key:          aws.String(key),
+							Body:         uf,
+							StorageClass: aws.String("GLACIER_IR"),
+						})
+						if err != nil {
+							return err
+						}
+						log.Printf("Successfully uploaded to %s", uRes.Location)
+					}
 					return nil
 				default:
 					return err

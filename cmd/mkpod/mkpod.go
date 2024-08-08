@@ -204,8 +204,9 @@ func parser(c *cli.Context) error {
 		return err
 	}
 
-	if doAction("Refresh lastBuildDate of atom (%s, will not update %s)?", atom.Atom, specFile) {
+	if doAction("Refresh lastBuildDate (will update %s and optionally %s)?", atom.Atom, specFile) {
 		atom.LastBuildDate.Time = time.Now().UTC()
+		updateAtom = true
 	}
 
 	if updateAtom {
