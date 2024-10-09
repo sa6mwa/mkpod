@@ -60,7 +60,7 @@ const (
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
 		`deesser,` +
 		`highpass=f=50,` +
-		`firequalizer=gain_entry='entry(90,{{ if .PreProcess.BassBoost }}2{{ else }}0{{ end }}); entry(538,-6); entry(12000,-3)',` +
+		`firequalizer=gain_entry='entry(90,{{ if .PreProcess.BassBoost }}2{{ else }}0{{ end }}); entry(538,-6); entry(12000,-2)',` +
 		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-10|0/-2|20/-2:soft-knee=12,` +
 		`alimiter=limit=0.7943282347242815:level=disabled" ` +
 		`{{ escape (print .PreProcess.Prefix .PreProcess.Input) }}`
