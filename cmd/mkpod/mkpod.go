@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"text/template"
 	"time"
@@ -18,17 +20,18 @@ import (
 var rssTemplate string
 
 var (
-	atom                         Atom
-	specFile                     string
-	awsHandler                   AwsHandler
-	askNoQuestions               bool       = false
-	dryRun                       bool       = false
-	lameCommandTemplate          string     = defaultLameCommandTemplate
-	ffmpegCommandTemplate        string     = defaultFfmpegCommandTemplate
-	ffmpegToAudioCommandTemplate string     = defaultFfmpegToAudioCommandTemplate
-	templates                    *Templates = &Templates{}
-	updateAtom                   bool       = false
-	processCounter               int        = 0
+	atom                               Atom
+	specFile                           string
+	awsHandler                         AwsHandler
+	askNoQuestions                     bool       = false
+	dryRun                             bool       = false
+	lameCommandTemplate                string     = defaultLameCommandTemplate
+	ffmpegCommandTemplate              string     = defaultFfmpegCommandTemplate
+	ffmpegToAudioCommandTemplate       string     = defaultFfmpegToAudioCommandTemplate
+	ffmpegPreProcessingCommandTemplate string     = defaultFfmpegPreProcessingCommandTemplate
+	templates                          *Templates = &Templates{}
+	updateAtom                         bool       = false
+	processCounter                     int        = 0
 )
 
 const (
@@ -46,6 +49,24 @@ const (
 
 	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ escape .Atom.Encoding.Language }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Description }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} - {{ escape (print $PRE .Episode.Output) }}`
 
+	// EQ and compression for the Rode PODMIC
+	//
+	// The settings should allow you to have a background stereo track
+	// (like music) below -10 dB. Minus 10.01 dB in fraction is
+	// 0.3158639048423471 or 0.31586 if you can not fit all figures,
+	// this should produce a mix without clipping, just make sure you
+	// lower the music to this fraction when the vocal track is on.
+	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
+		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
+		`deesser,` +
+		`highpass=f=50,` +
+		`firequalizer=gain_entry='entry(90,{{ if .PreProcess.BassBoost }}2{{ else }}0{{ end }}); entry(538,-6); entry(12000,-3)',` +
+		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-10|0/-2|20/-2:soft-knee=12,` +
+		`alimiter=limit=0.7943282347242815:level=disabled" ` +
+		`{{ escape (print .PreProcess.Prefix .PreProcess.Input) }}`
+
+	defaultPreProcessingPrefix string = "preprocessed-"
+
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
 )
@@ -56,6 +77,31 @@ func main() {
 		Usage:     "Tool to render a podcast rss feed from spec, automate mp3/mp4 encoding and publish to Amazon S3.",
 		Copyright: "Copyright SA6MWA 2022-2023 sa6mwa@gmail.com, https://github.com/sa6mwa/mkpod",
 		Commands: []*cli.Command{
+			{
+				Name:    "preprocess",
+				Aliases: []string{"pre"},
+				Usage:   "Run an audiofile (e.g a raw microphone track) through pre-processing",
+				Action:  preprocess,
+				Flags: []cli.Flag{
+					// &cli.StringFlag{
+					// 	Name:    "spec",
+					// 	Aliases: []string{"s"},
+					// 	Value:   defaultSpec,
+					// 	Usage:   "Main configuration file for generating the atom RSS",
+					// },
+					&cli.StringFlag{
+						Name:  "prefix",
+						Value: defaultPreProcessingPrefix,
+						Usage: "Prefix to add to the output file",
+					},
+					&cli.BoolFlag{
+						Name:    "bass",
+						Aliases: []string{"b"},
+						Value:   false,
+						Usage:   "Increase gain for the bass portion of the EQ setting, false means flat",
+					},
+				},
+			},
 			{
 				Name:    "parse",
 				Aliases: []string{"p"},
@@ -150,6 +196,58 @@ func main() {
 	if err != nil {
 		log.Fatalf("ERROR: %v", err)
 	}
+}
+
+func preprocess(c *cli.Context) error {
+	var err error
+
+	// specFile = c.String("spec")
+	// err = loadConfig()
+	// if err != nil {
+	// 	return err
+	// }
+
+	funcMap := template.FuncMap{
+		"escape": func(s string) string {
+			return shellescape.Quote(s)
+		},
+	}
+
+	if c.Args().Len() == 0 {
+		log.Fatal("You need to specify at least one audiofile as argument(s) to this command")
+	}
+
+	// Parse Go template
+	templates.FfmpegPreProcessing, err = template.New("ffmpegPreProcessing").Funcs(funcMap).Parse(ffmpegPreProcessingCommandTemplate)
+	if err != nil {
+		return err
+	}
+
+	for _, input := range c.Args().Slice() {
+		combined := &Combined{
+			// Atom: &atom,
+			PreProcess: &PreProcess{
+				Input:     input,
+				BassBoost: c.Bool("bass"),
+				Prefix:    c.String("prefix"),
+			},
+		}
+		buf := &bytes.Buffer{}
+		err = templates.FfmpegPreProcessing.Execute(buf, combined)
+		if err != nil {
+			return err
+		}
+		log.Printf("Executing %s", buf.String())
+		cmd := exec.Command(shell, shellCommandOption, buf.String())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			return fmt.Errorf("unable to pre-process %s using external tool (ffmpeg): %w", input, err)
+		}
+	}
+	return nil
 }
 
 func parser(c *cli.Context) error {
@@ -315,7 +413,7 @@ func encoder(c *cli.Context) error {
 		},
 	}
 
-	// Parse Go templates.
+	// Parse Go templates (except the pre-processing command template)
 	templates.Lame, err = template.New("lame").Funcs(funcMap).Parse(lameCommandTemplate)
 	if err != nil {
 		return err

@@ -26,9 +26,10 @@ import (
 )
 
 type Templates struct {
-	Lame         *template.Template
-	Ffmpeg       *template.Template
-	FfmpegToLame *template.Template
+	Lame                *template.Template
+	Ffmpeg              *template.Template
+	FfmpegToLame        *template.Template
+	FfmpegPreProcessing *template.Template
 }
 
 type AwsHandler struct {
@@ -375,9 +376,16 @@ type Atom struct {
 	Episodes []Episode `yaml:"episodes"`
 }
 
+type PreProcess struct {
+	Input     string
+	BassBoost bool
+	Prefix    string
+}
+
 type Combined struct {
-	Atom    *Atom
-	Episode *Episode
+	Atom       *Atom
+	Episode    *Episode
+	PreProcess *PreProcess
 }
 
 func (a *Atom) LocalStorageDirExpanded() string {
