@@ -377,9 +377,10 @@ type Atom struct {
 }
 
 type PreProcess struct {
-	Input     string
-	BassBoost bool
-	Prefix    string
+	Input   string
+	EQ      string
+	Profile string
+	Prefix  string
 }
 
 type Combined struct {
