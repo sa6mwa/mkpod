@@ -59,18 +59,18 @@ const (
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
 		`{{ if eq .PreProcess.EQ "podmic" }}` +
+		// `deesser,` +
+		`highpass=f=50,` +
 		`firequalizer=gain_entry='entry(125, +2); entry(250, 0); entry(500, -2); entry(1000, 0); entry(2000, 1); entry(4000, 1); entry(8000, 0); entry(15000, -5)',` +
 		`{{ else if eq .PreProcess.EQ "podmic2" }}` +
+		// `deesser,` +
+		`highpass=f=50,` +
 		`firequalizer=gain_entry='entry(90,2); entry(538,-3); entry(12000,-2)',` +
 		`{{ end }}` +
 		`{{ if eq .PreProcess.Profile "qzj" }}` +
-		`deesser,` +
-		`highpass=f=50,` +
 		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-12|0/-2|20/-2:soft-knee=12,` +
 		`alimiter=limit=0.7943282347242815:level=disabled" ` +
 		`{{ else if eq .PreProcess.Profile "heavy" }}` +
-		`deesser,` +
-		`highpass=f=50,` +
 		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-9|0/-2|20/-2:soft-knee=12,` +
 		`alimiter=limit=0.7943282347242815:level=disabled" ` +
 		`{{ end }}` +
