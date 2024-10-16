@@ -302,6 +302,9 @@ func parser(c *cli.Context) error {
 			}
 			return (t1 == t2 || t1.After(t2))
 		},
+		"markdown": func(s string) string {
+			return MarkdownToHTML(s)
+		},
 	}
 
 	//t, err := template.ParseFiles(templateFile)

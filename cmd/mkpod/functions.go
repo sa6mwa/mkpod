@@ -16,6 +16,9 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alfg/mp4"
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/html"
+	mdp "github.com/gomarkdown/markdown/parser"
 	"github.com/sa6mwa/mp3duration"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v3"
@@ -62,6 +65,20 @@ func loadConfig() error {
 	}
 
 	return nil
+}
+
+// MarkdownToHTML
+
+func MarkdownToHTML(md string) (outputHTML string) {
+	// Generate html from all description fields
+
+	p := mdp.NewWithExtensions(mdp.CommonExtensions | mdp.AutoHeadingIDs | mdp.NoEmptyLineBeforeBlock)
+	doc := p.Parse([]byte(md))
+	renderer := html.NewRenderer(html.RendererOptions{
+		Flags: html.CommonFlags | html.HrefTargetBlank,
+	})
+	outputHTML = string(markdown.Render(doc, renderer))
+	return
 }
 
 // Replaces or adds file extension.

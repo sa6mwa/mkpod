@@ -11,7 +11,7 @@
     <language>{{.Language}}</language>
     <copyright>{{.Copyright}}</copyright>
     <webMaster>{{.WebMaster}}</webMaster>
-    <description>{{.Description}}</description>
+    <description><![CDATA[{{markdown .Description}}]]></description>
 {{- if ne .Subtitle "" }}
     <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
@@ -42,7 +42,7 @@
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
-      <description>{{.Description}}</description>
+      <description><![CDATA[{{markdown .Description}}]]></description>
       <enclosure type="{{.Type}}" url="{{$.Atom.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
       <itunes:image href="{{$.Atom.Config.BaseURL}}/{{.Image}}"/>
     </item>
