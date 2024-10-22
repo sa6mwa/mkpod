@@ -78,7 +78,7 @@ const (
 
 	defaultPreProcessingPrefix string = "preprocessed-"
 	defaultProfile             string = "qzj"
-	defaultEQ                  string = "podmic"
+	defaultEQ                  string = "none"
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -110,7 +110,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "profile",
 						Value: defaultProfile,
-						Usage: "Filter (deesser, highpass and limiter) profile, available: qzj, none",
+						Usage: "Compression, limiter and highpass profile, available: qzj, heavy, none. Limiter settings (except \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
 					},
 					&cli.StringFlag{
 						Name:    "equalizer",
