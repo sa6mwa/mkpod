@@ -11,9 +11,9 @@ config:
   localStorageDir: ~/mypod
 atom: podcast.rss
 title: QZJ
-link: https://www.patreon.com/outsender
+link: https://qzj.se
 pubDate: Mon, 21 Mar 2022 22:37:44 +0000
-lastBuildDate: Fri, 25 Aug 2023 21:43:38 +0000
+lastBuildDate: Tue, 22 Oct 2024 21:23:47 +0000
 ttl: 60
 language: sv
 copyright: Copyright SA6MWA 2020-2023 All Rights Reserved.
@@ -39,10 +39,237 @@ encoding:
   genre: Podcast
   language: SWE
 episodes:
+- uid: 23
+  title: PACE vs Sambandstablå
+  pubDate: Wed, 16 Oct 2024 08:47:49 +0000
+  link: https://qzj.se/audio/qzj023-pace-vs-sambandstabla/
+  duration: "00:24:15"
+  author: SA6MWA
+  subtitle: Sambandsmedel lika mycket värda, sambandsmedelsdiversitet
+  description: |-
+    Alla sambandsmedel är lika mycket värda i denna politiskt korrekta kritik av P.A.C.E-konceptet. Skämtar, men kunde inte låta bli.
+
+    Avsnittet förklarar tanken med PACE-plan (*primary*, *alternate*, *contingency* samt *emergency*) som man snabbt kommer i kontakt med i preppertillhåll på nätet och jag ger min syn på hur jag tycker man bör tänka rörande utnyttjande av fler än ett sambandsmedel.
+
+    Länkar:
+
+    * <https://en.wikipedia.org/wiki/PACE_(communication_methodology)>
+    * <https://www.moore.army.mil/infantry/magazine/issues/2013/Jul-Sep/Ryan.html>
+    * <https://www.cisa.gov/sites/default/files/2024-08/24_0826_ncswic_leveraging_PACE_plan_emergency_comms_ecosystems_final_508C.pdf>
+
+    Kontakta podden på [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com)
+
+    Stöd QZJ via PayPal på <https://www.paypal.com/donate/?hosted_button_id=XDLCJ8AZ6LFDJ>
+
+    73 DE SA6MWA
+  type: audio/mpeg
+  length: 23393112
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj023-pace-vs-sambandstabla.flac
+  output: qzj023-pace-vs-sambandstabla.mp3
+- uid: 22
+  title: GPS QRM
+  pubDate: Wed, 09 Oct 2024 09:00:00 +0000
+  link: https://qzj.se/audio/qzj022-gps-qrm/
+  duration: "00:19:28"
+  author: SA6MWA
+  subtitle: Rysslands störsändningar riktade mot GPS och andra satellitnavigeringssystem
+  description: |-
+    I det här avsnittet av QZJ diskuterar jag hur GPS och andra globala satellitnavigationssystem påverkas av störsändningar och vilseledning (spoofing), särskilt i områden med geopolitiska konflikter. Vi dyker ner i telekrigföringens värld och hur länder som Ryssland använder dessa metoder, något som ökat sedan invasionen av Ukraina 2014 och 2022. Du får även höra om hur GPS-störningar påverkat flygtrafik över Östersjön, Baltikum och Moskva, samt hur dessa störsändningar kan påverka både militära och civila system. Med hjälp av artiklar och data från gpsjam.org utforskas omfattningen av störningarna och vad det innebär för totalförsvaret.
+
+    Länkar:
+
+    * <https://www.gpsworld.com/innovation-recent-gps-jamming-in-regions-of-geopolitical-conflict/>
+    * <https://gpsjam.org/>
+    * <https://www.adsbexchange.com/>
+    * <https://www.airandspaceforces.com/russian-gps-jamming-nato-ukraine/>
+    * <https://www.bbc.com/news/articles/cne900k4wvjo>
+
+    Kontakta podden på [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com)
+
+    Stöd QZJ via PayPal på <https://www.paypal.com/donate/?hosted_button_id=XDLCJ8AZ6LFDJ>
+
+    73 DE SA6MWA
+  type: audio/mpeg
+  length: 18806262
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj022-gps-qrm.flac
+  output: qzj022-gps-qrm.mp3
+- uid: 21
+  title: Fem punkter överlevnad
+  pubDate: Fri, 23 Aug 2024 16:52:19 +0000
+  link: https://qzj.se/audio/qzj021-five-points-survival/
+  duration: "00:54:48"
+  author: SA6MWA
+  subtitle: Prioriteringar, färdigheter och prylar att på fem fingrar överleva uppgiften
+  description: |-
+    Fem punkter överlevnad är min nära 20 år gamla minnesregel för att underlätta förberedelserna inför ett äventyr eller en uppgift ute i terrängen. Minnesregeln består av några självklarheter, men även initialförkortningar som hjälpmedel att prioritera rätt såväl under packningen som när man är där ute.
+
+    * STOP: Stanna, Tänk, Orientera, Planera (och SOLO: Stanna, Observera, Lyssna, Ofta)
+    * Ge aldrig upp ("få har dött av att kämpa vidare, fler däremot av att ge upp" / Handbok Överlevnad)
+    * Tre-reglerna (3 minuter utan syre, 3 timmar utan skydd, 3 dygn utan vatten, 3 veckor utan mat, dödstriangeln, eldtriangeln, m.fl)
+    * Fyra sysslor: SLEV: Skydd, Larma, Eld, Vatten
+    * VERKA FRITT: Fem väsentliga prylar och fem ytterligare möjliggörande prylar
+      * Visselpipa
+      * Elddon
+      * Rörelseriktningsredskap (kompass, GPS, osv)
+      * Kniv
+      * Avsnörande förband (tourniquet)
+      * Förstärkningskläder (inkl övernattningsutrustning)
+      * Reningsutrustning för att rena vatten samt hålla sig själv ren, personlig hygien
+      * Initiativförmågeskapande prylar (t.ex kartor, pannlampa, bildförstärkare, mat, kamouflage, larmminor)
+      * Taktiskt omhändertagande av skadad/stridsskadad (TOS) - sjukvårdsutrustning
+      * Tillagnings- och transportutrustning (t.ex kokkärl, kåsa, bestick, vattenflaskor, termos, fickor eller ryggsäck samt trosspackning att sortera utrustningen i, m.m)
+
+    Fem Punkter Överlevnad (ursprungliga versionen från 2006):
+
+    * <https://youtu.be/yIYkpbU5ees>
+
+    Synpunkter och idéer för kommande avsnitt? Skicka e-post till [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com).
+
+    73 DE SA6MWA
+  type: audio/mpeg
+  length: 52727368
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj021-five-points-survival.flac
+  output: qzj021-five-points-survival.mp3
+- uid: 20
+  title: Effekter av en EMP på radiokommunikation
+  pubDate: Wed, 21 Aug 2024 09:20:00 +0000
+  link: https://qzj.se/audio/qzj020-effects-of-emp-on-radio-comm/
+  duration: "00:27:49"
+  author: SA6MWA
+  subtitle: Är all radiokommunikation utstörd efter en kärnvapensprängning i atmosfären
+    eller kommer något fortfarande att funka?
+  description: |-
+    Jag läser ur och spekulerar fritt kring en rapport från 1976 vid namn
+    United States High-Altitude Test Experiences - A Review Emphasizing the
+    Impact on the Environment - A LASL MONOGRAPH av Herman Hoerlin.
+    Observationerna är efter de flertalet höghöjdstester som amerikanarna
+    gjorde på 60-talet. Slutsatserna är mina egna och fokuserar på olika
+    alternativ och sätt att kommunicera efter en EMP och vad det kan innebära.
+
+    Länk till rapporten:
+
+    * <https://sgp.fas.org/othergov/doe/lanl/docs1/00322994.pdf>
+  type: audio/mpeg
+  length: 26821232
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj020-emp-radio-effects.flac
+  output: qzj020-emp-radio-effects.mp3
+- uid: 19
+  title: EMP-myten
+  pubDate: Fri, 09 Aug 2024 18:30:00 +0000
+  link: https://qzj.se/audio/qzj019-emp/
+  duration: "00:22:51"
+  author: SA6MWA
+  subtitle: Kommer all elektronik verkligen att förstöras av en elektromagnetisk puls
+    orsakad av ett kärnvapen som detonerar i jonosfären?
+  description: |-
+    *"If we were hit by an EMP there would be no vehicles, no electric, no communications, no radio, no nothing. Not if it's modern, you are exactly right, because an EMP would short the circuitry."* // Andrew Bustamante & Shawn Ryan
+    <https://youtu.be/AUFBZLYAytE>
+
+    Är det verkligen så? Vad säger forskningen?
+
+    Följande studier och artiklar citeras i avsnittet:
+
+    * <https://www.cryptomuseum.com/radio/prc77/files/PRC77_EMP.pdf>
+    * <https://apps.dtic.mil/sti/pdfs/ADA210505.pdf>
+    * <https://domesticpreparedness.com/commentary/electromagnetic-pulses-six-common-misconceptions>
+    * <https://discover.lanl.gov/publications/national-security-science/2024-spring/emp-could-it-happen-to-me/>
+
+    Har du en fråga om radio, överlevnad eller hur du lägger en kabel på o-platsen (alltså en RG58-kabel)? Tveka inte att slänga iväg ett mail till [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com) och jag besvarar den i framtida avsnitt.
+
+    Besök och följ (via rss) den nya hemsidan på <https://qzj.se> vilken successivt kommer att ersätta inläggen på patreon.com för såväl Utesändaren som denna podden.
+
+    73 DE SA6MWA
+  type: audio/mpeg
+  length: 22060654
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj019-emp.flac
+  output: qzj019-emp.mp3
+- uid: 18
+  title: Sprint Retro kontra After Action Review
+  pubDate: Sun, 05 Nov 2023 16:08:37 +0000
+  link: https://qzj.se
+  duration: "00:17:08"
+  author: SA6MWA
+  explicit: "no"
+  subtitle: Hur After Action Review (AAR) skiljer sig från en vanlig Sprint Retrospective
+  description: |-
+    En After Action Review (AAR) skiljer sig på metodnivå i hur den syftar till att plocka fram de förbättringar man vill komma åt när man genomför en "debrief" eller betraktelse efter genomfört arbete, insats, osv från en del andra metoder. I detta avsnittet reflekterar jag fritt över skillnaden mellan en typisk "Sprint Retro" inom Scrum som den ser ut inom många arbetslag och vad After Action Review syftar till att åstadkomma.
+
+    Conducting Effective After Action Reviews:
+
+    * <https://youtu.be/bLC6phIZo1I>
+    * <https://youtu.be/74Afb8qLujo>
+
+    MSB, metod och verktyg After Action Review:
+
+    * <https://www.msb.se/aar>
+
+    Scrum och Uppdragstaktik:
+
+    * <https://open.spotify.com/episode/79zozas4d5JAG23k3ZAmH5>
+
+    Planering Under Tidspress:
+
+    * <https://open.spotify.com/episode/63GCkZEwYERqvR5XOEupYf>
+
+    Stöd QZJ / Utesändaren på [https://qzj.se](qzj.se).
+  type: audio/mpeg
+  length: 16566051
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj018-retro-kontra-aar.flac
+  output: qzj018-retro-kontra-aar.mp3
+- uid: 17
+  title: 'Utrymning och inrymning: War Diaries - A Radio Amateur In Kyiv'
+  pubDate: Sun, 05 Nov 2023 16:08:37 +0000
+  link: https://qzj.se
+  duration: "00:19:43"
+  author: SA6MWA
+  explicit: "no"
+  subtitle: 'Bug-out, bug-in och recension av boken War Diaries: A Radio Amateur In
+    Kyiv'
+  description: |-
+    Bug-out, bug-in? Är det klokt att preppa en s.k *"bug-out bag"* (BOB) eller är det bara dumheter? Det är några ämnen inom hemberedskap eller *"prepping"* som detta avsnittet behandlar där boken War Diaries - A Radio Amateur In Kyiv av Volodymyr Gurtovy agerar lite av ledstjärna för val av hemberedskapsstrategi.
+
+    War Diaries - A Radio Amateur In Kyiv hittar ni på Amazon:
+
+    * <https://www.amazon.com/War-Diaries-Radio-Amateur-Kyiv/dp/B0BM3GW8PJ>
+    * <https://www.amazon.com/War-Diaries-Radio-Amateur-Kyiv/dp/B0BM3L1YL1>
+
+    BBC Lights Out: Call Signs:
+
+    * <https://soundcloud.com/fallingtreeproductions/lights-out-call-signs-36>
+    * <https://www.bbc.co.uk/programmes/m001gj61>
+
+    BBC Short Cuts: Radio:
+
+    * <https://www.bbc.co.uk/programmes/m001brp6>. Hälften handlar om US7IGN Volodymyr i Kyiv och K4SWL Thomas i NC, USA, andra hälften av programmet är något helt annat.
+
+    Robert B Kauffman, Ph.D. om bugging out:
+
+    * <https://www.frostburg.edu/faculty/rkauffman/_files/images_preppers_chapters/Ch14-BugOut_v4.pdf>
+
+    Kauffman Prepper's Course Material:
+
+    * <https://www.frostburg.edu/faculty/rkauffman/writings-and-essays/writings-and-essays---preppers-course-materials.php>
+
+    Krigets Vittnen (Ukrainian Storybox – Voices of War):
+
+    * <https://www.svtplay.se/video/edPgoXv/dox-krigets-vittnen>
+
+    Stöd QZJ / Utesändaren på [qzj.se](https://qzj.se).
+  type: audio/mpeg
+  length: 19041007
+  image: artwork/qzj-3000x3000.jpeg
+  input: audiopod/masters/qzj017-war-diaries-us7ign.flac
+  output: qzj017-war-diaries-us7ign.mp3
 - uid: 16
   title: Zenitkonceptet
   pubDate: Fri, 20 Mar 2020 18:00:00 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:19:34"
   author: SA6MWA
   explicit: "no"
@@ -57,17 +284,19 @@ episodes:
     Samtliga försvarsmakter satsar idag mer och mer på kortvåg, speciellt de som tidigare förlitat sig på satellit- och repeaterlösningar. Många anser att dom förlorat kompetensen när man ersatta kortvåg med satellit- eller repeaterbaserade system. Zenitkonceptet är ämnat att erbjuda denna färdighet på ett förenklat, men ändå användbart sätt. Anledningen varför man satsar på kortvåg idag är att satellit- och repeater- eller basstationssystem är mycket mer sårbara för störning än kortvåg. Markbaserade system på UKV (VHF och UHF, etc) är av dess natur dessutom mer känsliga för pejling.
 
     Se video om Zenitkonceptet på YouTube eller på QZJ Video:
-    https://youtu.be/CsXpRmljY94
-    https://podcasts.apple.com/us/podcast/qzj-video/id1704487610?i=1000625769395
+
+    * <https://youtu.be/CsXpRmljY94>
+    * <https://podcasts.apple.com/us/podcast/qzj-video/id1704487610?i=1000625769395>
 
     QZJ Video RSS:
-    https://qzjvideo.s3.eu-west-1.amazonaws.com/videopod.rss
 
-    Stöd QZJ / Utesändaren på Patreon:
-    https://www.patreon.com/outsender
+    * <https://qzjvideo.s3.eu-west-1.amazonaws.com/videopod.rss>
+
+    Stöd QZJ / Utesändaren på [qzj.se](https://qzj.se).
 
     Musik under upprättandet av antennen: Rafael Krux - Guerilla Tactics
-    https://open.spotify.com/album/0L5oIKNyQ6SUQ5xYB2yfiu
+    <https://music.orchestralis.net/tracks>
+    <https://music.orchestralis.net/track/28901564>
   type: audio/mpeg
   length: 18902992
   image: artwork/qzj-3000x3000.jpeg
@@ -75,9 +304,9 @@ episodes:
   output: outsender53-zenitkonceptet.mp3
   format: audio
 - uid: 15
-  title: 015 Planering Under Tidspress
+  title: Planering Under Tidspress
   pubDate: Fri, 25 Mar 2022 16:00:13 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:20:12"
   author: SA6MWA
   explicit: "no"
@@ -87,18 +316,16 @@ episodes:
 
     Planering kan vara frustrerande och man vill bara ut och verkställa, men även de mest ivriga praktikerna inser att planering behövs. För oss som hatar långa planeringsmöten och planer som aldrig håller i verkligheten så är det fantastiskt att Planering Under Tidspress finns. Detta avsnittet går kortfattat igenom metoden, dess värde och underförstått varför Svenska Försvarsmakten använder metoden nästan uteslutande från åtminstone bataljon och nedåt - den är helt enkelt grym för otåliga taktiker. Jag utgår ifrån ett mer generellt tillämpningsperspektiv och menar att metoden går att utnyttja i all verksamhet man vill planera.
 
-    Stöd QZJ Utesändaren på Patreon:
-    https://www.patreon.com/outsender
+    Stöd QZJ / Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 19509907
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj015.flac
   output: qzj015.mp3
-  format: ""
 - uid: 14
-  title: 014 Arke
+  title: Arke
   pubDate: Fri, 15 Oct 2021 10:00:20 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:42:47"
   author: SA6MWA
   explicit: "no"
@@ -107,26 +334,24 @@ episodes:
     Hur kommunicerar man i ockuperat område mellan motståndsrörelsen, det som finns kvar av landets försvar och en exil-regering? Det är frågor som projekt Arke ämnar sysselsätta sig med och detta avsnittet presenterar dess bakgrund och varför det har fått namnet Arke.
 
     Lästips...
-    Der Totale Widerstand / Total Resistance:
-    https://en.wikipedia.org/wiki/Total_Resistance_(book)
-    https://www.adlibris.com/se/bok/total-resistance-9781607963042
 
-    Referenser återfinns i följande inlägg:
-    https://www.patreon.com/posts/projekt-arke-56989898
-    https://www.patreon.com/posts/arke-framat-57208191
+    * Der Totale Widerstand / Total Resistance:
+    <https://en.wikipedia.org/wiki/Total_Resistance_(book)>
+    <https://www.adlibris.com/se/bok/total-resistance-9781607963042>
+    * Referenser återfinns i följande inlägg:
+    <https://www.patreon.com/posts/projekt-arke-56989898>
+    <https://www.patreon.com/posts/arke-framat-57208191>
 
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+    Stöd QZJ / Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 41189607
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj014.flac
   output: qzj014.mp3
-  format: ""
 - uid: 13
-  title: 013 Normaltaktikens nya kläder
+  title: Normaltaktikens nya kläder
   pubDate: Fri, 24 Sep 2021 10:00:09 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:36:39"
   author: SA6MWA
   explicit: "no"
@@ -135,24 +360,25 @@ episodes:
     Om avsnitt 12 kort handlade om vad som är uppdragstaktik enligt dess tyska förlaga Auftragstaktik så handlar detta avsnitt om vad som inte är uppdragstaktik samt vad som inte är agilitet inom IT-världen i samma avsnitt. Jag ramar in avsnittet runt en artikel av överstelöjtnant Ola Palmquist - chef för Taktikavdelningen vid Markstridsskolan - med titeln Uppdragstaktik, en svensk papperstiger?
 
     Referenser:
-    https://kkrva.se/uppdragstaktik-en-svensk-papperstiger/
-    https://kkrva.se/tillbaka-till-framtiden/
-    https://www.armyupress.army.mil/Portals/7/combat-studies-institute/csi-books/Sonnenberger_Book.pdf
+
+    * <https://kkrva.se/uppdragstaktik-en-svensk-papperstiger/>
+    * <https://kkrva.se/tillbaka-till-framtiden/>
+    * <https://www.armyupress.army.mil/Portals/7/combat-studies-institute/csi-books/Sonnenberger_Book.pdf>
 
     Annat:
-    https://youtu.be/0pYf_odrgLE
-    https://ryansydnor.com/blog/certain-to-win/
-    https://youtube.com/playlist?list=PL4pmLxkc7CTcukIlpD0UThT7Y_K09oxXe
+
+    * <https://youtu.be/0pYf_odrgLE>
+    * <https://ryansydnor.com/blog/certain-to-win/>
+    * <https://youtube.com/playlist?list=PL4pmLxkc7CTcukIlpD0UThT7Y_K09oxXe>
   type: audio/mpeg
   length: 35301615
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj013.flac
   output: qzj013.mp3
-  format: ""
 - uid: 12
-  title: 012 Scrum och Uppdragstaktik
+  title: Scrum och Uppdragstaktik
   pubDate: Fri, 13 Aug 2021 10:00:06 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:56:23"
   author: SA6MWA
   explicit: "no"
@@ -160,21 +386,18 @@ episodes:
   description: |-
     Off-topic, fast relevant för den som kan komma att arbeta som signalist i t.ex en stab. Avsnitt 12 handlar om min åsikt att Scrum och Agile har sitt ursprung i ledarskapsfilosofin Uppdragstaktik, dvs Auftragstaktik, Führen mit Auftrag. Jag går igenom var Uppdragstaktik kommer ifrån och vad det är samt min syn på under vilken gemensam värdegrund det fungerar allra bäst. Därtill introducerar jag dig till överste John Boyd och OODA-loopen samt Boyd's ramverk Organizational Climate For Operational Success. Näst sist går jag igenom hela ramverket Scrum och hur det fungerar rent praktiskt. Allra sist redogör jag för hur vår familj förverkligar semesterplanerna med hjälp av Scrum där semestern är uppdelad i 10 så kallade sprintar.
 
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+    Stöd QZJ och Utesändaren på [qzj.se](https://qzj.se).
 
-    Länk nämnd i avsnittet:
-    https://kkrva.se/forsvarsmakten-och-uppdragstaktiken/
+    Länk nämnd i avsnittet: <https://kkrva.se/forsvarsmakten-och-uppdragstaktiken/>
   type: audio/mpeg
   length: 54245343
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj012.flac
   output: qzj012.mp3
-  format: ""
 - uid: 11
-  title: 011 Så lär du dig Morsekod
+  title: Så lär du dig Morsekod
   pubDate: Fri, 02 Jul 2021 13:00:00 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:38:00"
   author: SA6MWA
   explicit: "no"
@@ -182,18 +405,16 @@ episodes:
   description: |-
     I detta avsnitt tar jag upp några tips om hur man lämpligen lär sig telegrafi med Morsekod vare sig det är som blivande signalmatros, radioamatör, signalspanare, radiotelegrafist eller helt vanlig nörd. Syftet med avsnittet är att belysa problemen med de många snabbfix-metoder som bl.a florerar på YouTube. Dessa metoder hävdar att du lär dig telegrafera på 15 minuter och annat trams. Jag har flera år av träning bakom mig för att nå den hastighet jag klarar av idag och delar med mig av mina erfarenheter samt inom radioamatörhobbyn vedertagna metoder för att komma upp i användbar hastighet.
 
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+    Stöd QZJ och Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 36597033
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj011.flac
   output: qzj011.mp3
-  format: ""
 - uid: 10
-  title: 010 HF Non-Cooperative Target Recognition (HFNCTR)
+  title: HF Non-Cooperative Target Recognition (HFNCTR)
   pubDate: Fri, 05 Mar 2021 16:00:02 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:15:40"
   author: SA6MWA
   explicit: "no"
@@ -201,23 +422,21 @@ episodes:
   description: |-
     Detta är avsnitt 97 av Utesändaren, men som podcast och handlar om RÖS - röjande strålning samt huruvida man är ett samarbetsvilligt respektive icke samarbetsvilligt mål. Avsnittet behandlar hur kortvåg är resilient mot pejling och utstörning, men bara om man samtidigt tar hänsyn till dess sårbarheter och att därmed inte vara ett samarbetsvilligt mål.
 
-    https://www.youtube.com/c/utesandaren
-    https://youtu.be/CsXpRmljY94
-    https://youtu.be/JZEoqFP4xHQ
-    https://ieeexplore.ieee.org/document/9250315
+    * <https://www.youtube.com/c/utesandaren>
+    * <https://youtu.be/CsXpRmljY94>
+    * <https://youtu.be/JZEoqFP4xHQ>
+    * <https://ieeexplore.ieee.org/document/9250315>
 
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+    Stöd QZJ och Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 15156624
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj010.flac
   output: qzj010.mp3
-  format: ""
 - uid: 9
-  title: 009 Utesändaren blickar bakåt och framåt
+  title: Utesändaren blickar bakåt och framåt
   pubDate: Fri, 19 Feb 2021 17:00:25 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:25:49"
   author: SA6MWA
   explicit: "no"
@@ -226,21 +445,18 @@ episodes:
     En tillbakablick vad som hänt sen YouTube-kanalen Utesändaren introducerades och även bakgrunden till beslutet att starta kanalen. Jag blickar även framåt och presenterar hur upplägget kan tänkas bli framöver. Avsnittet spretar åt olika håll och utlovar en hel del episk musik (från videvo.net).
     https://www.youtube.com/c/utesandaren
 
-    Lästips och en referens bland många till innehållet:
-    https://ieeexplore.ieee.org/document/9250315
+    Lästips och en referens bland många till innehållet: <https://ieeexplore.ieee.org/document/9250315>
 
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+    Stöd QZJ och Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 24901245
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj009.flac
   output: qzj009.mp3
-  format: ""
 - uid: 8
-  title: 008 Genomgång CW QSO och förkortningar
+  title: Genomgång CW QSO och förkortningar
   pubDate: Sat, 30 Jan 2021 14:42:05 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:53:25"
   author: SA6MWA
   explicit: "no"
@@ -248,115 +464,113 @@ episodes:
   description: |-
     Avsnittet går igenom formatet på ett lagom långt CW QSO och vad flertalet av trafikförkortningarna man kommer i kontakt med betyder. Liknande format och förkortningar återfinns även i RTTY och PSK31 QSOn. Många av trafikförkortningarna och Q-koderna används även inom militär signalering både på CW och via RTTY.
     Tillägg: QRL? frågas om frekvensen är ledig, eller bättre om frekvensen är upptagen. Får man QRL tillbaka (utan fråegetecken) så är frekvensen upptagen (QRL = Jag är upptagen, QRL? = Är du upptagen?).
-    https://www.patreon.com/outsender
+
+    <https://qzj.se>
   type: audio/mpeg
   length: 51396959
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj008.flac
   output: qzj008.mp3
-  format: ""
 - uid: 7
-  title: 007 Morsealfabetet
+  title: Morsealfabetet
   pubDate: Mon, 01 Mar 2021 17:00:12 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:24:28"
   author: SA6MWA
   explicit: "no"
   subtitle: Övningsmaterial, telegrafi, CW.
   description: |-
     Övningsmaterial med alfabetet A till Ö samt siffror 0 till 9 enligt International/Continental Morse Code.
-    Stöd QZJ och Utesändaren på:
-    https://www.patreon.com/outsender
+
+    Stöd QZJ och Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 23604161
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj007.flac
   output: qzj007.mp3
-  format: ""
 - uid: 6
-  title: 006 HNY Introduktion till Morsekod
+  title: HNY Introduktion till Morsekod
   pubDate: Sat, 23 Jan 2021 10:06:39 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:27:40"
   author: SA6MWA
   explicit: "no"
   subtitle: Introduktion till CW och Morse-kod
   description: |-
     En liten introduktion till CW samt Morse-kod och framför allt lite tips utifrån mina misstag hur man kan gå tillväga för att lära sig Morse-kod samt hur lång tid man kan förvänta sig att det tar.
+
     Länkar:
-    https://www.ditdit.fm/shows/episode-31-cw-traffic-nets
-    https://qninewsletterdotnet.files.wordpress.com/2015/11/qni-2014-4.pdf
-    https://www.arrl.org/files/file/Public%20Service/ARES/Cascadia%20Rising%202016%20-%20Final%20Report.pdf
-    https://www.patreon.com/outsender
+
+    * <https://www.ditdit.fm/shows/episode-31-cw-traffic-nets>
+    * <https://qninewsletterdotnet.files.wordpress.com/2015/11/qni-2014-4.pdf>
+    * <https://www.arrl.org/files/file/Public%20Service/ARES/Cascadia%20Rising%202016%20-%20Final%20Report.pdf>
+    * <https://qzj.se>
   type: audio/mpeg
   length: 26676407
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj006.flac
   output: qzj006.mp3
-  format: ""
 - uid: 5
-  title: 005 Eftersnack QZJ003
+  title: Eftersnack QZJ003
   pubDate: Sat, 06 Mar 2021 08:00:02 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:43:07"
   author: SA6MWA
   explicit: "no"
   subtitle: Extramaterial, QZJ avsnitt 3
   description: |-
     Extramaterial för medlemmar på patreon.com/outsender. Jag rättar mig själv och reder ut begreppen robusthet och motståndskraft (resilience) i komplexa system enligt Dr Richard Cook, m.fl samt tänker högt angående min ambition att föra in Uppdragstaktik i IT-branschen. Lite om hur man skulle kunnat anpassa RAKEL fort att fungera under skogsbränder även när man inte har basstationer (signalister och att vara snabb genom OODA-loopen). Avslutas med vad nästa avsnitt ska handla om: 7S.
-    https://www.youtube.com/watch?v=2S0k12uZR14
+
+    <https://www.youtube.com/watch?v=2S0k12uZR14>
   type: audio/mpeg
   length: 41508889
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj005eftersnack003.flac
   output: qzj005eftersnack003.mp3
-  format: ""
 - uid: 4
-  title: 004 7S
+  title: 7S
   pubDate: Sun, 29 Nov 2020 01:08:03 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:34:35"
   author: SA6MWA
   explicit: "no"
   subtitle: Lär dig initialförkortningen 7S.
   description: |-
     I detta avsnittet lär du dig initialförkortningen 7S innan- och utantill. 7S står för stund, ställe, styrka, slag, sysselsättning, symbol och sagesman. Det kan även avslutas med ett 8:e S: sedan. En rättning är att pansarbilen (pb) i spaningsrapportexemplet förmodligen mer korrekt är en pansarterrängbil, ptgb.
+
     Länkar:
-    https://www.patreon.com/outsender
-    https://hemvarn.wordpress.com/2020/03/13/15-spaningsrapport-7s-och-dess-8-punkter/
-    sa6mwa@gmail.com
+
+    * <https://qzj.se>
+    * <https://hemvarn.wordpress.com/2020/03/13/15-spaningsrapport-7s-och-dess-8-punkter/>
+    * [mailto:sa6mwa@gmail.com](sa6mwa@gmail.com)
   type: audio/mpeg
   length: 33316835
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj004.flac
   output: qzj004.mp3
-  format: ""
 - uid: 3
-  title: 003 Radiokommunikation för effektiv ledning och komplexa system
+  title: Radiokommunikation för effektiv ledning och komplexa system
   pubDate: Wed, 25 Nov 2020 23:59:47 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:35:51"
   author: SA6MWA
   explicit: "no"
   subtitle: Om komplexa system och nyttan med alternativ.
-  description: |-
-    Detta avsnitt handlar om komplexa system och nyttan med alternativ i kris och höjd beredskap. Avsnittet tar avstamp in i denna djungel från skogsbranden i Älvdalen 2018 och de kommunikationsproblem man upplevde med ett radiosystem tänkt för trygg och säker kommunikation i kris och höjd beredskap.
-    Länkar:
-    https://www.dn.se/nyheter/politik/problem-med-raddningstjanstens-kommunikationssystem-sakerhetsrisk/
-    https://how.complexsystems.fail
-    https://www.patreon.com/outsender
-    https://youtube.com/c/utesandaren
-    sa6mwa@gmail.com
+  description: "Detta avsnitt handlar om komplexa system och nyttan med alternativ
+    i kris och höjd beredskap. Avsnittet tar avstamp in i denna djungel från skogsbranden
+    i Älvdalen 2018 och de kommunikationsproblem man upplevde med ett radiosystem
+    tänkt för trygg och säker kommunikation i kris och höjd beredskap.\n\nLänkar:\n
+    \ \n* <https://www.dn.se/nyheter/politik/problem-med-raddningstjanstens-kommunikationssystem-sakerhetsrisk/>\n*
+    <https://how.complexsystems.fail>\n* <https://youtube.com/c/utesandaren>\n* [mailto:sa6mwa@gmail.com](sa6mwa@gmail.com)"
   type: audio/mpeg
   length: 34533217
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj003.flac
   output: qzj003.mp3
-  format: ""
 - uid: 2
-  title: 002 Erfarenheter från en framskjuten ledningsplats
+  title: Erfarenheter från en framskjuten ledningsplats
   pubDate: Wed, 25 Nov 2020 23:58:24 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:32:08"
   author: SA6MWA
   explicit: "no"
@@ -375,11 +589,10 @@ episodes:
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj002.flac
   output: qzj002.mp3
-  format: ""
 - uid: 1
-  title: 001 Utesändaren blir också en podcast
+  title: Utesändaren blir också en podcast
   pubDate: Mon, 23 Nov 2020 00:36:03 +0000
-  link: https://www.patreon.com/outsender
+  link: https://qzj.se
   duration: "00:15:56"
   author: SA6MWA
   explicit: "no"
@@ -387,11 +600,9 @@ episodes:
   description: |-
     Avsnitt 91 av Utesändaren i podcastformat. Detta är starten på podcasten QZJ. Vad händer med vår moderna kommunkation? Blir basstationer i mobilnätet, repeatrar i diverse kommradionät och knutpunkter för datatrafik utan soppa till elverken då tystnar det i såväl kabel som etern. QZJ är en gammal militär Q-förkortning som sändes när man inte hörde svar på UKV och ber om kvittering via KV. UKV är ultrakortvåg - all mobil telefoni och kommradio är UKV. KV är kortvåg - det där gamla, förlegade sättet att kommunicera. KV kräver kompetens - precis som mycket annat när strömmen inte längre strömmar i vägguttaget. Tanken med QZJ är att fokusera på vad vi behöver kunna när det krisar och speciellt inom radiokommunikation.
 
-    Stöd QZJ Utesändaren på Patreon:
-    https://www.patreon.com/outsender
+    Stöd QZJ Utesändaren på [qzj.se](https://qzj.se).
   type: audio/mpeg
   length: 15413570
   image: artwork/qzj-3000x3000.jpeg
   input: audiopod/masters/qzj001.flac
   output: qzj001.mp3
-  format: ""
