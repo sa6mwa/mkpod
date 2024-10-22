@@ -1,5 +1,5 @@
 config:
-  baseURL: https://mypod.domain.tld
+  baseURL: https://mypod.s3.eu-west-1.amazonaws.com
   image: https://mypod.domain.tld/artwork/mypod-1600x1600.jpeg
   defaultPodImage: artwork/mypod-3000x3000.jpeg
   aws:
