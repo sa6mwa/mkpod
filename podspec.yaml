@@ -28,7 +28,11 @@ ownerEmail: sa6mwa@gmail.com
 author: SA6MWA
 explicit: "no"
 keywords: amatörradio,kortvåg,hf,telegrafi,cw,överlevnad,totalförsvar,prepping,hemberedskap,friluftsliv,uteliv
-category: Technology
+categories:
+- Technology
+- 'Society &amp; Culture'
+- Leisure:
+  - Hobbies
 encoding:
   bitrate: 128
   lamepath: /usr/bin/lame
