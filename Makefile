@@ -36,7 +36,7 @@ go.mod:
 	go mod tidy
 
 .PHONY: install
-install: bin/$(NAME)
+install:
 	install bin/$(NAME) $(DESTDIR)/$(NAME)
 
 .PHONY: release
