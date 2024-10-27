@@ -28,7 +28,17 @@
       <title>{{.Title}}</title>
       <link>{{.Link}}</link>
     </image>
-    <itunes:category text="{{.Category}}"/>
+{{- range .Categories }}
+		{{- if .Subcategories }}
+<itunes:category text="{{ .Name }}">
+      {{- range .Subcategories }}
+<itunes:category text="{{ . }}" />
+			{{- end }}
+</itunes:category>
+    {{- else }}
+<itunes:category text="{{ .Name }}" />
+    {{- end }}
+{{- end }}
 {{- range .Episodes }}
 {{- if isAfter timeNow .PubDate.Time }}
     <item>
