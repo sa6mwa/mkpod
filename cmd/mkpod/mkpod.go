@@ -58,19 +58,22 @@ const (
 	// lower the music to this fraction when the vocal track is on.
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
-		`highpass=f=50,` +
-		`{{ if eq .PreProcess.EQ "podmic" }}` +
+		`{{ if .PreProcess.Highpass }}` +
+		`highpass=f=90,` +
+		`{{ end }}` +
+		`{{ if eq .PreProcess.EQ "sm7b" }}` +
+		`firequalizer=gain_entry='entry(50,-90); entry(80,-12); entry(125,-3); entry(200, 0)',` +
+		`{{ else if eq .PreProcess.EQ "podmic" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(125, +2); entry(250, 0); entry(500, -2); entry(1000, 0); entry(2000, 1); entry(4000, 1); entry(8000, 0); entry(15000, -5)',` +
 		`{{ else if eq .PreProcess.EQ "podmic2" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(90,2); entry(538,-3); entry(12000,-2)',` +
 		`{{ else if eq .PreProcess.EQ "lowcut" }}` +
-		`firequalizer=gain_entry='entry(125,-5); entry(250, 0)',` +
+		`firequalizer=gain_entry='entry(130,-5); entry(250, 0)',` +
 		`{{ end }}` +
-		`{{ if eq .PreProcess.Profile "qzj" }}` +
-		`compand=attacks=.001:decays=.5:points=-90/-900|-80/-90|-50/-50|-30/-15|0/-2|20/-2:soft-knee=3,` +
-		// `" ` +
+		`{{ if eq .PreProcess.Profile "qzj" }}` + `compand=attacks=.001:decays=.5:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		//`" ` +
 		`alimiter=limit=0.7943282347242815:level=disabled" ` +
 		`{{ else if eq .PreProcess.Profile "heavy" }}` +
 		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-9|0/-2|20/-2:soft-knee=12,` +
@@ -80,7 +83,8 @@ const (
 
 	defaultPreProcessingPrefix string = "preprocessed-"
 	defaultProfile             string = "qzj"
-	defaultEQ                  string = "none"
+	defaultEQ                  string = "sm7b"
+	defaultHighpass            bool   = false
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -114,11 +118,17 @@ func main() {
 						Value: defaultProfile,
 						Usage: "Compression and limiter profile, available: qzj, heavy, none. Limiter settings (except \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
 					},
+					&cli.BoolFlag{
+						Name:    "highpass",
+						Aliases: []string{"lowcut", "hp"},
+						Value:   defaultHighpass,
+						Usage:   "Enable highpass/lowcut filter",
+					},
 					&cli.StringFlag{
 						Name:    "equalizer",
 						Aliases: []string{"eq"},
 						Value:   defaultEQ,
-						Usage:   "Pre-configured equalizer settings to apply, available: podmic, podmic2, lowcut, none",
+						Usage:   "Pre-configured equalizer settings to apply, available: sm7b, podmic, podmic2, lowcut, none",
 					},
 				},
 			},
@@ -247,10 +257,11 @@ func preprocess(c *cli.Context) error {
 		combined := &Combined{
 			// Atom: &atom,
 			PreProcess: &PreProcess{
-				Input:   input,
-				EQ:      c.String("equalizer"),
-				Profile: c.String("profile"),
-				Prefix:  c.String("prefix"),
+				Input:    input,
+				Highpass: c.Bool("highpass"),
+				EQ:       c.String("equalizer"),
+				Profile:  c.String("profile"),
+				Prefix:   c.String("prefix"),
 			},
 		}
 		buf := &bytes.Buffer{}
