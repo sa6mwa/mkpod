@@ -62,7 +62,7 @@ const (
 		`highpass=f=90,` +
 		`{{ end }}` +
 		`{{ if eq .PreProcess.EQ "sm7b" }}` +
-		`firequalizer=gain_entry='entry(50,-90); entry(80,-12); entry(125,-3); entry(200, 0)',` +
+		`firequalizer=gain_entry='entry(50,-90); entry(80,-12); entry(125,-2); entry(200, 0)',` +
 		`{{ else if eq .PreProcess.EQ "podmic" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(125, +2); entry(250, 0); entry(500, -2); entry(1000, 0); entry(2000, 1); entry(4000, 1); entry(8000, 0); entry(15000, -5)',` +
