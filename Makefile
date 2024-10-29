@@ -16,7 +16,19 @@ clean:
 	rm -rf bin
 
 .PHONY: build
-build: test bin/$(NAME)
+build: test vulncheck bin/$(NAME) strip upx
+
+.PHONY: vulncheck
+vulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+.PHONY: strip
+strip:
+	strip -s bin/$(NAME)
+
+.PHONY: upx
+upx:
+	if which upx > /dev/null ; then upx -9 bin/$(NAME) ; fi
 
 .PHONY: test
 test:
@@ -26,10 +38,7 @@ bin:
 	mkdir bin
 
 bin/$(NAME): bin
-	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 	$(GO) build -v -trimpath -ldflags '-s -w -X main.version=$(VERSION)' -o bin/$(NAME) $(SRC)
-	strip -s bin/$(NAME)
-	if which upx > /dev/null ; then upx -9 bin/$(NAME) ; fi
 
 go.mod:
 	go mod init $(MODULE)

@@ -413,10 +413,11 @@ func (c *Category) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 type PreProcess struct {
-	Input   string
-	EQ      string
-	Profile string
-	Prefix  string
+	Input    string
+	Highpass bool
+	EQ       string
+	Profile  string
+	Prefix   string
 }
 
 type Combined struct {
