@@ -49,7 +49,7 @@ const (
 
 	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ escape .Atom.Encoding.Language }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Subtitle }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} - {{ escape (print $PRE .Episode.Output) }}`
 
-	// EQ and compression for the Rode PODMIC
+	// EQ and compression presets
 	//
 	// The settings should allow you to have a background stereo track
 	// (like music) below -10 dB. Minus 10.01 dB in fraction is
@@ -58,33 +58,32 @@ const (
 	// lower the music to this fraction when the vocal track is on.
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
-		`{{ if .PreProcess.Highpass }}` +
-		`highpass=f=90,` +
-		`{{ end }}` +
-		`{{ if eq .PreProcess.EQ "sm7b" }}` +
-		`firequalizer=gain_entry='entry(0,-90); entry(80,0); entry(100,0); entry(125,-3); entry(300, -12); entry(400, -12); entry(600,0); entry(1000, 0); entry(1500, 0)',` +
-		`{{ else if eq .PreProcess.EQ "podmic" }}` +
+		`{{ if eq .PreProcess.Preset "qzj" }}` +
+		`firequalizer=gain_entry='entry(0,-90); entry(50,0); entry(80,0); entry(125,-20); entry(200,0); entry(250,-9); entry(300,-6); entry(1000,0); entry(1400,-3); entry(1700,0); entry(7000,0); entry(10000,+3); entry(13000,+3); entry(16000,+3); entry(18000,-12)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`firequalizer=gain_entry='entry(80, 0); entry(130,-2); entry(180,0)',` +
+		`alimiter=limit=0.7943282347242815:level=disabled` +
+		`{{ else if eq .PreProcess.Preset "heavy" }}` +
+		`compand=attacks=.01:decays=.1:points=-90/-900|-80/-90|-57/-57|-27/-9|0/-2|20/-2:soft-knee=12,` +
+		`alimiter=limit=0.7943282347242815:level=disabled` +
+		`{{ else if eq .PreProcess.Preset "qzj-podmic" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(125, +2); entry(250, 0); entry(500, -2); entry(1000, 0); entry(2000, 1); entry(4000, 1); entry(8000, 0); entry(15000, -5)',` +
-		`{{ else if eq .PreProcess.EQ "podmic2" }}` +
+		`compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`alimiter=limit=0.7943282347242815:level=disabled` +
+
+		`{{ else if eq .PreProcess.Preset "qzj-podmic2" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(90,2); entry(538,-3); entry(12000,-2)',` +
-		`{{ else if eq .PreProcess.EQ "lowcut" }}` +
+		`{{ else if eq .PreProcess.Preset "lowcut" }}` +
 		`firequalizer=gain_entry='entry(130,-5); entry(250, 0)',` +
+		`compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`alimiter=limit=0.7943282347242815:level=disabled` +
 		`{{ end }}` +
-		`{{ if eq .PreProcess.Profile "qzj" }}` + `compand=attacks=.01:decays=.8:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
-		//`" ` +
-		`alimiter=limit=0.7943282347242815:level=disabled" ` +
-		`{{ else if eq .PreProcess.Profile "heavy" }}` +
-		`compand=attacks=.0001:decays=.5:points=-90/-900|-80/-90|-50/-50|-27/-9|0/-2|20/-2:soft-knee=12,` +
-		`alimiter=limit=0.7943282347242815:level=disabled" ` +
-		`{{ end }}` +
+		`" ` +
 		`{{ escape (print .PreProcess.Prefix .PreProcess.Input) }}`
 
 	defaultPreProcessingPrefix string = "preprocessed-"
-	defaultProfile             string = "qzj"
-	defaultEQ                  string = "sm7b"
-	defaultHighpass            bool   = false
+	defaultPreset              string = "qzj"
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -114,21 +113,10 @@ func main() {
 						Usage: "Prefix to add to the output file",
 					},
 					&cli.StringFlag{
-						Name:  "profile",
-						Value: defaultProfile,
-						Usage: "Compression and limiter profile, available: qzj, heavy, none. Limiter settings (except \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
-					},
-					&cli.BoolFlag{
-						Name:    "highpass",
-						Aliases: []string{"lowcut", "hp"},
-						Value:   defaultHighpass,
-						Usage:   "Enable highpass/lowcut filter",
-					},
-					&cli.StringFlag{
-						Name:    "equalizer",
-						Aliases: []string{"eq"},
-						Value:   defaultEQ,
-						Usage:   "Pre-configured equalizer settings to apply, available: sm7b, podmic, podmic2, lowcut, none",
+						Name:    "preset",
+						Aliases: []string{"p"},
+						Value:   defaultPreset,
+						Usage:   "Preset for EQ, compression, limiter and similar, available: qzj, none. Limiter settings (except preset \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
 					},
 				},
 			},
@@ -257,11 +245,9 @@ func preprocess(c *cli.Context) error {
 		combined := &Combined{
 			// Atom: &atom,
 			PreProcess: &PreProcess{
-				Input:    input,
-				Highpass: c.Bool("highpass"),
-				EQ:       c.String("equalizer"),
-				Profile:  c.String("profile"),
-				Prefix:   c.String("prefix"),
+				Input:  input,
+				Prefix: c.String("prefix"),
+				Preset: c.String("preset"),
 			},
 		}
 		buf := &bytes.Buffer{}
