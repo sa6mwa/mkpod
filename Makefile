@@ -1,7 +1,7 @@
 NAME = mkpod
 MODULE = github.com/sa6mwa/mkpod
 #VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0)
-VERSION = v0.2.1
+VERSION = v0.3.0
 DESTDIR = /usr/local/bin
 SRC = $(MODULE)/cmd/$(NAME)
 GOOS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
