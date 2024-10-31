@@ -62,7 +62,7 @@ const (
 		`highpass=f=90,` +
 		`{{ end }}` +
 		`{{ if eq .PreProcess.EQ "sm7b" }}` +
-		`firequalizer=gain_entry='entry(50,-90); entry(80,-12); entry(125,-2); entry(200, 0)',` +
+		`firequalizer=gain_entry='entry(0,-90); entry(80,0); entry(100,0); entry(125,-3); entry(300, -12); entry(400, -12); entry(600,0); entry(1000, 0); entry(1500, 0)',` +
 		`{{ else if eq .PreProcess.EQ "podmic" }}` +
 		// `deesser,` +
 		`firequalizer=gain_entry='entry(125, +2); entry(250, 0); entry(500, -2); entry(1000, 0); entry(2000, 1); entry(4000, 1); entry(8000, 0); entry(15000, -5)',` +
@@ -72,7 +72,7 @@ const (
 		`{{ else if eq .PreProcess.EQ "lowcut" }}` +
 		`firequalizer=gain_entry='entry(130,-5); entry(250, 0)',` +
 		`{{ end }}` +
-		`{{ if eq .PreProcess.Profile "qzj" }}` + `compand=attacks=.001:decays=.5:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`{{ if eq .PreProcess.Profile "qzj" }}` + `compand=attacks=.01:decays=.8:points=-90/-900|-57/-57|-27/-7|-3/-3|0/-3|20/-3:soft-knee=2,` +
 		//`" ` +
 		`alimiter=limit=0.7943282347242815:level=disabled" ` +
 		`{{ else if eq .PreProcess.Profile "heavy" }}` +
