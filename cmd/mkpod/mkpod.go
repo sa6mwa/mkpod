@@ -59,7 +59,8 @@ const (
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
 		`{{ if eq .PreProcess.Preset "qzj" }}` +
-		`firequalizer=gain_entry='entry(0,-90); entry(50,0); entry(80,0); entry(125,-15); entry(200,0); entry(250,-9); entry(300,-6); entry(1000,0); entry(1400,-2); entry(1700,0); entry(17000,0); entry(18000,-12)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`lowpass=18000,` +
+		`firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
 		`alimiter=limit=0.7943282347242815:level=disabled` +
 		`{{ else if eq .PreProcess.Preset "aggressive" }}` +
 		`firequalizer=gain_entry='entry(0,-90); entry(50,0); entry(80,0); entry(125,-20); entry(200,0); entry(250,-9); entry(300,-6); entry(1000,0); entry(1400,-3); entry(1700,0); entry(7000,0); entry(10000,+3); entry(13000,+3); entry(16000,+3); entry(18000,-12)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
