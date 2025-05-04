@@ -271,6 +271,13 @@ func downloadEncodeUpload(tmpl *Templates, uid int64, force bool) error {
 			return fmt.Errorf("input is missing for UID %d (%s)", atom.Episodes[idx].UID, atom.Episodes[idx].Title)
 		}
 		if len(atom.Episodes[idx].Output) < 3 || force {
+			// If -R option is given and user answers yes or supplied the
+			// force option, delete remote master.
+			if removeRemoteMasterFile && doAction("Remove s3://%s?", path.Join(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Input)) {
+				if err := awsHandler.Remove(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Input); err != nil {
+					return err
+				}
+			}
 			// Download input file, encode it and upload the output file.
 			if doAction("Download s3://%s, encode and upload to s3://%s?", path.Join(atom.Config.Aws.Buckets.Input, atom.Episodes[idx].Input), atom.Config.Aws.Buckets.Output) {
 				// Start by downloading the artwork.

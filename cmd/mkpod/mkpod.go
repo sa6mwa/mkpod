@@ -24,6 +24,7 @@ var (
 	specFile                           string
 	awsHandler                         AwsHandler
 	askNoQuestions                     bool       = false
+	removeRemoteMasterFile             bool       = false
 	dryRun                             bool       = false
 	lameCommandTemplate                string     = defaultLameCommandTemplate
 	ffmpegCommandTemplate              string     = defaultFfmpegCommandTemplate
@@ -36,8 +37,7 @@ var (
 
 const (
 	//defaultTemplate   string = "template.rss"
-	defaultSpec string = "podspec.yaml"
-	//defaultPrivate    string = "private.yaml"
+	defaultSpec       string = "podspec.yaml"
 	defaultPodcastRSS string = "podcast.rss"
 	// The lame command template is parsed for each episode being
 	// encoded where .Atom is the full atom and .Episode is the episode
@@ -59,6 +59,7 @@ const (
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
 		`{{ if eq .PreProcess.Preset "qzj" }}` +
+		`highpass=80,` +
 		`lowpass=18000,` +
 		`firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
 		`alimiter=limit=0.7943282347242815:level=disabled` +
@@ -185,6 +186,12 @@ func main() {
 						Aliases: []string{"s"},
 						Value:   defaultSpec,
 						Usage:   "Main configuration file for generating the atom RSS",
+					},
+					&cli.BoolFlag{
+						Name:    "remove-remote-master",
+						Aliases: []string{"R"},
+						Value:   false,
+						Usage:   "Remove remote input master audio or video file before uploading local master input file. Unless the force option is given, there is a yes/no prompt before proceeding",
 					},
 					// &cli.StringFlag{
 					// 	Name:    "private",
@@ -413,6 +420,7 @@ func encoder(c *cli.Context) error {
 	//privateFile = c.String("private")
 	//templateFile = c.String("template")
 	askNoQuestions = c.Bool("force")
+	removeRemoteMasterFile = c.Bool("remove-remote-master")
 
 	err = loadConfig()
 	if err != nil {

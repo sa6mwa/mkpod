@@ -210,6 +210,14 @@ type ItunesTime struct {
 	time.Time
 }
 
+func (s *AwsHandler) Remove(bucket string, key string) error {
+	_, err := s.S3.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	return err
+}
+
 // Custom unmarshal function for RFC1123Z time (Itunes "RFC2822" date format).
 func (t *ItunesTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var buf string
