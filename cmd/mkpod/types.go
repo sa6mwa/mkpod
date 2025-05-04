@@ -472,21 +472,22 @@ type Defaults struct {
 }
 
 type Episode struct {
-	UID         int64          `yaml:"uid"`
-	Title       string         `yaml:"title"`
-	PubDate     ItunesTime     `yaml:"pubDate"`
-	Link        string         `yaml:"link"`
-	Duration    ItunesDuration `yaml:"duration"`
-	Author      string         `yaml:"author"`
-	Explicit    ItunesExplicit `yaml:"explicit,omitempty"`
-	Subtitle    string         `yaml:"subtitle"`
-	Description string         `yaml:"description"`
-	Type        string         `yaml:"type"`
-	Length      int64          `yaml:"length"`
-	Image       string         `yaml:"image"`
-	Input       string         `yaml:"input"`
-	Output      string         `yaml:"output"`
-	Format      string         `yaml:"format,omitempty"`
+	UID              int64          `yaml:"uid"`
+	Title            string         `yaml:"title"`
+	PubDate          ItunesTime     `yaml:"pubDate"`
+	Link             string         `yaml:"link"`
+	Duration         ItunesDuration `yaml:"duration"`
+	Author           string         `yaml:"author"`
+	Explicit         ItunesExplicit `yaml:"explicit,omitempty"`
+	Subtitle         string         `yaml:"subtitle"`
+	Description      string         `yaml:"description"`
+	Type             string         `yaml:"type"`
+	Length           int64          `yaml:"length"`
+	Image            string         `yaml:"image"`
+	Input            string         `yaml:"input"`
+	Output           string         `yaml:"output"`
+	Format           string         `yaml:"format,omitempty"`
+	EncodingLanguage string         `yaml:"encodingLanguage,omitempty"`
 }
 
 type Rss struct {

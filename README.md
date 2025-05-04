@@ -73,3 +73,43 @@ $ git add podspec.yaml ; git commit -m 'Update pod' ; git push
 `mkpod` uses `libfdk_aac` to encode `mp4`. In the [scripts/](scripts) directory
 you will find a build script that should work for various Ubuntu/Debian Linux
 distributions.
+
+## AWS access policy
+
+For the public podcast bucket, you are going to have to disable `Block
+all public access` (set it to `Off`) under `Permissions` in the
+console or via...
+
+```console
+aws s3api put-public-access-block \
+	--bucket YOUR_BUCKET_NAME \
+	--public-access-block-configuration \
+	BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false
+```
+
+Apply something like the following policy to allow everyone to
+download the rss, audio, artwork, etc. List-access is not required.
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "PublicRead",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "*"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::mypodbucket/*"
+        }
+    ]
+}
+```
+
+Apply the policy in the UI or via something like the following
+command...
+
+```console
+aws s3api put-bucket-policy --bucket YOUR_BUCKET_NAME --policy file://YOUR_POLICY_FILE.json
+```
