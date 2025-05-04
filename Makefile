@@ -1,7 +1,7 @@
 NAME = mkpod
 MODULE = github.com/sa6mwa/mkpod
 #VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0)
-VERSION = v0.3.1
+VERSION = v0.4.1
 DESTDIR = /usr/local/bin
 SRC = $(MODULE)/cmd/$(NAME)
 GOOS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
@@ -50,5 +50,8 @@ install:
 
 .PHONY: release
 release:
+	$(eval VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0))
+	$(MAKE) VERSION=$(VERSION) clean build
 	cp bin/$(NAME) bin/$(NAME)-$(shell go env GOOS)-$(shell go env GOARCH)-$(VERSION)
 	cd bin && sha256sum $(NAME)-$(shell go env GOOS)-$(shell go env GOARCH)-$(VERSION) > checksums.txt
+	gh release create $(VERSION) --generate-notes bin/$(NAME)-$(shell go env GOOS)-$(shell go env GOARCH)-$(VERSION) bin/checksums.txt
