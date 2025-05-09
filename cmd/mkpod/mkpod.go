@@ -58,11 +58,19 @@ const (
 	// lower the music to this fraction when the vocal track is on.
 	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
-		`{{ if eq .PreProcess.Preset "qzj" }}` +
+
+		`{{ if eq .PreProcess.Preset "sm7b" }}` +
+		`highpass=80,` +
+		`lowpass=18000,` +
+		`firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-12|-3/-3|0/-3|20/-3:soft-knee=2,` +
+		`alimiter=limit=0.7943282347242815:level=disabled` +
+
+		`{{ else if eq .PreProcess.Preset "qzj" }}` +
 		`highpass=80,` +
 		`lowpass=18000,` +
 		`firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
 		`alimiter=limit=0.7943282347242815:level=disabled` +
+
 		`{{ else if eq .PreProcess.Preset "aggressive" }}` +
 		`firequalizer=gain_entry='entry(0,-90); entry(50,0); entry(80,0); entry(125,-20); entry(200,0); entry(250,-9); entry(300,-6); entry(1000,0); entry(1400,-3); entry(1700,0); entry(7000,0); entry(10000,+3); entry(13000,+3); entry(16000,+3); entry(18000,-12)',` + `compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,` +
 		`firequalizer=gain_entry='entry(80, 0); entry(130,-2); entry(180,0)',` +
@@ -88,7 +96,7 @@ const (
 		`{{ escape (print .PreProcess.Prefix .PreProcess.Input) }}`
 
 	defaultPreProcessingPrefix string = "preprocessed-"
-	defaultPreset              string = "qzj"
+	defaultPreset              string = "sm7b"
 
 	shell              string = "/bin/sh"
 	shellCommandOption string = "-c"
@@ -98,7 +106,7 @@ func main() {
 	app := &cli.App{
 		Name:      "mkpod",
 		Usage:     "Tool to render a podcast rss feed from spec, automate mp3/mp4 encoding and publish to Amazon S3.",
-		Copyright: "Copyright SA6MWA 2022-2023 sa6mwa@gmail.com, https://github.com/sa6mwa/mkpod",
+		Copyright: "Copyright SA6MWA 2022-2025 sa6mwa@gmail.com, https://github.com/sa6mwa/mkpod",
 		Commands: []*cli.Command{
 			{
 				Name:    "preprocess",
@@ -121,7 +129,7 @@ func main() {
 						Name:    "preset",
 						Aliases: []string{"p"},
 						Value:   defaultPreset,
-						Usage:   "Preset for EQ, compression, limiter and similar, available: qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, none. Limiter settings (except preset \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
+						Usage:   "Preset for EQ, compression, limiter and similar, available: sm7b, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, none. Limiter settings (except preset \"none\") will allow you to have background audio/music -10 dB. Minus 10.01 dB in fraction is 0.3158639048423471 or 0.31586 which should produce a mix without clipping.",
 					},
 				},
 			},
