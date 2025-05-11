@@ -431,16 +431,11 @@ type PreProcess struct {
 	Preset string
 }
 
-type CommandParameters struct {
-	MetadataFile string
-	Untyped      map[string]string
-}
-
 type Combined struct {
-	Atom       *Atom
-	Episode    *Episode
-	PreProcess *PreProcess
-	Params     *CommandParameters
+	Atom         *Atom
+	Episode      *Episode
+	PreProcess   *PreProcess
+	MetadataFile string
 }
 
 func (a *Atom) LocalStorageDirExpanded() string {
@@ -496,7 +491,7 @@ type Episode struct {
 	Length           int64            `yaml:"length"`
 	Image            string           `yaml:"image"`
 	Input            string           `yaml:"input"`
-	Output           string           `yaml:"output"`
+	Output           string           `yaml:"output,omitempty"`
 	Format           string           `yaml:"format,omitempty"`
 	EncodingLanguage string           `yaml:"encodingLanguage,omitempty"`
 	Chapters         []id3v24.Chapter `yaml:"chapters,omitempty"`

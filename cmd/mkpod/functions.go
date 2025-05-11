@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alfg/mp4"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	mdp "github.com/gomarkdown/markdown/parser"
@@ -503,24 +503,33 @@ func createLocalStorageDir() error {
 	return nil
 }
 
-// https://www.tutorialspoint.com/how-to-detect-the-content-type-of-a-file-in-golang
+// // https://www.tutorialspoint.com/how-to-detect-the-content-type-of-a-file-in-golang
+// func GetFileContentType(filename string) (contentType string, err error) {
+// 	// to sniff the content type only the first
+// 	// 512 bytes are used.
+// 	var f *os.File
+// 	f, err = os.Open(filename)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer f.Close()
+// 	buf := make([]byte, 512)
+// 	_, err = f.Read(buf)
+// 	if err != nil {
+// 		return
+// 	}
+// 	// the function that actually does the trick
+// 	contentType = http.DetectContentType(buf)
+// 	return
+// }
+
 func GetFileContentType(filename string) (contentType string, err error) {
-	// to sniff the content type only the first
-	// 512 bytes are used.
-	var f *os.File
-	f, err = os.Open(filename)
+	mimetype.SetLimit(1024 * 1024)
+	mimeType, err := mimetype.DetectFile(filename)
 	if err != nil {
-		return
+		return "", err
 	}
-	defer f.Close()
-	buf := make([]byte, 512)
-	_, err = f.Read(buf)
-	if err != nil {
-		return
-	}
-	// the function that actually does the trick
-	contentType = http.DetectContentType(buf)
-	return
+	return mimeType.String(), nil
 }
 
 // Mp4Duration returns the length in bytes and the duration in
@@ -580,10 +589,14 @@ func GetSizeAndDurationViaFFprobe(filename string) (time.Duration, int64, error)
 	return ffprobejson.Format.Duration.Duration, fi.Size(), nil
 }
 
-func ApplyMetadataToM4A(metadatafile, inputM4file, outputM4file string) error {
-	ffmpegCmd := fmt.Sprintf("ffmpeg -i %s -i %s -map 0 -map_metadata 1 -c copy %s", shellescape.Quote(inputM4file), shellescape.Quote(metadatafile), shellescape.Quote(outputM4file))
-	return Run(ffmpegCmd)
-}
+// // ApplyMetadataToM4A does not work for metadata chapter title tags,
+// // they will be missing as this function copies the stream. It would
+// // need to be re-encoded to add chapter titles. Instead we are using
+// // GetSizeAndDurationViaFFprobe which supports various input formats.
+// func ApplyMetadataToM4A(metadatafile, inputM4file, outputM4file string) error {
+// 	ffmpegCmd := fmt.Sprintf("ffmpeg -y -i %s -i %s -map 0 -map_metadata 1 -c copy -movflags +faststart+use_metadata_tags %s", shellescape.Quote(inputM4file), shellescape.Quote(metadatafile), shellescape.Quote(outputM4file))
+// 	return Run(ffmpegCmd)
+// }
 
 // Run runs commandString via shell (probably /bin/sh) and
 // shellCommandOption (-c). Output is os.Stdout, os.Stderr,
@@ -626,49 +639,38 @@ func EncodeFFmpegAudio(tmpl *Templates, episode *Episode, format string) error {
 		Track:       fmt.Sprintf("%d", episode.UID),
 		Comment:     episode.Link,
 		Description: rplcr.Replace(episode.Subtitle),
-		Language:    lang,
+		Language:    strings.ToLower(lang),
 		CoverJPEG:   path.Join(atom.LocalStorageDirExpanded(), atom.Encoding.Coverfront),
 		Chapters:    episode.Chapters,
 	}
 
-	buf := &bytes.Buffer{}
-	if err := tmpl.FFmpegM4A.Execute(buf, combined); err != nil {
-		return err
-	}
-
-	// First, encode to preferred output format (m4a or m4b).
-	log.Printf("Executing: %s", buf.String())
-	if err := Run(buf.String()); err != nil {
-		return fmt.Errorf("unable to encode to %s using ffmpeg: %w", atom.Encoding.PreferredFormat, err)
-	}
-	temporaryOutputPath := path.Join(atom.LocalStorageDirExpanded(), "without-metadata-"+episode.Output)
-	outputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
-
-	// // Run ffprobe to get duration and size (size is from os.Stat)
-	// log.Printf("Retrieving size and duration of %q", temporaryOutputPath)
-	// duration, size, err := GetSizeAndDurationViaFFprobe(temporaryOutputPath)
-	// if err != nil {
-	// 	return fmt.Errorf("unable to get size and duration via ffprobe: %w", err)
-	// }
-
-	// Use github.com/alfg/mp4 to get size and duration of temporary m4a
-	// or m4b.
-	size, duration, err := Mp4Duration(temporaryOutputPath)
+	// Get duration of original input file
+	duration, size, err := GetSizeAndDurationViaFFprobe(path.Join(atom.LocalStorageDirExpanded(), episode.Input))
 	if err != nil {
-		return fmt.Errorf("unable to get size and duration: %w", err)
+		return fmt.Errorf("unable to get duration and size from input file: %w", err)
 	}
 	// Generate metadata /w chapters (if any)
 	metadataFile, err := id3v24.WriteFFmpegMetadataFile(duration, trackInfo)
 	if err != nil {
 		return fmt.Errorf("unable to generate ffmetadata file: %w", err)
 	}
-	// Apply metadata to output file
-	if err := ApplyMetadataToM4A(metadataFile, temporaryOutputPath, outputPath); err != nil {
-		return fmt.Errorf("unable to apply metadata %q to %q and create %q: %w", metadataFile, temporaryOutputPath, outputPath, err)
+	//defer os.Remove(metadataFile)
+	combined.MetadataFile = metadataFile
+	// Parse template (with metadatafile added to input values)
+	buf := &bytes.Buffer{}
+	if err := tmpl.FFmpegM4A.Execute(buf, combined); err != nil {
+		return err
 	}
-	log.Printf("Removing %q", temporaryOutputPath)
-	if err := os.Remove(temporaryOutputPath); err != nil {
-		return fmt.Errorf("unable to remove %q: %w", temporaryOutputPath, err)
+	// Encode to preferred output format (m4a or m4b).
+	log.Printf("Executing: %s", buf.String())
+	if err := Run(buf.String()); err != nil {
+		return fmt.Errorf("unable to encode to %s using ffmpeg: %w", atom.Encoding.PreferredFormat, err)
+	}
+	outputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+	// Get correct duration and size of the output file
+	duration, size, err = GetSizeAndDurationViaFFprobe(outputPath)
+	if err != nil {
+		return fmt.Errorf("unable to get duration and size from %s: %w", episode.Output, err)
 	}
 	// Update episode length and duration
 	log.Printf("%s is %s long and %d bytes (updating %s)", episode.Output, duration, size, specFile)
