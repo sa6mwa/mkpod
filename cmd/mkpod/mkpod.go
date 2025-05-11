@@ -13,6 +13,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	//"github.com/logrusorgru/aurora"
+
 	"gopkg.in/alessio/shellescape.v1"
 )
 
@@ -27,9 +28,10 @@ var (
 	removeRemoteMasterFile             bool       = false
 	dryRun                             bool       = false
 	lameCommandTemplate                string     = defaultLameCommandTemplate
-	ffmpegCommandTemplate              string     = defaultFfmpegCommandTemplate
-	ffmpegToAudioCommandTemplate       string     = defaultFfmpegToAudioCommandTemplate
-	ffmpegPreProcessingCommandTemplate string     = defaultFfmpegPreProcessingCommandTemplate
+	ffmpegCommandTemplate              string     = defaultFFmpegCommandTemplate
+	ffmpegToAudioCommandTemplate       string     = defaultFFmpegToAudioCommandTemplate
+	ffmpegToM4ACommandTemplate         string     = defaultFFmpegToM4ACommandTemplate
+	ffmpegPreProcessingCommandTemplate string     = defaultFFmpegPreProcessingCommandTemplate
 	templates                          *Templates = &Templates{}
 	updateAtom                         bool       = false
 	processCounter                     int        = 0
@@ -43,11 +45,22 @@ const (
 	// encoded where .Atom is the full atom and .Episode is the episode
 	// currently being processed (current item in the Episodes struct
 	// slice).
-	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Subtitle }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Episode.Link }} {{ escape (print $PRE .Episode.Input) }} {{ escape (print $PRE .Episode.Output) }}`
+	defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} {{ escape (print $PRE .Episode.Input) }} {{ escape (print $PRE .Episode.Output) }}`
 
-	defaultFfmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} {{ escape (print $PRE .Episode.Output) }}`
+	// defaultLameCommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded "" }}{{ $PRE = print .Atom.LocalStorageDirExpanded "/" }}{{ end }}{{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Subtitle }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Episode.Link }} {{ escape (print $PRE .Episode.Input) }} {{ escape (print $PRE .Episode.Output) }}`
 
-	defaultFfmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FfmpegpathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Subtitle }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} - {{ escape (print $PRE .Episode.Output) }}`
+	defaultFFmpegCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FFmpegPathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -pix_fmt yuv420p -colorspace bt709 -color_trc bt709 -color_primaries bt709 -color_range tv -c:v libx264 -profile:v high -crf {{ .Atom.Encoding.CRF }} -maxrate 1M -bufsize 2M -preset medium -coder 1 -movflags +faststart -x264-params open-gop=0 -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} {{ escape (print $PRE .Episode.Output) }}`
+
+	defaultFFmpegToAudioCommandTemplate string = `{{ $PRE := ""}}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FFmpegPathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -vn -f wav -c:a pcm_s16le -ac 2 pipe: | {{ .Atom.LamepathExpanded }} -b {{ .Atom.Encoding.Bitrate }} --add-id3v2 --tv TLAN={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} --tt {{ escape .Episode.Title }} --ta {{ escape .Atom.Author }} --tl {{ escape .Atom.Title }} --ty {{ escape (.Episode.PubDate.Format "2006") }} --tc {{ escape .Episode.Subtitle }} --tn {{ .Episode.UID }} --tg {{ escape .Atom.Encoding.Genre }} --ti {{ escape (print $PRE .Atom.Encoding.Coverfront) }} --tv WOAR={{ escape .Atom.Link }} - {{ escape (print $PRE .Episode.Output) }}`
+
+	// ffmpeg -i input.wav -i metadata.txt -i cover.jpg \
+	// -map 0 -map_metadata 1 -map 2 \
+	// -metadata:s:v title="Cover" \
+	// -metadata:s:v comment="Cover (front)" \
+	// -c:a libfdk_aac -profile:a aac_low -ac 2 -b:a 128k \
+	// -movflags +faststart -c:v:0 mjpeg -disposition:v:0 attached_pic \
+	// output.m4a
+	defaultFFmpegToM4ACommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FFmpegPathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -i {{ escape (print $PRE .Atom.Encoding.Coverfront) }} -map 0 -c:a libfdk_aac -profile:a aac_low -ac 2 -b:a {{ .Atom.Encoding.ABR }} -map 1 -metadata:s:v title="Cover" -metadata:s:v comment="Cover (front)" -c:v:0 mjpeg -disposition:v:0 attached_pic -movflags +faststart {{ escape (print $PRE "without-metadata-" .Episode.Output) }}`
 
 	// EQ and compression presets
 	//
@@ -56,7 +69,7 @@ const (
 	// 0.3158639048423471 or 0.31586 if you can not fit all figures,
 	// this should produce a mix without clipping, just make sure you
 	// lower the music to this fraction when the vocal track is on.
-	defaultFfmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
+	defaultFFmpegPreProcessingCommandTemplate string = `ffmpeg -y -i {{ escape .PreProcess.Input }} -vn -ac 2 -filter_complex "` +
 		`pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,` +
 
 		`{{ if eq .PreProcess.Preset "sm7b" }}` +
@@ -255,7 +268,7 @@ func preprocess(c *cli.Context) error {
 	}
 
 	// Parse Go template
-	templates.FfmpegPreProcessing, err = template.New("ffmpegPreProcessing").Funcs(funcMap).Parse(ffmpegPreProcessingCommandTemplate)
+	templates.FFmpegPreProcessing, err = template.New("ffmpegPreProcessing").Funcs(funcMap).Parse(ffmpegPreProcessingCommandTemplate)
 	if err != nil {
 		return err
 	}
@@ -270,7 +283,7 @@ func preprocess(c *cli.Context) error {
 			},
 		}
 		buf := &bytes.Buffer{}
-		err = templates.FfmpegPreProcessing.Execute(buf, combined)
+		err = templates.FFmpegPreProcessing.Execute(buf, combined)
 		if err != nil {
 			return err
 		}
@@ -462,11 +475,15 @@ func encoder(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	templates.Ffmpeg, err = template.New("ffmpeg").Funcs(funcMap).Parse(ffmpegCommandTemplate)
+	templates.FFmpeg, err = template.New("ffmpeg").Funcs(funcMap).Parse(ffmpegCommandTemplate)
 	if err != nil {
 		return err
 	}
-	templates.FfmpegToLame, err = template.New("ffmpegToLame").Funcs(funcMap).Parse(ffmpegToAudioCommandTemplate)
+	templates.FFmpegToLame, err = template.New("ffmpegToLame").Funcs(funcMap).Parse(ffmpegToAudioCommandTemplate)
+	if err != nil {
+		return err
+	}
+	templates.FFmpegM4A, err = template.New("ffmpegM4A").Funcs(funcMap).Parse(ffmpegToM4ACommandTemplate)
 	if err != nil {
 		return err
 	}

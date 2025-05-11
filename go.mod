@@ -1,8 +1,6 @@
 module github.com/sa6mwa/mkpod
 
-go 1.23.0
-
-toolchain go1.24.3
+go 1.24.3
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
@@ -10,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go v1.55.7
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/hexops/gotextdiff v1.0.3
+	github.com/sa6mwa/id3v24 v0.3.0
 	github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e
 	github.com/urfave/cli/v2 v2.27.6
 	golang.org/x/term v0.32.0
@@ -20,6 +19,7 @@ require (
 
 require (
 	github.com/alessio/shellescape v1.4.2 // indirect
+	github.com/bogem/id3v2 v1.2.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
