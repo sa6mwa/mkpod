@@ -9,7 +9,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.9
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/hexops/gotextdiff v1.0.3
-	github.com/sa6mwa/id3v24 v0.3.0
+	github.com/sa6mwa/id3v24 v0.4.0
 	github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e
 	github.com/urfave/cli/v2 v2.27.6
 	golang.org/x/term v0.32.0

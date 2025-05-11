@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/sa6mwa/id3v24"
 	"github.com/urfave/cli/v2"
 	//"github.com/logrusorgru/aurora"
 
@@ -340,6 +341,9 @@ func parser(c *cli.Context) error {
 		},
 		"markdown": func(s string) string {
 			return MarkdownToHTML(s)
+		},
+		"spotifyChapters": func(chapters []id3v24.Chapter) string {
+			return SpotifyChapters(chapters)
 		},
 	}
 

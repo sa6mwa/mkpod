@@ -51,6 +51,8 @@ github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sa6mwa/id3v24 v0.3.0 h1:fKA7fCKiVs1XlXg2ttMDnYTZUgF4BndDp0NSEhgBwwY=
 github.com/sa6mwa/id3v24 v0.3.0/go.mod h1:cLb6kNEZ4UH5IpRvwJgxrLOYLA3+MKwJ53PvVXSuCfw=
+github.com/sa6mwa/id3v24 v0.4.0 h1:GjKxZFlNBlYQR+Q9WxpTm2xQyAY3JH/H5PymGWXvNLI=
+github.com/sa6mwa/id3v24 v0.4.0/go.mod h1:cLb6kNEZ4UH5IpRvwJgxrLOYLA3+MKwJ53PvVXSuCfw=
 github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e h1:tDBySLzhs1WyhaqH5fdbxFWYVHFapoobnVcuG99OFD0=
 github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e/go.mod h1:+QE4ei24uYpCLKmCHShIq8OBjdml1Zj+qVRTn+sKpzQ=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
