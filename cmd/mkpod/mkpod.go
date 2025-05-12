@@ -66,7 +66,7 @@ const (
 	// build script included in the repo if this is an issue. The
 	// resulting m4a with chapters does however work really well in
 	// AntennaPod and VLC.
-	defaultFFmpegToM4ACommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FFmpegPathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -i {{ escape (print $PRE .Atom.Encoding.Coverfront) }} -i {{ escape .MetadataFile }} -map 0:a -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} -metadata:s:a:0 language={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} -map 1:v -c:v mjpeg -disposition:v:0 attached_pic -metadata:s:v title="Cover" -metadata:s:v comment="Cover (front)" -map_metadata 2 -movflags +faststart {{ escape (print $PRE .Episode.Output) }}`
+	defaultFFmpegToM4ACommandTemplate string = `{{ $PRE := "" }}{{ if ne .Atom.LocalStorageDirExpanded ""}}{{ $PRE = print .Atom.LocalStorageDirExpanded "/"}}{{ end }}{{ .Atom.FFmpegPathExpanded }} -y -i {{ escape (print $PRE .Episode.Input) }} -i {{ escape (print $PRE .Atom.Encoding.Coverfront) }} -i {{ escape .MetadataFile }} -map 0:a -c:a libfdk_aac -profile:a aac_low -b:a {{ .Atom.Encoding.ABR }} -metadata:s:a:0 language={{ if ne .Episode.EncodingLanguage "" }}{{ escape .Episode.EncodingLanguage }}{{ else }}{{ escape .Atom.Encoding.Language }}{{ end }} -map 1:v -c:v mjpeg -disposition:v:0 attached_pic -metadata:s:v title="Cover" -metadata:s:v comment="Cover (front)" -map_metadata 2 -map_chapters 2 -movflags faststart {{ escape (print $PRE .Episode.Output) }}`
 
 	// EQ and compression presets
 	//
@@ -343,7 +343,10 @@ func parser(c *cli.Context) error {
 			return MarkdownToHTML(s)
 		},
 		"spotifyChapters": func(chapters []id3v24.Chapter) string {
-			return SpotifyChapters(chapters)
+			output := "\n<pre>\n"
+			output += SpotifyChapters(chapters)
+			output += "</pre>\n"
+			return output
 		},
 	}
 

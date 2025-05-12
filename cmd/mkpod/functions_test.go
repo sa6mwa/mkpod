@@ -8,21 +8,18 @@ import (
 )
 
 func TestSpotifyChapters(t *testing.T) {
-	expected1 := `
-(01:30) Introduction
+	expected1 := `(01:30) Introduction
 (02:00) Hello world
 (13:37) Famous last words
 `
 
-	expected2 := `
-(00:00:29) First chapter
+	expected2 := `(00:00:29) First chapter
 (00:01:02) Second chapter
 (00:49:31) Third chapter
 (01:00:00) Fourth chapter
 `
 
-	expected3 := `
-(00:00:00) Introduction
+	expected3 := `(00:00:00) Introduction
 (00:59:59) First chapter
 (01:00:01) Second chapter
 (01:59:59) Third chapter

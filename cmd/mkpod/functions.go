@@ -118,7 +118,7 @@ func SpotifyChapters(chapters []id3v24.Chapter) string {
 			longTimeFormat = true
 		}
 	}
-	var output string = "\n"
+	var output string
 	for _, c := range schaps {
 		format := "(%s) %s\n"
 		if longTimeFormat {
