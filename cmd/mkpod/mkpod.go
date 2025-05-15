@@ -343,9 +343,13 @@ func parser(c *cli.Context) error {
 			return MarkdownToHTML(s)
 		},
 		"spotifyChapters": func(chapters []id3v24.Chapter) string {
-			output := "\n<pre>\n"
-			output += SpotifyChapters(chapters)
-			output += "</pre>\n"
+			var output string
+			chaps := SpotifyChapters(chapters)
+			if len([]rune(chaps)) > 0 {
+				output := "\n<pre>\n"
+				output += chaps
+				output += "</pre>\n"
+			}
 			return output
 		},
 	}
