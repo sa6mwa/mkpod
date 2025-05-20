@@ -46,13 +46,14 @@
       <title>{{.Title}}</title>
       <pubDate>{{.PubDate}}</pubDate>
       <link>{{.Link}}</link>
+      <itunes:episode>{{.UID}}</itunes:episode>
       <itunes:duration>{{.Duration}}</itunes:duration>
       <itunes:author>{{.Author}}</itunes:author>
       <itunes:explicit>{{.Explicit}}</itunes:explicit>
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
-      <description><![CDATA[{{markdown .Description}}]]></description>
+      <description><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></description>
       <enclosure type="{{.Type}}" url="{{$.Atom.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
       <itunes:image href="{{$.Atom.Config.BaseURL}}/{{.Image}}"/>
     </item>

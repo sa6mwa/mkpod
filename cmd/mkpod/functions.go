@@ -2,10 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -16,11 +17,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/alfg/mp4"
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/html"
 	mdp "github.com/gomarkdown/markdown/parser"
+	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mp3duration"
 	"golang.org/x/term"
+	"gopkg.in/alessio/shellescape.v1"
 	"gopkg.in/yaml.v3"
 )
 
@@ -67,11 +71,9 @@ func loadConfig() error {
 	return nil
 }
 
-// MarkdownToHTML
-
+// MarkdownToHTML takes md as markdown and returns html.
 func MarkdownToHTML(md string) (outputHTML string) {
 	// Generate html from all description fields
-
 	p := mdp.NewWithExtensions(mdp.CommonExtensions | mdp.AutoHeadingIDs | mdp.NoEmptyLineBeforeBlock)
 	doc := p.Parse([]byte(md))
 	renderer := html.NewRenderer(html.RendererOptions{
@@ -79,6 +81,53 @@ func MarkdownToHTML(md string) (outputHTML string) {
 	})
 	outputHTML = string(markdown.Render(doc, renderer))
 	return
+}
+
+// SpotifyChapters returns a list of chapters from a slice of
+// id3v24.Chapters (the chapter key for each episode in the
+// podspec.yaml). If there are no chapters or an error occurs during
+// parsing, it returns an empty string. The format is (HH:MM:SS) if
+// duration is over 59m59s, otherwise it is (MM:SS). See the following
+// link for spec:
+// https://support.spotify.com/us/creators/article/creating-and-managing-chapters/
+func SpotifyChapters(chapters []id3v24.Chapter) string {
+	if len(chapters) == 0 {
+		return ""
+	}
+	oneHour, err := time.Parse("15:04:05", "01:00:00")
+	if err != nil {
+		return ""
+	}
+	type spotifyChapter struct {
+		title string
+		start time.Time
+	}
+	var schaps []spotifyChapter
+	var longTimeFormat bool
+	for _, c := range chapters {
+		s, err := id3v24.StringTimeToTime(c.Start)
+		if err != nil {
+			return ""
+		}
+		chap := spotifyChapter{
+			title: c.Title,
+			start: s,
+		}
+		schaps = append(schaps, chap)
+		if !s.Before(oneHour) {
+			longTimeFormat = true
+		}
+	}
+	var output string
+	for _, c := range schaps {
+		format := "(%s) %s\n"
+		if longTimeFormat {
+			output += fmt.Sprintf(format, c.start.Format("15:04:05"), strings.TrimSpace(c.title))
+		} else {
+			output += fmt.Sprintf(format, c.start.Format("04:05"), strings.TrimSpace(c.title))
+		}
+	}
+	return output
 }
 
 // Replaces or adds file extension.
@@ -97,6 +146,13 @@ func ExtensionToBaseMp3(filename string) string {
 func ExtensionToBaseMp4(filename string) string {
 	baseName := path.Base(filename)
 	return ReplaceExtension(baseName, ".mp4")
+}
+
+// This can be insecure as format is used unescaped and is only used
+// where format is known.
+func ExtensionToBaseFormat(filename string, format string) string {
+	baseName := path.Base(filename)
+	return ReplaceExtension(baseName, "."+strings.TrimSpace(strings.ToLower(format)))
 }
 
 func doAction(format string, a ...any) bool {
@@ -150,7 +206,7 @@ func basicAtomValidation() error {
 		return fmt.Errorf("title and description must not be empty in %s", specFile)
 	}
 	// Validate executables
-	executables := []string{atom.LamepathExpanded(), atom.FfmpegpathExpanded()}
+	executables := []string{atom.LamepathExpanded(), atom.FFmpegPathExpanded()}
 	for _, e := range executables {
 		fs, err := os.Stat(e)
 		if err != nil {
@@ -304,119 +360,91 @@ func downloadEncodeUpload(tmpl *Templates, uid int64, force bool) error {
 					return err
 				}
 
+				format := strings.TrimSpace(strings.ToLower(atom.Episodes[idx].Format))
+
+				// TODO: This nested if statement needs to serious refactoring.
+				// Perhaps
+				//
 				// if input content type is video/* and format is not "audio",
 				// we are to encode it using ffmpeg to an mp4. If format is
 				// "audio", drop the video stream and encode an mp3 (audio
 				// only).
 				if strings.HasPrefix(inputContentType, "video/") {
-					format := strings.TrimSpace(strings.ToLower(atom.Episodes[idx].Format))
-					if format == "" || format == "video" || format == "mp4" {
-						atom.Episodes[idx].Output = ExtensionToBaseMp4(atom.Episodes[idx].Input)
-						updateAtom = true
-						combined := getCombined(atom.Episodes[idx])
-						buf := &bytes.Buffer{}
-						err = tmpl.Ffmpeg.Execute(buf, combined)
-						if err != nil {
+					// If episode.format is video or mp4, it's a video episode.
+					switch format {
+					case "", "video", "mp4":
+						if err := EncodeMP4(tmpl, &atom.Episodes[idx]); err != nil {
 							return err
 						}
-						log.Printf("Executing: %s", buf.String())
-						cmd := exec.Command(shell, shellCommandOption, buf.String())
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						err = cmd.Run()
-						if err != nil {
-							return fmt.Errorf("unable to encode using external encoder (ffmpeg): %w", err)
+					case "audio":
+						if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
+							// Encode into m4a or m4b
+							if err := EncodeFFmpegAudio(tmpl, &atom.Episodes[idx], atom.Encoding.PreferredFormat); err != nil {
+								return err
+							}
+						} else {
+							// Encode mp3 via ffmpeg (piped into lame)
+							if err := EncodeMP3ViaFFmpeg(tmpl, &atom.Episodes[idx]); err != nil {
+								return err
+							}
 						}
-						// Update atom with the length and duration of the encoded mp4.
-						size, duration, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-						if err != nil {
+					case "mp3":
+						// Encode mp3 via ffmpeg
+						if err := EncodeMP3ViaFFmpeg(tmpl, &atom.Episodes[idx]); err != nil {
 							return err
 						}
-						log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, duration, size, specFile)
-						atom.Episodes[idx].Length = size
-						atom.Episodes[idx].Duration.Duration = duration
-					} else if format == "audio" || format == "mp3" {
-						atom.Episodes[idx].Output = ExtensionToBaseMp3(atom.Episodes[idx].Input)
-						updateAtom = true
-						combined := getCombined(atom.Episodes[idx])
-						buf := &bytes.Buffer{}
-						err = tmpl.FfmpegToLame.Execute(buf, combined)
-						if err != nil {
+					case "m4a", "m4b":
+						// Encode m4a or m4b
+						if err := EncodeFFmpegAudio(tmpl, &atom.Episodes[idx], format); err != nil {
 							return err
 						}
-						log.Printf("Executing: %s", buf.String())
-						cmd := exec.Command(shell, shellCommandOption, buf.String())
-						cmd.Stdin = os.Stdin
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						err = cmd.Run()
-						if err != nil {
-							return fmt.Errorf("unable to encode to audio using extern encoders (ffmpeg and lame): %w", err)
-						}
-						// Update atom with the length and duration of the encoded mp3.
-						di, err := mp3duration.ReadFile(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-						if err != nil {
-							return err
-						}
-						log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, di.Duration, di.Length, specFile)
-						atom.Episodes[idx].Length = di.Length
-						atom.Episodes[idx].Duration.Duration = di.TimeDuration
-					} else {
-						return fmt.Errorf("unknown format %q, possibly values: video (default), audio", format)
-					}
-					// Upload output mp4 to output S3 bucket.
-					contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output), err)
-					}
-					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
-					atom.Episodes[idx].Type = contentType
-					err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return err
+					default:
+						return fmt.Errorf("invalid or unsupported format %q", format)
 					}
 				} else {
-					// ...else, assume it's audio only and encode it to mp3 using lame...
+					// ...else, assume it's audio only and encode it to either
+					// mp3 using lame or m4a/m4b using ffmpeg
+					switch format {
+					case "", "audio":
+						if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
+							// Encode into m4a or m4b
+							if err := EncodeFFmpegAudio(tmpl, &atom.Episodes[idx], atom.Encoding.PreferredFormat); err != nil {
+								return err
+							}
+						} else {
+							// Encode mp3 using Lame
+							if err := EncodeMP3(tmpl, &atom.Episodes[idx]); err != nil {
+								return err
+							}
+						}
+					case "mp3":
+						// Encode mp3 using Lame
+						if err := EncodeMP3(tmpl, &atom.Episodes[idx]); err != nil {
+							return err
+						}
+					case "m4a", "m4b":
+						// Encode m4a or m4b
+						if err := EncodeFFmpegAudio(tmpl, &atom.Episodes[idx], format); err != nil {
+							return err
+						}
+					default:
+						return fmt.Errorf("invalid or unsupported format %q", format)
+					}
+				}
 
-					// lameTemplate uses the output file field in the atom, therefore we
-					// need to set it before executing the template.
-					atom.Episodes[idx].Output = ExtensionToBaseMp3(atom.Episodes[idx].Input)
-					updateAtom = true
-					combined := getCombined(atom.Episodes[idx])
-					buf := &bytes.Buffer{}
-					err = tmpl.Lame.Execute(buf, combined)
-					if err != nil {
-						return err
-					}
-					log.Printf("Executing: %s", buf.String())
-					cmd := exec.Command(shell, shellCommandOption, buf.String())
-					cmd.Stdin = os.Stdin
-					cmd.Stdout = os.Stdout
-					cmd.Stderr = os.Stderr
-					err = cmd.Run()
-					if err != nil {
-						return fmt.Errorf("unable to encode using external encoder (lame): %w", err)
-					}
-					// Update atom with the length and duration of the encoded mp3.
-					di, err := mp3duration.ReadFile(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return err
-					}
-					log.Printf("%s is %s long and %d bytes (updating %s)", atom.Episodes[idx].Output, di.Duration, di.Length, specFile)
-					atom.Episodes[idx].Length = di.Length
-					atom.Episodes[idx].Duration.Duration = di.TimeDuration
-					// Upload output mp3 to output S3 bucket.
-					contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output), err)
-					}
-					log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
-					atom.Episodes[idx].Type = contentType
-					err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
-					if err != nil {
-						return err
-					}
+				// The Encode functions above all change fields in the atom.
+				updateAtom = true
+
+				// Upload output mp4/mp3/m4a/m4b to output S3 bucket.
+				contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
+				if err != nil {
+					return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output), err)
+				}
+				log.Printf("Content-Type of %s is: %s", atom.Episodes[idx].Output, contentType)
+				atom.Episodes[idx].Type = contentType
+				err = awsHandler.Upload(atom.Config.Aws.Buckets.Output, atom.Episodes[idx].Output, contentType, path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Output))
+				if err != nil {
+					return err
 				}
 
 				// Ensure there is a pubDate set
@@ -427,7 +455,7 @@ func downloadEncodeUpload(tmpl *Templates, uid int64, force bool) error {
 				}
 
 				// Upload artwork (data-in is free, so I did not bother making a smart upload function)
-				contentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image))
+				contentType, err = GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image))
 				if err != nil {
 					return fmt.Errorf("unable to get content-type of file %s: %w", path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[idx].Image), err)
 				}
@@ -520,24 +548,33 @@ func createLocalStorageDir() error {
 	return nil
 }
 
-// https://www.tutorialspoint.com/how-to-detect-the-content-type-of-a-file-in-golang
+// // https://www.tutorialspoint.com/how-to-detect-the-content-type-of-a-file-in-golang
+// func GetFileContentType(filename string) (contentType string, err error) {
+// 	// to sniff the content type only the first
+// 	// 512 bytes are used.
+// 	var f *os.File
+// 	f, err = os.Open(filename)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer f.Close()
+// 	buf := make([]byte, 512)
+// 	_, err = f.Read(buf)
+// 	if err != nil {
+// 		return
+// 	}
+// 	// the function that actually does the trick
+// 	contentType = http.DetectContentType(buf)
+// 	return
+// }
+
 func GetFileContentType(filename string) (contentType string, err error) {
-	// to sniff the content type only the first
-	// 512 bytes are used.
-	var f *os.File
-	f, err = os.Open(filename)
+	mimetype.SetLimit(1024 * 1024)
+	mimeType, err := mimetype.DetectFile(filename)
 	if err != nil {
-		return
+		return "", err
 	}
-	defer f.Close()
-	buf := make([]byte, 512)
-	_, err = f.Read(buf)
-	if err != nil {
-		return
-	}
-	// the function that actually does the trick
-	contentType = http.DetectContentType(buf)
-	return
+	return mimeType.String(), nil
 }
 
 // Mp4Duration returns the length in bytes and the duration in
@@ -561,4 +598,238 @@ func Mp4Duration(filename string) (int64, time.Duration, error) {
 	} else {
 		return 0, 0, fmt.Errorf("%s does not contain a Moov Mvhd box (maybe not an mp4?)", filename)
 	}
+}
+
+// FFprobe runs ffprobe on filename and returns an FFprobeJSON with
+// format filled in or returns error if something failed. Full command
+// executed via shell (probably /bin/sh) and shellCommandOption (-c):
+//
+//	ffprobe -v error -show_format -print_format json filename
+func FFprobe(filename string) (*FFprobeJSON, error) {
+	ffprobeCmd := fmt.Sprintf("ffprobe -v error -show_format -print_format json %s", shellescape.Quote(filename))
+	cmd := exec.Command(shell, shellCommandOption, ffprobeCmd)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		return nil, err
+	}
+	var result FFprobeJSON
+	if err := json.NewDecoder(&out).Decode(&result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetSizeAndDurationViaFFprobe returns duration, size or error if
+// something failed.
+func GetSizeAndDurationViaFFprobe(filename string) (time.Duration, int64, error) {
+	fi, err := os.Stat(filename)
+	if err != nil {
+		return 0, 0, err
+	}
+	ffprobejson, err := FFprobe(filename)
+	if err != nil {
+		return 0, fi.Size(), err
+	}
+	return ffprobejson.Format.Duration.Duration, fi.Size(), nil
+}
+
+// // ApplyMetadataToM4A does not work for metadata chapter title tags,
+// // they will be missing as this function copies the stream. It would
+// // need to be re-encoded to add chapter titles. Instead we are using
+// // GetSizeAndDurationViaFFprobe which supports various input formats.
+// func ApplyMetadataToM4A(metadatafile, inputM4file, outputM4file string) error {
+// 	ffmpegCmd := fmt.Sprintf("ffmpeg -y -i %s -i %s -map 0 -map_metadata 1 -c copy -movflags +faststart+use_metadata_tags %s", shellescape.Quote(inputM4file), shellescape.Quote(metadatafile), shellescape.Quote(outputM4file))
+// 	return Run(ffmpegCmd)
+// }
+
+// Run runs commandString via shell (probably /bin/sh) and
+// shellCommandOption (-c). Output is os.Stdout, os.Stderr,
+// etc. Returns error if cmd.Run() fails.
+func Run(commandString string) error {
+	cmd := exec.Command(shell, shellCommandOption, commandString)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// EncodeFFmpegAudio encodes input into an m4a or m4b file depending
+// on the value of format.
+func EncodeFFmpegAudio(tmpl *Templates, episode *Episode, format string) error {
+	if episode == nil {
+		return errors.New("received nil pointer episode")
+	}
+	format = strings.TrimSpace(strings.ToLower(format))
+	episode.Output = ExtensionToBaseFormat(episode.Input, format)
+	combined := getCombined(*episode)
+
+	rplcr := strings.NewReplacer("\n", " ", "\r", "")
+
+	lang := atom.Encoding.Language
+	if episode.EncodingLanguage != "" {
+		lang = episode.EncodingLanguage
+	}
+
+	trackInfo := id3v24.TrackInfo{
+		Title:       episode.Title,
+		Album:       atom.Title,
+		Artist:      episode.Author,
+		Genre:       atom.Encoding.Genre,
+		Year:        episode.PubDate.Format("2006"),
+		Date:        episode.PubDate.Time,
+		Track:       fmt.Sprintf("%d", episode.UID),
+		Comment:     episode.Link,
+		Description: rplcr.Replace(episode.Subtitle),
+		Language:    strings.ToLower(lang),
+		CoverJPEG:   path.Join(atom.LocalStorageDirExpanded(), atom.Encoding.Coverfront),
+		Chapters:    episode.Chapters,
+	}
+
+	// Get duration of original input file
+	duration, size, err := GetSizeAndDurationViaFFprobe(path.Join(atom.LocalStorageDirExpanded(), episode.Input))
+	if err != nil {
+		return fmt.Errorf("unable to get duration and size from input file: %w", err)
+	}
+	// Generate metadata /w chapters (if any)
+	metadataFile, err := id3v24.WriteFFmpegMetadataFile(duration, trackInfo)
+	if err != nil {
+		return fmt.Errorf("unable to generate ffmetadata file: %w", err)
+	}
+	//defer os.Remove(metadataFile)
+	combined.MetadataFile = metadataFile
+	// Parse template (with metadatafile added to input values)
+	buf := &bytes.Buffer{}
+	if err := tmpl.FFmpegM4A.Execute(buf, combined); err != nil {
+		return err
+	}
+	// Encode to preferred output format (m4a or m4b).
+	log.Printf("Executing: %s", buf.String())
+	if err := Run(buf.String()); err != nil {
+		return fmt.Errorf("unable to encode to %s using ffmpeg: %w", atom.Encoding.PreferredFormat, err)
+	}
+	outputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+	// Get correct duration and size of the output file
+	duration, size, err = GetSizeAndDurationViaFFprobe(outputPath)
+	if err != nil {
+		return fmt.Errorf("unable to get duration and size from %s: %w", episode.Output, err)
+	}
+	// Update episode length and duration
+	log.Printf("%s is %s long and %d bytes (updating %s)", episode.Output, duration, size, specFile)
+	episode.Length = size
+	episode.Duration.Duration = duration
+	return nil
+}
+
+// EncodeMP3ViaFFmpeg encodes input through ffmpeg piped into lame as
+// an mp3.
+func EncodeMP3ViaFFmpeg(tmpl *Templates, episode *Episode) error {
+	if episode == nil {
+		return errors.New("received nil pointer episode")
+	}
+	episode.Output = ExtensionToBaseMp3(episode.Input)
+	combined := getCombined(*episode)
+
+	buf := &bytes.Buffer{}
+	if err := tmpl.FFmpegToLame.Execute(buf, combined); err != nil {
+		return err
+	}
+	log.Printf("Executing: %s", buf.String())
+	if err := Run(buf.String()); err != nil {
+		return fmt.Errorf("unable to encode to audio using external encoders (ffmpeg and lame): %w", err)
+	}
+
+	// Add ID3v2.4 tag (artist, album, title, chapters, etc.).
+	outputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+	log.Printf("Adding ID3v2.4 tag to %s", outputPath)
+	if err := id3v24.WriteID3v2Tag(outputPath, id3v24.TrackInfo{
+		Title:     episode.Title,
+		Album:     atom.Title,
+		Artist:    episode.Author,
+		Genre:     atom.Encoding.Genre,
+		Year:      episode.PubDate.Format("2006"),
+		CoverJPEG: path.Join(atom.LocalStorageDirExpanded(), atom.Encoding.Coverfront),
+		Chapters:  episode.Chapters,
+	}); err != nil {
+		return err
+	}
+	// Get duration and length.
+	di, err := mp3duration.ReadFile(outputPath)
+	if err != nil {
+		return err
+	}
+	// Update atom with the length and duration of the encoded mp3.
+	log.Printf("%s is %s long and %d bytes (updating %s)", episode.Output, di.Duration, di.Length, specFile)
+	episode.Length = di.Length
+	episode.Duration.Duration = di.TimeDuration
+	return nil
+}
+
+// EncodeMP3 encodes an mp3 using lame.
+func EncodeMP3(tmpl *Templates, episode *Episode) error {
+	if episode == nil {
+		return errors.New("received nil pointer episode")
+	}
+	episode.Output = ExtensionToBaseMp3(episode.Input)
+	combined := getCombined(*episode)
+	buf := &bytes.Buffer{}
+	if err := tmpl.Lame.Execute(buf, combined); err != nil {
+		return err
+	}
+	log.Printf("Executing: %s", buf.String())
+	if err := Run(buf.String()); err != nil {
+		return fmt.Errorf("unable to encode to audio using external encoders (ffmpeg and lame): %w", err)
+	}
+	// Add ID3v2.4 tag (artist, album, title, chapters, etc.).
+	outputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+	log.Printf("Adding ID3v2.4 tag to %s", outputPath)
+	if err := id3v24.WriteID3v2Tag(outputPath, id3v24.TrackInfo{
+		Title:     episode.Title,
+		Album:     atom.Title,
+		Artist:    episode.Author,
+		Genre:     atom.Encoding.Genre,
+		Year:      episode.PubDate.Format("2006"),
+		CoverJPEG: path.Join(atom.LocalStorageDirExpanded(), atom.Encoding.Coverfront),
+		Chapters:  episode.Chapters,
+	}); err != nil {
+		return err
+	}
+	// Update atom with the length and duration of the encoded mp3.
+	di, err := mp3duration.ReadFile(outputPath)
+	if err != nil {
+		return err
+	}
+	log.Printf("%s is %s long and %d bytes (updating %s)", episode.Output, di.Duration, di.Length, specFile)
+	episode.Length = di.Length
+	episode.Duration.Duration = di.TimeDuration
+	return nil
+}
+
+// EncodeMP4 encodes input to an mp4 video.
+func EncodeMP4(tmpl *Templates, episode *Episode) error {
+	if episode == nil {
+		return errors.New("received nil pointer episode")
+	}
+	episode.Output = ExtensionToBaseMp4(episode.Input)
+	combined := getCombined(*episode)
+	buf := &bytes.Buffer{}
+	if err := tmpl.FFmpeg.Execute(buf, combined); err != nil {
+		return err
+	}
+	log.Printf("Executing: %s", buf.String())
+	if err := Run(buf.String()); err != nil {
+		return fmt.Errorf("unable to encode to audio using external encoders (ffmpeg and lame): %w", err)
+	}
+	// Update atom with the length and duration of the encoded mp4
+	size, duration, err := Mp4Duration(path.Join(atom.LocalStorageDirExpanded(), episode.Output))
+	if err != nil {
+		return err
+	}
+	log.Printf("%s is %s long and %d bytes (updating %s)", episode.Output, duration, size, specFile)
+	episode.Length = size
+	episode.Duration.Duration = duration
+	return nil
 }
