@@ -346,7 +346,7 @@ func parser(c *cli.Context) error {
 			var output string
 			chaps := SpotifyChapters(chapters)
 			if len([]rune(chaps)) > 0 {
-				output := "\n<pre>\n"
+				output = "\n<pre>\n"
 				output += chaps
 				output += "</pre>\n"
 			}
