@@ -1,5 +1,11 @@
 package model
 
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
+
 type Atom struct {
 	Config        Config         `yaml:"config"`
 	Atom          string         `yaml:"atom"`
@@ -32,4 +38,40 @@ type Atom struct {
 		Language        string `yaml:"language"`
 	} `yaml:"encoding"`
 	Episodes []Episode `yaml:"episodes"`
+}
+
+// Atom_ContainsEpisode returns the index of episode uid in the
+// Episodes slice based on UID or -1 if UID does not exist.
+func (a *Atom) ContainsEpisode(uid int64) int64 {
+	for idx := range a.Episodes {
+		if a.Episodes[idx].UID == uid {
+			return int64(uid)
+		}
+	}
+	return -1
+}
+
+func (a *Atom) LocalStorageDirExpanded() string {
+	return resolvetilde(a.Config.LocalStorageDir)
+}
+
+func (a *Atom) LamepathExpanded() string {
+	return resolvetilde(a.Encoding.Lamepath)
+}
+
+func (a *Atom) FFmpegPathExpanded() string {
+	return resolvetilde(a.Encoding.FFmpegPath)
+}
+
+// resolvetilde returns path where initial tilde (~) is replaced by
+// os.UserHomeDir().
+func resolvetilde(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		dirname, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		return filepath.Join(dirname, path[2:])
+	}
+	return path
 }

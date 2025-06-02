@@ -21,7 +21,8 @@ script produces a yaml file which can be pasted inside an episode object in
 How to install the add-on `export_markers.py`:
 
 * In Blender: go to Edit, Preferences, Add-ons
-* Click Install.., then choose `export_markers.py`
+* Click *Install...* or choose the arrow-down box in the upper right hand
+  corner and choose *Install from Disk...*, then choose `export_markers.py`
 * Enable the add-on with the checkbox
 
 Use it:

@@ -3,18 +3,32 @@ package parser
 import (
 	"context"
 	_ "embed"
+	"errors"
+	"io"
+	"os"
 	"text/template"
 	"time"
 
 	"github.com/alessio/shellescape"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
+	"github.com/sa6mwa/mkpod/internal/app/ports"
 )
 
 //go:embed template.rss
 var rssTemplate string
 
-var funcMap template.FuncMap
+var (
+	ErrNilPointerAtom error = errors.New("received nil pointer to atom")
+)
+
+// parser.New returns a file-based podcast.rss generator that
+// implements the ports.ForParsing interface.
+func New() ports.ForParsing {
+	return &forParsing{
+		funcMap: mkFuncMap(),
+	}
+}
 
 // forParsing implements the ports.ForParsing port (interface).
 type forParsing struct {
@@ -22,13 +36,30 @@ type forParsing struct {
 }
 
 func (p *forParsing) WriteRSS(_ context.Context, atom *model.Atom) error {
+	if atom == nil {
+		return ErrNilPointerAtom
+	}
+	f, err := os.Create(atom.Atom)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return writeRSS(f, p, atom)
+}
+
+func (p *forParsing) WriteRSSToStdout(_ context.Context, atom *model.Atom) error {
+	return writeRSS(os.Stdout, p, atom)
+}
+
+// Functions...
+
+func writeRSS(w io.Writer, p *forParsing, atom *model.Atom) error {
 	t, err := template.New("template.rss").Funcs(p.funcMap).Parse(rssTemplate)
 	if err != nil {
 		return err
 	}
+	return t.Execute(w, atom)
 }
-
-// Functions...
 
 func mkFuncMap() template.FuncMap {
 	return template.FuncMap{
