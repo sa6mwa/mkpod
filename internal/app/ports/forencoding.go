@@ -7,7 +7,8 @@ import (
 )
 
 type ForEncoding interface {
+	ForAsking
 	// Encode encodes episode with UID uid. If uid is -1, all episodes
 	// in the Episodes slice of atom will be encoded.
-	Encode(ctx context.Context, atom *model.Atom, uid int64, force bool) error
+	Encode(ctx context.Context, atom *model.Atom, uid int64) error
 }
