@@ -3,6 +3,8 @@ package ports
 import (
 	"context"
 	"errors"
+
+	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
 var (
@@ -20,7 +22,9 @@ type ForUploadingRequest struct {
 	To string
 	// From is the path to upload from (local disk or URI depending on
 	// adapter implementation).
-	From        string
+	From string
+	// If ContentType is empty, automatically determine the content
+	// type.
 	ContentType string
 	// StorageClass only used for AWS. Can be STANDARD,
 	// REDUCED_REDUNDANCY, STANDARD_IA, ONEZONE_IA, INTELLIGENT_TIERING,
@@ -29,8 +33,14 @@ type ForUploadingRequest struct {
 	StorageClass string
 }
 
+// PostEncodeFunc is executed after each encoded episode where atom is
+// a pointer to the actual atom object and episode points to the
+// episode in that atom (not a copy). Modifying any field in either
+// atom or episode will update the actual atom object.
+type PostEncodeFunc func(atom *model.Atom, episode *model.Episode) error
+
 type ForUploading interface {
-	Upload(ctx context.Context, request *ForUploadingRequest) error
+	Upload(ctx context.Context, request *ForUploadingRequest, postFunc PostEncodeFunc) error
 	Diff(ctx context.Context, bucketOrStore, keyOrName, fileToDiff string) error
 }
 
