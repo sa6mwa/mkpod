@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <atom:link href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/podcast.rss" rel="self" type="application/rss+xml"/>
+    <title>mkpod integration test</title>
+    <link>https://qzj.se</link>
+    <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+    <lastBuildDate>Sat, 30 Aug 2025 22:54:21 +0000</lastBuildDate>
+    <ttl>60</ttl>
+    <language>en</language>
+    <copyright>Copyright SA6MWA 2025 All Rights Reserved.</copyright>
+    <webMaster>sa6mwa@gmail.com</webMaster>
+    <description><![CDATA[<p>This is the <code>mkpod</code> integration test. See <a href="https://github.com/sa6mwa/mkpod" target="_blank">https://github.com/sa6mwa/mkpod</a> for more information.</p>
+]]></description>
+    <itunes:subtitle>mkpod integration test</itunes:subtitle>
+    <itunes:owner>
+      <itunes:name>SA6MWA</itunes:name>
+      <itunes:email>sa6mwa@gmail.com</itunes:email>
+    </itunes:owner>
+    <itunes:author>SA6MWA</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>mkpod,integration test,e2e test,test</itunes:keywords>
+    <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-1600x1600-english.jpeg"/>
+    <image>
+      <url>https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-1600x1600-english.jpeg</url>
+      <title>mkpod integration test</title>
+      <link>https://qzj.se</link>
+    </image>
+<itunes:category text="Technology" />
+<itunes:category text="Society &amp; Culture" />
+<itunes:category text="Leisure">
+<itunes:category text="Hobbies" />
+</itunes:category>
+    <item>
+      <guid isPermaLink="true">https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj029-english.m4a</guid>
+      <title>Switching to English</title>
+      <pubDate>Sat, 30 Aug 2025 22:47:56 +0000</pubDate>
+      <link>https://qzj.se/audio/qzj029-english</link>
+      <itunes:episode>1</itunes:episode>
+      <itunes:duration>00:13:33</itunes:duration>
+      <itunes:author>SA6MWA</itunes:author>
+      <itunes:explicit></itunes:explicit>
+      <itunes:subtitle>QZJ expands scope, now in English with a sharper focus on modern defense, comms, and the systems behind them.</itunes:subtitle>
+      <description><![CDATA[<p>This episode is about the evolution of Quebec Zulu Juliett as it shifts from Swedish to English and broadens its scope within the C4ISR domain — Command, Control, Communications, Computers, Intelligence, Surveillance, and Reconnaissance.</p>
+
+<p>Host Mike (SA6MWA) reflects on why he’s making the change, critiques Sweden’s defense posture and procurement system, and previews future topics such as:</p>
+
+<ul>
+<li>Terrain-tactical HF radio communication (the Zenith Concept)</li>
+<li>The shortcomings of traditional defense acquisition models</li>
+<li>Agile frameworks applied to mission command</li>
+<li>Radio communication in contested environments</li>
+<li>The crossover between IT, defense, and resistance and resilience planning</li>
+<li>Survival and outdoor life</li>
+</ul>
+
+<p>He also shares his background in cybersecurity and naval systems, thoughts on Cassandra syndrome and prediction backlash, and why folding his <em>Everything As Code</em> podcast into <strong>QZJ</strong> just makes sense.</p>
+
+<p>If you&rsquo;re interested in modern defense communication, decentralized command philosophies, or how AI and software are reshaping military systems, this episode sets the stage for everything that’s coming next.</p>
+
+<p>Contact Mike at <a href="mailto:sa6mwa@gmail.com" target="_blank">sa6mwa@gmail.com</a>.</p>
+
+<h3 id="links">Links</h3>
+
+<ul>
+<li><a href="https://qzj.se" target="_blank">https://qzj.se</a></li>
+<li><a href="https://qzj.se/audio/qzj029-english" target="_blank">https://qzj.se/audio/qzj029-english</a></li>
+<li><a href="https://www.youtube.com/Utes%C3%A4ndaren" target="_blank">https://www.youtube.com/Utes%C3%A4ndaren</a></li>
+<li><a href="https://warontherocks.com/category/vertical/cogs-of-war/" target="_blank">Cogs Of War</a> (<a href="https://open.spotify.com/show/1yFIpVpxqYvcv0rADoykrp" target="_blank">On Spotify</a>)</li>
+</ul>
+
+<p><strong>73 DE SA6MWA</strong></p>
+
+<pre>
+(00:00) Intro
+(00:25) C4ISR
+(01:59) The switch
+(04:13) Cassandra
+(05:42) Everything As Code
+(06:26) Defense procurement
+(07:48) What to expect
+(11:10) Next episode
+(12:57) Contact
+</pre>
+]]></description>
+      <enclosure type="audio/x-m4a" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj029-english.m4a" length="13286440"/>
+      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-3000x3000-english.jpeg"/>
+    </item>
+    <item>
+      <guid isPermaLink="true">https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj033-c4isr-computers-data-driven-decisions.m4a</guid>
+      <title>C4ISR Stories: Computers - Data-Driven Decisions for Disaster Defence</title>
+      <pubDate>Sat, 30 Aug 2025 22:47:56 +0000</pubDate>
+      <link>https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions</link>
+      <itunes:episode>2</itunes:episode>
+      <itunes:duration>00:17:26</itunes:duration>
+      <itunes:author>SA6MWA</itunes:author>
+      <itunes:explicit></itunes:explicit>
+      <itunes:subtitle>C4ISR explained through short stories, this is about Computers</itunes:subtitle>
+      <description><![CDATA[<p>In this episode of C4ISR Stories, titled <strong>Data-Driven Decisions for Disaster Defence</strong>, we explore the transformative role of technology in crisis management through the gripping tale of a flooded town and an improvised coordination cell. Join us as we follow Karin, an IT consultant, who turns chaos into clarity using a laptop and innovative tools to drive effective rescue efforts. Discover how computers, GIS mapping, and live telemetry reshaped decision-making, empowering volunteers to act decisively amidst the flood. This episode highlights the synergy between human ingenuity and technology in disaster response, illustrating how shared understanding can save lives. Tune in for a compelling narrative about navigating the storm with data and determination.</p>
+
+<p>Read more on <a href="https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions" target="_blank">https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions</a></p>
+
+<p><strong>73 DE SA6MWA</strong></p>
+
+<pre>
+(00:00) Intro
+(01:16) The Flood
+(01:46) Karin
+(03:03) Spreadsheet FTW
+(04:41) GIS
+(06:42) APRS
+(08:42) LoRa Sensors
+(10:07) Magic Carpets
+(10:52) Clarity
+(12:17) After Action Review
+(16:06) Outro
+</pre>
+]]></description>
+      <enclosure type="audio/x-m4a" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj033-c4isr-computers-data-driven-decisions.m4a" length="17058316"/>
+      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-3000x3000-english.jpeg"/>
+    </item>
+  </channel>
+</rss>

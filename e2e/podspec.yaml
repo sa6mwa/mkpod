@@ -1,23 +1,24 @@
 config:
-  baseURL: https://mkpod-integration-test.s3.eu-west-1.amazonaws.com
-  image: https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-1600x1600-english.jpeg
-  defaultPodImage: artwork/qzj-3000x3000-english.jpeg
-  aws:
-    profile: default
-    region: eu-west-1
-    buckets:
-      input: mkpod-integration-test-assets
-      output: mkpod-integration-test
-  localStorageDir: ./pod
+    baseURL: https://mkpod-integration-test.s3.eu-west-1.amazonaws.com
+    image: https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-1600x1600-english.jpeg
+    defaultPodImage: artwork/qzj-3000x3000-english.jpeg
+    aws:
+        profile: default
+        region: eu-west-1
+        buckets:
+            input: mkpod-integration-test-assets
+            output: mkpod-integration-test
+    localStorageDir: ./pod
 atom: podcast.rss
 title: mkpod integration test
 link: https://qzj.se
+pubDate: Mon, 01 Jan 0001 00:00:00 +0000
+lastBuildDate: Sat, 30 Aug 2025 23:47:05 +0000
 ttl: 60
 language: en
 copyright: Copyright SA6MWA 2025 All Rights Reserved.
 webMaster: sa6mwa@gmail.com
-description: |-
-  This is the `mkpod` integration test. See https://github.com/sa6mwa/mkpod for more information.
+description: This is the `mkpod` integration test. See https://github.com/sa6mwa/mkpod for more information.
 subtitle: mkpod integration test
 ownerName: SA6MWA
 ownerEmail: sa6mwa@gmail.com
@@ -25,105 +26,118 @@ author: SA6MWA
 explicit: "no"
 keywords: mkpod,integration test,e2e test,test
 categories:
-- name: Technology
-  subcategories: []
-- name: Society &amp; Culture
-  subcategories: []
-- name: Leisure
-  subcategories:
-  - Hobbies
+    - name: Technology
+      subcategories: []
+    - name: Society &amp; Culture
+      subcategories: []
+    - name: Leisure
+      subcategories:
+        - Hobbies
 encoding:
-  preferredFormat: m4a
-  bitrate: 128
-  lamepath: /usr/bin/lame
-  ffmpegpath: ~/bin/ffmpeg
-  crf: 38
-  abr: 128k
-  coverfront: artwork/qzj-1000x1000-english.jpeg
-  genre: Podcast
-  language: end
+    preferredFormat: m4a
+    bitrate: 128
+    lamepath: /usr/bin/lame
+    ffmpegpath: ~/bin/ffmpeg
+    crf: 38
+    abr: 128k
+    coverfront: artwork/qzj-1000x1000-english.jpeg
+    genre: Podcast
+    language: end
 episodes:
-- uid: 1
-  title: Switching to English
-  link: https://qzj.se/audio/qzj029-english
-  subtitle: QZJ expands scope, now in English with a sharper focus on modern defense,
-    comms, and the systems behind them.
-  input: masters/qzj029-english.flac
-  description: |-
-    This episode is about the evolution of Quebec Zulu Juliett as it shifts from Swedish to English and broadens its scope within the C4ISR domain — Command, Control, Communications, Computers, Intelligence, Surveillance, and Reconnaissance.
+    - uid: 1
+      title: Switching to English
+      pubDate: Sat, 30 Aug 2025 22:47:56 +0000
+      link: https://qzj.se/audio/qzj029-english
+      duration: "00:13:33"
+      author: SA6MWA
+      subtitle: QZJ expands scope, now in English with a sharper focus on modern defense, comms, and the systems behind them.
+      description: |-
+        This episode is about the evolution of Quebec Zulu Juliett as it shifts from Swedish to English and broadens its scope within the C4ISR domain — Command, Control, Communications, Computers, Intelligence, Surveillance, and Reconnaissance.
 
-    Host Mike (SA6MWA) reflects on why he’s making the change, critiques Sweden’s defense posture and procurement system, and previews future topics such as:
+        Host Mike (SA6MWA) reflects on why he’s making the change, critiques Sweden’s defense posture and procurement system, and previews future topics such as:
 
-    - Terrain-tactical HF radio communication (the Zenith Concept)
-    - The shortcomings of traditional defense acquisition models
-    - Agile frameworks applied to mission command
-    - Radio communication in contested environments
-    - The crossover between IT, defense, and resistance and resilience planning
-    - Survival and outdoor life
+        - Terrain-tactical HF radio communication (the Zenith Concept)
+        - The shortcomings of traditional defense acquisition models
+        - Agile frameworks applied to mission command
+        - Radio communication in contested environments
+        - The crossover between IT, defense, and resistance and resilience planning
+        - Survival and outdoor life
 
-    He also shares his background in cybersecurity and naval systems, thoughts on Cassandra syndrome and prediction backlash, and why folding his *Everything As Code* podcast into **QZJ** just makes sense.
+        He also shares his background in cybersecurity and naval systems, thoughts on Cassandra syndrome and prediction backlash, and why folding his *Everything As Code* podcast into **QZJ** just makes sense.
 
-    If you're interested in modern defense communication, decentralized command philosophies, or how AI and software are reshaping military systems, this episode sets the stage for everything that’s coming next.
+        If you're interested in modern defense communication, decentralized command philosophies, or how AI and software are reshaping military systems, this episode sets the stage for everything that’s coming next.
 
-    Contact Mike at [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com).
+        Contact Mike at [sa6mwa@gmail.com](mailto:sa6mwa@gmail.com).
 
-    ### Links
-    - <https://qzj.se>
-    - <https://qzj.se/audio/qzj029-english>
-    - <https://www.youtube.com/Utes%C3%A4ndaren>
-    - [Cogs Of War](https://warontherocks.com/category/vertical/cogs-of-war/) ([On Spotify](https://open.spotify.com/show/1yFIpVpxqYvcv0rADoykrp))
+        ### Links
+        - <https://qzj.se>
+        - <https://qzj.se/audio/qzj029-english>
+        - <https://www.youtube.com/Utes%C3%A4ndaren>
+        - [Cogs Of War](https://warontherocks.com/category/vertical/cogs-of-war/) ([On Spotify](https://open.spotify.com/show/1yFIpVpxqYvcv0rADoykrp))
 
-    **73 DE SA6MWA**
-  chapters:
-  - title: Intro
-    start: "00:00:00.000"
-  - title: C4ISR
-    start: "00:00:25.960"
-  - title: The switch
-    start: "00:01:59.599"
-  - title: Cassandra
-    start: "00:04:13.280"
-  - title: Everything As Code
-    start: "00:05:42.639"
-  - title: Defense procurement
-    start: "00:06:26.240"
-  - title: What to expect
-    start: "00:07:48.519"
-  - title: Next episode
-    start: "00:11:10.720"
-  - title: Contact
-    start: "00:12:57.120"
-- uid: 2
-  title: 'C4ISR Stories: Computers - Data-Driven Decisions for Disaster Defence'
-  link: https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions
-  subtitle: C4ISR explained through short stories, this is about Computers
-  description: |-
-    In this episode of C4ISR Stories, titled **Data-Driven Decisions for Disaster Defence**, we explore the transformative role of technology in crisis management through the gripping tale of a flooded town and an improvised coordination cell. Join us as we follow Karin, an IT consultant, who turns chaos into clarity using a laptop and innovative tools to drive effective rescue efforts. Discover how computers, GIS mapping, and live telemetry reshaped decision-making, empowering volunteers to act decisively amidst the flood. This episode highlights the synergy between human ingenuity and technology in disaster response, illustrating how shared understanding can save lives. Tune in for a compelling narrative about navigating the storm with data and determination.
+        **73 DE SA6MWA**
+      type: audio/x-m4a
+      length: 13286440
+      image: artwork/qzj-3000x3000-english.jpeg
+      input: masters/qzj029-english.flac
+      output: qzj029-english.m4a
+      chapters:
+        - title: Intro
+          start: "00:00:00.000"
+        - title: C4ISR
+          start: "00:00:25.960"
+        - title: The switch
+          start: "00:01:59.599"
+        - title: Cassandra
+          start: "00:04:13.280"
+        - title: Everything As Code
+          start: "00:05:42.639"
+        - title: Defense procurement
+          start: "00:06:26.240"
+        - title: What to expect
+          start: "00:07:48.519"
+        - title: Next episode
+          start: "00:11:10.720"
+        - title: Contact
+          start: "00:12:57.120"
+    - uid: 2
+      title: 'C4ISR Stories: Computers - Data-Driven Decisions for Disaster Defence'
+      pubDate: Sat, 30 Aug 2025 22:47:56 +0000
+      link: https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions
+      duration: "00:17:26"
+      author: SA6MWA
+      subtitle: C4ISR explained through short stories, this is about Computers
+      description: |-
+        In this episode of C4ISR Stories, titled **Data-Driven Decisions for Disaster Defence**, we explore the transformative role of technology in crisis management through the gripping tale of a flooded town and an improvised coordination cell. Join us as we follow Karin, an IT consultant, who turns chaos into clarity using a laptop and innovative tools to drive effective rescue efforts. Discover how computers, GIS mapping, and live telemetry reshaped decision-making, empowering volunteers to act decisively amidst the flood. This episode highlights the synergy between human ingenuity and technology in disaster response, illustrating how shared understanding can save lives. Tune in for a compelling narrative about navigating the storm with data and determination.
 
-    Read more on <https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions>
+        Read more on <https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions>
 
-    **73 DE SA6MWA**
-  input: masters/qzj033-c4isr-computers-data-driven-decisions.flac
-  chapters:
-  - title: Intro
-    start: "00:00:00.000"
-  - title: The Flood
-    start: "00:01:16.280"
-  - title: Karin
-    start: "00:01:46.400"
-  - title: Spreadsheet FTW
-    start: "00:03:03.639"
-  - title: GIS
-    start: "00:04:41.160"
-  - title: APRS
-    start: "00:06:42.439"
-  - title: LoRa Sensors
-    start: "00:08:42.960"
-  - title: Magic Carpets
-    start: "00:10:07.159"
-  - title: Clarity
-    start: "00:10:52.960"
-  - title: After Action Review
-    start: "00:12:17.440"
-  - title: Outro
-    start: "00:16:06.759"
+        **73 DE SA6MWA**
+      type: audio/x-m4a
+      length: 17058316
+      image: artwork/qzj-3000x3000-english.jpeg
+      input: masters/qzj033-c4isr-computers-data-driven-decisions.flac
+      output: qzj033-c4isr-computers-data-driven-decisions.m4a
+      chapters:
+        - title: Intro
+          start: "00:00:00.000"
+        - title: The Flood
+          start: "00:01:16.280"
+        - title: Karin
+          start: "00:01:46.400"
+        - title: Spreadsheet FTW
+          start: "00:03:03.639"
+        - title: GIS
+          start: "00:04:41.160"
+        - title: APRS
+          start: "00:06:42.439"
+        - title: LoRa Sensors
+          start: "00:08:42.960"
+        - title: Magic Carpets
+          start: "00:10:07.159"
+        - title: Clarity
+          start: "00:10:52.960"
+        - title: After Action Review
+          start: "00:12:17.440"
+        - title: Outro
+          start: "00:16:06.759"

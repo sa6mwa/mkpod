@@ -41,7 +41,7 @@
 {{- range .Episodes }}
 {{- if isAfter timeNow .PubDate.Time }}
     <item>
-      <guid isPermaLink="true">{{.Config.BaseURL}}/{{.Output}}</guid>
+      <guid isPermaLink="true">{{$.Config.BaseURL}}/{{.Output}}</guid>
       <title>{{.Title}}</title>
       <pubDate>{{.PubDate}}</pubDate>
       <link>{{.Link}}</link>
@@ -53,8 +53,8 @@
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
       <description><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></description>
-      <enclosure type="{{.Type}}" url="{{.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
-      <itunes:image href="{{.Config.BaseURL}}/{{.Image}}"/>
+      <enclosure type="{{.Type}}" url="{{$.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
+      <itunes:image href="{{$.Config.BaseURL}}/{{.Image}}"/>
     </item>
 {{- end }}
 {{- end }}

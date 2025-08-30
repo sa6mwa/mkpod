@@ -51,3 +51,8 @@ versions of these packages and patch go.mod for you.
 Always create unit tests for new code. Create mock adapters when
 necessary. Most of the current codebase lack unit tests, add when
 necessarry or when you modify existing codebase.
+
+Never build your own binary under the top-level directory, always
+build it as bin/mkpod (under the top-level directory of the repo).
+
+Always use bin/mkpod when running mkpod yourself.

@@ -2,3 +2,5 @@
 - [ ] Refactor cmd/mkpod/ to new mkpod under top-level directory using ports and adapters pattern
 - [X] Implement the remove-remote-master from asset bucket feature
 - [ ] Make full e2e integration tests
+- [ ] Ensure it is impossible to remove a remote master if the local master is not available
+  
