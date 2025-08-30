@@ -16,13 +16,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var defaultSpecfile string = "podspec.yaml"
+var DefaultSpecfile string = "podspec.yaml"
 
 // configurator.New returns a local file-based configurator that
 // satisfies the ports.ForConfiguring port interface.
 func New(podcastYamlFilename string) ports.ForConfiguring {
 	if podcastYamlFilename == "" {
-		podcastYamlFilename = defaultSpecfile
+		podcastYamlFilename = DefaultSpecfile
 	}
 	return &forConfiguring{
 		properties: make(map[string]any),

@@ -55,7 +55,7 @@ func (e *forEncoding) GetEncodedOutputs() []string {
 	return e.encodedOutputs
 }
 
-func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, uploaders ...ports.ForUploading) error {
+func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, postEncoding ports.PostEncodeFunc) error {
 	var indexes []int = make([]int, 0)
 
 	l := logger.FromContext(ctx)
@@ -156,20 +156,12 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, u
 		// Add episode.Output to e.encodedOutputs
 		e.encodedOutputs = append(e.encodedOutputs, atom.Episodes[i].Output)
 
-		// If one or more uploader is given, upload output mp4/mp3/m4a/m4b
-		// using the ForUploading port (interface).
-		for _, uploader := range uploaders {
-			if err := uploader.Upload(ctx, &ports.ForUploadingRequest{
-				Store:        atom.Config.Aws.Buckets.Output,
-				To:           atom.Episodes[i].Output,
-				StorageClass: e.storageClass,
-			}); err != nil {
-				return err
-			}
+		// If postEncoding functions is given, call it...
+		if err := postEncoding(atom, &atom.Episodes[i]); err != nil {
+			return err
 		}
-
 	}
-
+	return nil
 }
 
 // EncodeMP4 encodes episode into an mp4 video (using ffmpeg)
