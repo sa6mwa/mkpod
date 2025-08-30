@@ -3,3 +3,14 @@
 \#*\#
 /mkpod
 /bin
+
+# Audio files
+*.flac
+*.mp3
+*.m4a
+*.m4b
+*.wav
+
+# Image files
+*.jpeg
+*.jpg

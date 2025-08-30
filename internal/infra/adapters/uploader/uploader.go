@@ -61,8 +61,8 @@ func (u *forUploading) getContentType(filename string) (contentType string, err 
 
 // Upload fileToUpload as key to S3 bucket. If ContentType is empty in
 // r, function will attempt to detect the content-type of the file in
-// the r.From field.
-func (u *forUploading) Upload(ctx context.Context, r *ports.ForUploadingRequest) error {
+// the r.From field. The postFunc parameter can be nil for non-episode uploads.
+func (u *forUploading) Upload(ctx context.Context, r *ports.ForUploadingRequest, postFunc ports.PostEncodeFunc) error {
 	l := logger.FromContext(ctx)
 	if r == nil {
 		return ErrNilPointerRequest

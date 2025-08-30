@@ -14,6 +14,7 @@ import (
 
 	"github.com/alfg/mp4"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/parser"
 	"gopkg.in/alessio/shellescape.v1"
 )
@@ -80,7 +81,7 @@ func Mp4Duration(filename string) (int64, time.Duration, error) {
 // executed via shell (probably /bin/sh) and shellCommandOption (-c):
 //
 //	ffprobe -v error -show_format -print_format json filename
-func FFprobe(filename string) (*FFprobeJSON, error) {
+func FFprobe(filename string) (*model.FFprobeJSON, error) {
 	ffprobeCmd := fmt.Sprintf("ffprobe -v error -show_format -print_format json %s", shellescape.Quote(filename))
 	cmd := exec.Command(shell, shellCommandOption, ffprobeCmd)
 	var out bytes.Buffer
@@ -88,7 +89,7 @@ func FFprobe(filename string) (*FFprobeJSON, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, err
 	}
-	var result FFprobeJSON
+	var result model.FFprobeJSON
 	if err := json.NewDecoder(&out).Decode(&result); err != nil {
 		return nil, err
 	}

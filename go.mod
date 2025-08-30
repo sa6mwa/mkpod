@@ -13,6 +13,7 @@ require (
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/sa6mwa/id3v24 v0.4.0
 	github.com/sa6mwa/mp3duration v0.0.0-20221104103912-0716b1a5de6e
+	github.com/spf13/cobra v1.9.1
 	github.com/urfave/cli/v2 v2.27.6
 	golang.org/x/term v0.32.0
 	gopkg.in/alessio/shellescape.v1 v1.0.0-20170105083845-52074bc9df61
@@ -42,7 +43,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/spf13/cobra v1.9.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/tcolgate/mp3 v0.0.0-20170426193717-e79c5a46d300 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect

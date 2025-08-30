@@ -91,7 +91,7 @@ func (d *forDownloading) Download(ctx context.Context, bucket, key string) error
 							To:           key,
 							From:         completePath,
 							StorageClass: sc,
-						}); err != nil {
+						}, nil); err != nil {
 							return err
 						}
 					}

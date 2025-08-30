@@ -25,21 +25,25 @@ import (
 	"context"
 	"os"
 
+	"time"
+
+	"github.com/sa6mwa/mkpod/internal/app/ports"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/configurator"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/parser"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/uploader"
 	"github.com/spf13/cobra"
 )
 
 // parseCmd represents the parse command
 var parseCmd = &cobra.Command{
 	Use:   "parse",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Parse podspec.yaml into podcast RSS feed",
+	Long: `Parse the podcast specification file (podspec.yaml) and generate
+the RSS feed (podcast.rss). This command reads the configuration,
+validates the podcast metadata, and generates the RSS XML file.
+Optionally, it can upload the RSS file to the configured S3 bucket.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
 		imsg := "Internal error"
@@ -56,6 +60,12 @@ to quickly create a Cobra application.`,
 		dryRun, err := cmd.Flags().GetBool("dry-run")
 		if err != nil {
 			l.Error(imsg, "error", err)
+			os.Exit(1)
+		}
+		upload, err := cmd.Flags().GetBool("upload")
+		if err != nil {
+			l.Error(imsg, "error", err)
+			os.Exit(1)
 		}
 
 		if len(args) > 0 {
@@ -64,15 +74,78 @@ to quickly create a Cobra application.`,
 		}
 
 		ctx := context.Background()
+		ctx = logger.WithDefaultLogger(ctx)
 
+		// Load configuration
 		config := configurator.New(specFile)
-
 		atom, err := config.Load(ctx)
 		if err != nil {
 			l.Error("Failed to load configuration", "error", err, "specfile", specFile)
 			os.Exit(1)
 		}
 
+		if upload {
+			l.Info("About to generate RSS and upload to S3", "atom", atom.Atom, "bucket", atom.Config.Aws.Buckets.Output)
+		} else {
+			l.Info("About to generate RSS", "atom", atom.Atom)
+		}
+
+		// Create adapters
+		askerAdapter := asker.New(dryRun, askNoQuestions)
+		parserAdapter := parser.New()
+
+		// Ask if user wants to refresh lastBuildDate
+		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.Atom, specFile) {
+			atom.LastBuildDate.Time = time.Now().UTC()
+			
+			// Save updated configuration
+			if askerAdapter.Ask(ctx, "Fields in the atom have changed, re-write %s?", specFile) {
+				if err := config.Save(ctx, atom); err != nil {
+					l.Error("Unable to save configuration", "error", err, "specfile", specFile)
+					os.Exit(1)
+				}
+			}
+		}
+
+		// Generate RSS
+		if dryRun {
+			if err := parserAdapter.WriteRSSToStdout(ctx, atom); err != nil {
+				l.Error("Failed to write RSS to stdout", "error", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := parserAdapter.WriteRSS(ctx, atom); err != nil {
+				l.Error("Failed to write RSS file", "error", err, "file", atom.Atom)
+				os.Exit(1)
+			}
+			l.Info("Successfully generated RSS", "file", atom.Atom)
+		}
+
+		// Upload if requested
+		if upload && !dryRun {
+			uploaderAdapter := uploader.New(atom)
+			
+			// Show diff first
+			if err := uploaderAdapter.Diff(ctx, atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
+				l.Error("Failed to show diff", "error", err)
+				// Don't exit on diff error, continue with upload
+			}
+
+			if askerAdapter.Ask(ctx, "Upload new %s?", atom.Atom) {
+				request := &ports.ForUploadingRequest{
+					Store:       atom.Config.Aws.Buckets.Output,
+					To:          atom.Atom,
+					From:        atom.Atom,
+					ContentType: "text/xml",
+				}
+				if err := uploaderAdapter.Upload(ctx, request, nil); err != nil {
+					l.Error("Failed to upload RSS", "error", err)
+					os.Exit(1)
+				}
+			}
+		} else if upload && dryRun {
+			l.Info("Dry run: would upload RSS", "file", atom.Atom, "bucket", atom.Config.Aws.Buckets.Output)
+		}
 	},
 }
 
