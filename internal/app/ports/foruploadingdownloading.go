@@ -35,9 +35,10 @@ type ForUploadingRequest struct {
 
 // PostEncodeFunc is executed after each encoded episode where atom is
 // a pointer to the actual atom object and episode points to the
-// episode in that atom (not a copy). Modifying any field in either
-// atom or episode will update the actual atom object.
-type PostEncodeFunc func(atom *model.Atom, episode *model.Episode) error
+// episode in that atom (not a copy). The wasEncoded parameter indicates
+// whether the episode was actually encoded (true) or just processed (false).
+// Modifying any field in either atom or episode will update the actual atom object.
+type PostEncodeFunc func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error
 
 type ForUploading interface {
 	Upload(ctx context.Context, request *ForUploadingRequest, postFunc PostEncodeFunc) error

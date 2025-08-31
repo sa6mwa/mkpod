@@ -55,6 +55,20 @@ func (e *forEncoding) GetEncodedOutputs() []string {
 	return e.encodedOutputs
 }
 
+func (e *forEncoding) shouldEncode(ctx context.Context, uid int64, filename string) bool {
+	// l := logger.FromContext(ctx)
+	if len(strings.TrimSpace(filename)) < 5 {
+		return true
+	} else if uid == -2 {
+		return true
+	} else if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return true
+	} else if uid == -1 {
+		return false
+	}
+	return e.Ask(ctx, "Re-encode %s?", filename)
+}
+
 func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, postEncoding ports.PostEncodeFunc) error {
 	var indexes []int = make([]int, 0)
 
@@ -63,7 +77,7 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, p
 
 	if uid < 0 {
 		// Iterate all episodes into the indexes slice
-		for i, _ := range atom.Episodes {
+		for i := range atom.Episodes {
 			indexes = append(indexes, i)
 		}
 	} else {
@@ -76,7 +90,7 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, p
 	}
 
 	// Iterate over one episode or all episodes depending on value of
-	// uid.
+	// uid (<0 == all, -2 == force reencoding even if output field exists)
 	for _, i := range indexes {
 		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
 		inputContentType, err := GetFileContentType(inputPath)
@@ -85,80 +99,87 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, p
 		}
 		format := strings.TrimSpace(strings.ToLower(atom.Episodes[i].Format))
 
-		// If input content type is video/* and format is not "audio",
-		// we are to encode it using ffmpeg to an mp4. If format is
-		// "audio", drop the video stream and encode an mp3 (audio
-		// only).
-		if strings.HasPrefix(inputContentType, "video/") {
-			// If episode format is video or mp4, it's a video episode.
-			switch format {
-			case "", "video", "mp4":
-				//continue here, implement EncodeMP4 function
-				if err := EncodeMP4(ctx, atom, &atom.Episodes[i]); err != nil {
-					return err
-				}
-			case "audio":
-				if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
-					// Encode into m4a or m4b
-					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
+		outputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
+		wasEncoded := false
+		if e.shouldEncode(ctx, uid, outputPath) {
+			wasEncoded = true
+			// If input content type is video/* and format is not "audio",
+			// we are to encode it using ffmpeg to an mp4. If format is
+			// "audio", drop the video stream and encode an mp3 (audio
+			// only).
+			if strings.HasPrefix(inputContentType, "video/") {
+				// If episode format is video or mp4, it's a video episode.
+				switch format {
+				case "", "video", "mp4":
+					//continue here, implement EncodeMP4 function
+					if err := EncodeMP4(ctx, atom, &atom.Episodes[i]); err != nil {
 						return err
 					}
-				} else {
-					// Encode mp3 via ffmpeg (piped into lame)
+				case "audio":
+					if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
+						// Encode into m4a or m4b
+						if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
+							return err
+						}
+					} else {
+						// Encode mp3 via ffmpeg (piped into lame)
+						if err := EncodeMP3ViaFFmpeg(ctx, atom, &atom.Episodes[i]); err != nil {
+							return err
+						}
+					}
+				case "mp3":
+					// Encode mp3 via ffmpeg
 					if err := EncodeMP3ViaFFmpeg(ctx, atom, &atom.Episodes[i]); err != nil {
 						return err
 					}
-				}
-			case "mp3":
-				// Encode mp3 via ffmpeg
-				if err := EncodeMP3ViaFFmpeg(ctx, atom, &atom.Episodes[i]); err != nil {
-					return err
-				}
-			case "m4a", "m4b":
-				// Encode m4a or m4b
-				if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
-					return err
-				}
-			default:
-				return fmt.Errorf("invalid or unsupported format %q", format)
-			}
-		} else {
-			// ...else, assume it's audio only and encode it to either
-			// mp3 using lame or m4a/m4b using ffmpeg
-			switch format {
-			case "", "audio":
-				if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
-					// Encode into m4a or m4b
-					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
+				case "m4a", "m4b":
+					// Encode m4a or m4b
+					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
 						return err
 					}
-				} else {
+				default:
+					return fmt.Errorf("invalid or unsupported format %q", format)
+				}
+			} else {
+				// ...else, assume it's audio only and encode it to either
+				// mp3 using lame or m4a/m4b using ffmpeg
+				switch format {
+				case "", "audio":
+					if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
+						// Encode into m4a or m4b
+						if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
+							return err
+						}
+					} else {
+						// Encode mp3 using lame
+						if err := EncodeMP3(ctx, atom, &atom.Episodes[i]); err != nil {
+							return err
+						}
+					}
+				case "mp3":
 					// Encode mp3 using lame
 					if err := EncodeMP3(ctx, atom, &atom.Episodes[i]); err != nil {
 						return err
 					}
+				case "m4a", "m4b":
+					// Encode m4a or m4b
+					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
+						return err
+					}
+				default:
+					return fmt.Errorf("invalid or unsupported format %q", format)
 				}
-			case "mp3":
-				// Encode mp3 using lame
-				if err := EncodeMP3(ctx, atom, &atom.Episodes[i]); err != nil {
-					return err
-				}
-			case "m4a", "m4b":
-				// Encode m4a or m4b
-				if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
-					return err
-				}
-			default:
-				return fmt.Errorf("invalid or unsupported format %q", format)
 			}
+
+			// Add episode.Output to e.encodedOutputs
+			e.encodedOutputs = append(e.encodedOutputs, atom.Episodes[i].Output)
 		}
 
-		// Add episode.Output to e.encodedOutputs
-		e.encodedOutputs = append(e.encodedOutputs, atom.Episodes[i].Output)
-
 		// If postEncoding functions is given, call it...
-		if err := postEncoding(atom, &atom.Episodes[i]); err != nil {
-			return err
+		if postEncoding != nil {
+			if err := postEncoding(atom, &atom.Episodes[i], wasEncoded); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

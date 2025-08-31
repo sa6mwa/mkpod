@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -41,8 +42,9 @@ import (
 
 // encodeCmd represents the encode command
 var encodeCmd = &cobra.Command{
-	Use:   "encode [episode-uids...] | --all",
-	Short: "Encode and upload single or all episodes in podspec.yaml",
+	Aliases: []string{"e"},
+	Use:     "encode [episode-uids...] | --all",
+	Short:   "Encode and upload single or all episodes in podspec.yaml",
 	Long: `Encode and upload single or all output files defined in the podcast
 specification. This command will encode audio/video master files into
 the specified output formats (MP3, M4A, M4B, MP4) and optionally upload
@@ -58,13 +60,13 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
 		imsg := "Internal error"
-		
+
 		all, err := cmd.Flags().GetBool("all")
 		if err != nil {
 			l.Error(imsg, "error", err)
 			os.Exit(1)
 		}
-		
+
 		if len(args) == 0 && !all {
 			l.Error("Syntax error", "error", "You need to select one or several episode UIDs to encode as argument(s) to this command or use the all-option --all")
 			os.Exit(1)
@@ -103,45 +105,58 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		uploaderAdapter := uploader.New(atom)
 		// Always create awshandlerAdapter for file existence checks
 		awshandlerAdapter := awshandler.New(atom, askerAdapter)
-		
-	// Create combined post-processing function
-	postEncodeFunc := func(atom *model.Atom, episode *model.Episode) error {
-		// First, handle remote master removal if requested
-		if removeRemoteMaster && episode.Input != "" {
-			request := &ports.ForAdministeringRemoteFilesRequest{
-				Store: atom.Config.Aws.Buckets.Input,
-				Key:   episode.Input,
-			}
-			if err := awshandlerAdapter.DeleteRemoteFile(ctx, request); err != nil {
-				l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
-				// Don't fail the entire process for this - just log and continue
-			}
-		}
-		
-		// Check if local output file exists but is missing from output bucket
-		if episode.Output != "" {
-			shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, askerAdapter, awshandlerAdapter)
-			if err != nil {
-				return fmt.Errorf("failed to check for missing output file: %w", err)
-			}
-			
-			if shouldUpload {
-				request := &ports.ForUploadingRequest{
-					Store: atom.Config.Aws.Buckets.Output,
-					To:    episode.Output,
-					From:  episode.Output,
+
+		// Create combined post-processing function
+		// Track which episodes were encoded vs just processed
+		encodedEpisodes := make(map[string]bool)
+
+		postEncodeFunc := func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error {
+			// Track if this episode was encoded
+			encodedEpisodes[episode.Output] = wasEncoded
+
+			// First, handle remote master removal if requested
+			if removeRemoteMaster && episode.Input != "" {
+				request := &ports.ForAdministeringRemoteFilesRequest{
+					Store: atom.Config.Aws.Buckets.Input,
+					Key:   episode.Input,
 				}
-				return uploaderAdapter.Upload(ctx, request, nil)
+				if err := awshandlerAdapter.DeleteRemoteFile(ctx, request); err != nil {
+					l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
+					// Don't fail the entire process for this - just log and continue
+				}
 			}
+
+			// Check if local output file exists but is missing from output bucket
+			if episode.Output != "" {
+				shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, askerAdapter, awshandlerAdapter, wasEncoded)
+				if err != nil {
+					return fmt.Errorf("failed to check for missing output file: %w", err)
+				}
+
+				if shouldUpload {
+					// Use full local path for upload
+					localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+					request := &ports.ForUploadingRequest{
+						Store: atom.Config.Aws.Buckets.Output,
+						To:    episode.Output,
+						From:  localPath,
+					}
+					return uploaderAdapter.Upload(ctx, request, nil)
+				}
+			}
+			return nil
 		}
-		return nil
-	}
 
 		processedCount := 0
-		
+
 		if all {
-			// Encode all episodes
-			if err := encoderAdapter.Encode(ctx, atom, -1, postEncodeFunc); err != nil {
+			// Determine UID based on force flag
+			var encodeUID int64 = -1 // Default: process all but don't re-encode existing
+			if askNoQuestions {
+				encodeUID = -2 // Force re-encode everything
+			}
+
+			if err := encoderAdapter.Encode(ctx, atom, encodeUID, postEncodeFunc); err != nil {
 				l.Error("Failed to encode episodes", "error", err)
 				os.Exit(1)
 			}
@@ -154,7 +169,6 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 					l.Error("Invalid episode UID", "uid", uidStr, "error", err)
 					continue
 				}
-				
 				if err := encoderAdapter.Encode(ctx, atom, uid, postEncodeFunc); err != nil {
 					l.Error("Failed to encode episode", "uid", uid, "error", err)
 					os.Exit(1)
@@ -166,11 +180,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		if processedCount == 0 {
 			l.Info("No episode was processed")
 		} else {
-			plural := ""
-			if processedCount > 1 {
-				plural = "s"
-			}
-			l.Info("Processing complete", "processed", processedCount, "episodes", plural)
+			l.Info("Processing complete", "processed", processedCount)
 		}
 
 		// Save updated configuration if needed
@@ -185,16 +195,19 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 }
 
 // checkForMissingOutputFile checks if a local output file exists but is missing from the output bucket
-func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *model.Episode, askerAdapter ports.ForAsking, awshandlerAdapter ports.ForAdministeringRemoteFiles) (bool, error) {
+func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *model.Episode, askerAdapter ports.ForAsking, awshandlerAdapter ports.ForAdministeringRemoteFiles, wasEncoded bool) (bool, error) {
 	l := logger.FromContext(ctx)
-	
+
+	// Build full local path
+	localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+
 	// Check if local file exists
-	if _, err := os.Stat(episode.Output); os.IsNotExist(err) {
+	if _, err := os.Stat(localPath); os.IsNotExist(err) {
 		return false, nil // No local file, nothing to upload
 	} else if err != nil {
 		return false, fmt.Errorf("failed to check local file: %w", err)
 	}
-	
+
 	// Check if remote file exists
 	if awshandlerAdapter != nil {
 		request := &ports.ForAdministeringRemoteFilesRequest{
@@ -205,13 +218,17 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *m
 		if err != nil {
 			return false, fmt.Errorf("failed to check remote file: %w", err)
 		}
-		
+
 		if !exists {
-			l.Info("Local output file exists but is missing from output bucket", "file", episode.Output)
+			l.Info("Local output file exists but is missing from output bucket", "file", episode.Output, "localPath", localPath)
 			return askerAdapter.Ask(ctx, "Upload local file %s to output bucket?", episode.Output), nil
+		} else if wasEncoded {
+			// File exists remotely but was just re-encoded locally, ask if we should overwrite
+			l.Info("Output file was re-encoded and remote file exists", "file", episode.Output)
+			return askerAdapter.Ask(ctx, "Overwrite remote file %s with newly encoded version?", episode.Output), nil
 		}
 	}
-	
+
 	return false, nil
 }
 

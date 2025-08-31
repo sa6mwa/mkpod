@@ -45,7 +45,7 @@ type Atom struct {
 func (a *Atom) ContainsEpisode(uid int64) int64 {
 	for idx := range a.Episodes {
 		if a.Episodes[idx].UID == uid {
-			return int64(uid)
+			return int64(idx)
 		}
 	}
 	return -1

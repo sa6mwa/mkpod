@@ -3,7 +3,7 @@ MODULE = github.com/sa6mwa/mkpod
 #VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0)
 VERSION = v0.6.0
 DESTDIR = /usr/local/bin
-SRC = $(MODULE)/cmd/$(NAME)
+SRC = $(MODULE)
 GOOS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 GOARCH = amd64
 GO = CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go
@@ -16,7 +16,7 @@ clean:
 	rm -rf bin
 
 .PHONY: build
-build: test vulncheck bin/$(NAME) strip upx
+build: test vulncheck bin/$(NAME) strip
 
 .PHONY: vulncheck
 vulncheck:
@@ -49,7 +49,7 @@ install:
 	install bin/$(NAME) $(DESTDIR)/$(NAME)
 
 .PHONY: release
-release:
+release: upx
 	$(eval VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0))
 	$(MAKE) VERSION=$(VERSION) clean build
 	cp bin/$(NAME) bin/$(NAME)-$(shell go env GOOS)-$(shell go env GOARCH)-$(VERSION)

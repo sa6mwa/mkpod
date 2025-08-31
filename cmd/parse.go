@@ -40,8 +40,9 @@ import (
 
 // parseCmd represents the parse command
 var parseCmd = &cobra.Command{
-	Use:   "parse",
-	Short: "Parse podspec.yaml into podcast RSS feed",
+	Use:     "parse",
+	Aliases: []string{"p"},
+	Short:   "Parse podspec.yaml into podcast RSS feed",
 	Long: `Parse the podcast specification file (podspec.yaml) and generate
 the RSS feed (podcast.rss). This command reads the configuration,
 validates the podcast metadata, and generates the RSS XML file.
@@ -99,7 +100,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		// Ask if user wants to refresh lastBuildDate
 		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.Atom, specFile) {
 			atom.LastBuildDate.Time = time.Now().UTC()
-			
+
 			// Save updated configuration
 			if askerAdapter.Ask(ctx, "Fields in the atom have changed, re-write %s?", specFile) {
 				if err := config.Save(ctx, atom); err != nil {
@@ -126,13 +127,13 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		// Upload if requested
 		if upload && !dryRun {
 			uploaderAdapter := uploader.New(atom)
-			
+
 			// Check and upload podcast image if needed
 			if err := checkAndUploadPodcastImage(ctx, atom, askerAdapter, uploaderAdapter); err != nil {
 				l.Warn("Failed to check/upload podcast image", "error", err)
 				// Don't exit on podcast image error - this is not critical
 			}
-			
+
 			// Show diff first
 			if err := uploaderAdapter.Diff(ctx, atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
 				l.Error("Failed to show diff", "error", err)
@@ -164,31 +165,31 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 // checkAndUploadPodcastImage checks if podcast images referenced in URLs exist in S3 and uploads missing ones
 func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdapter ports.ForAsking, uploaderAdapter ports.ForUploading) error {
 	l := logger.FromContext(ctx)
-	
+
 	// Extract bucket domain from output bucket URL
 	bucketDomain := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", atom.Config.Aws.Buckets.Output, atom.Config.Aws.Region)
-	
+
 	// Function to check and upload an image
 	checkAndUpload := func(imageURL, localImagePath, imageType string) error {
 		if imageURL == "" {
 			return nil // No image URL specified
 		}
-		
+
 		// Check if the image URL points to our S3 bucket
 		if !strings.HasPrefix(imageURL, bucketDomain) {
 			l.Debug("Image URL does not reference our S3 bucket, skipping", "url", imageURL, "type", imageType)
 			return nil
 		}
-		
+
 		// Extract the S3 key from the URL
 		s3Key := strings.TrimPrefix(imageURL, bucketDomain+"/")
-		
+
 		// Build the full path using localStorageDir from config
 		fullLocalPath := localImagePath
 		if atom.Config.LocalStorageDir != "" {
 			fullLocalPath = atom.Config.LocalStorageDir + "/" + localImagePath
 		}
-		
+
 		// Check if local image file exists
 		if _, err := os.Stat(fullLocalPath); os.IsNotExist(err) {
 			l.Warn("Local image file does not exist", "path", fullLocalPath, "type", imageType)
@@ -196,13 +197,13 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 		} else if err != nil {
 			return fmt.Errorf("failed to check local image file %s: %w", fullLocalPath, err)
 		}
-		
+
 		if uploaderAdapter == nil {
 			// Dry run mode
 			l.Info("Would check/upload image", "s3Key", s3Key, "localPath", localImagePath, "type", imageType)
 			return nil
 		}
-		
+
 		// TODO: Check if remote file exists in S3 (would need AWS handler)
 		// For now, just ask if user wants to upload
 		if askerAdapter.Ask(ctx, "Upload %s image %s to S3?", imageType, localImagePath) {
@@ -211,7 +212,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 			if strings.HasSuffix(strings.ToLower(localImagePath), ".png") {
 				contentType = "image/png"
 			}
-			
+
 			request := &ports.ForUploadingRequest{
 				Store:       atom.Config.Aws.Buckets.Output,
 				To:          s3Key,
@@ -220,10 +221,10 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 			}
 			return uploaderAdapter.Upload(ctx, request, nil)
 		}
-		
+
 		return nil
 	}
-	
+
 	// Check main podcast image
 	// Extract the local path from the image URL by removing the baseURL prefix
 	mainImageLocalPath := ""
@@ -233,7 +234,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 	if err := checkAndUpload(atom.Config.Image, mainImageLocalPath, "podcast"); err != nil {
 		return fmt.Errorf("failed to check/upload main podcast image: %w", err)
 	}
-	
+
 	// Check encoding cover image
 	coverImagePath := atom.Encoding.Coverfront
 	if coverImagePath != "" {
@@ -243,7 +244,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 			return fmt.Errorf("failed to check/upload cover image: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
