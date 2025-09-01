@@ -61,6 +61,12 @@ func (c *forConfiguring) Load(ctx context.Context) (*model.Atom, error) {
 	if err := yaml.NewDecoder(f).Decode(&atom); err != nil {
 		return nil, err
 	}
+	
+	// Validate required top-level fields
+	if err := c.validateRequiredFields(&atom); err != nil {
+		return nil, fmt.Errorf("validation failed for %s: %w", c.specFile, err)
+	}
+	
 	// Set defaults
 	if atom.Encoding.CRF == 0 {
 		atom.Encoding.CRF = 28
@@ -85,5 +91,62 @@ func (c *forConfiguring) Save(ctx context.Context, atom *model.Atom) error {
 	if err := yaml.NewEncoder(f).Encode(atom); err != nil {
 		return fmt.Errorf("unable to marshall yaml: %w", err)
 	}
+	return nil
+}
+
+// validateRequiredFields validates that all required top-level fields are present and not empty
+func (c *forConfiguring) validateRequiredFields(atom *model.Atom) error {
+	var missingFields []string
+	
+	// Check required string fields
+	if strings.TrimSpace(atom.Author) == "" {
+		missingFields = append(missingFields, "author")
+	}
+	if strings.TrimSpace(atom.Config.BaseURL) == "" {
+		missingFields = append(missingFields, "config.baseURL")
+	}
+	if strings.TrimSpace(atom.Config.Image) == "" {
+		missingFields = append(missingFields, "config.image")
+	}
+	if strings.TrimSpace(atom.Config.DefaultPodImage) == "" {
+		missingFields = append(missingFields, "config.defaultPodImage")
+	}
+	if strings.TrimSpace(atom.Atom) == "" {
+		missingFields = append(missingFields, "atom")
+	}
+	if strings.TrimSpace(atom.Title) == "" {
+		missingFields = append(missingFields, "title")
+	}
+	if atom.TTL == 0 {
+		missingFields = append(missingFields, "ttl")
+	}
+	if strings.TrimSpace(atom.Language) == "" {
+		missingFields = append(missingFields, "language")
+	}
+	if strings.TrimSpace(atom.Copyright) == "" {
+		missingFields = append(missingFields, "copyright")
+	}
+	if strings.TrimSpace(atom.WebMaster) == "" {
+		missingFields = append(missingFields, "webMaster")
+	}
+	if strings.TrimSpace(atom.Description) == "" {
+		missingFields = append(missingFields, "description")
+	}
+	if strings.TrimSpace(atom.Subtitle) == "" {
+		missingFields = append(missingFields, "subtitle")
+	}
+	if strings.TrimSpace(atom.OwnerName) == "" {
+		missingFields = append(missingFields, "ownerName")
+	}
+	if strings.TrimSpace(atom.OwnerEmail) == "" {
+		missingFields = append(missingFields, "ownerEmail")
+	}
+	
+	// Note: pubDate is not validated here as it's defaulted to current time in Load() if missing
+	
+	if len(missingFields) > 0 {
+		return fmt.Errorf("required fields are missing or empty: %s", strings.Join(missingFields, ", "))
+	}
+	
 	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/app/ports"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 )
 
 //go:embed template.rss
@@ -35,7 +37,7 @@ type forParsing struct {
 	funcMap template.FuncMap
 }
 
-func (p *forParsing) WriteRSS(_ context.Context, atom *model.Atom) error {
+func (p *forParsing) WriteRSS(ctx context.Context, atom *model.Atom) error {
 	if atom == nil {
 		return ErrNilPointerAtom
 	}
@@ -44,21 +46,121 @@ func (p *forParsing) WriteRSS(_ context.Context, atom *model.Atom) error {
 		return err
 	}
 	defer f.Close()
-	return writeRSS(f, p, atom)
+	return writeRSS(ctx, f, p, atom)
 }
 
-func (p *forParsing) WriteRSSToStdout(_ context.Context, atom *model.Atom) error {
-	return writeRSS(os.Stdout, p, atom)
+func (p *forParsing) WriteRSSToStdout(ctx context.Context, atom *model.Atom) error {
+	return writeRSS(ctx, os.Stdout, p, atom)
 }
 
 // Functions...
 
-func writeRSS(w io.Writer, p *forParsing, atom *model.Atom) error {
-	t, err := template.New("template.rss").Funcs(p.funcMap).Parse(rssTemplate)
+func writeRSS(ctx context.Context, w io.Writer, p *forParsing, atom *model.Atom) error {
+	// Create template with context-aware function map
+	funcMapWithContext := p.mkFuncMapWithContext(ctx, atom)
+	
+	t, err := template.New("template.rss").Funcs(funcMapWithContext).Parse(rssTemplate)
 	if err != nil {
 		return err
 	}
 	return t.Execute(w, atom)
+}
+
+// mkFuncMapWithContext creates a function map with context-aware functions
+func (p *forParsing) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) template.FuncMap {
+	l := logger.FromContext(ctx)
+	if l == nil {
+		l = logger.DefaultLogger()
+	}
+	
+	// Start with base function map
+	funcMap := mkFuncMap()
+	
+	// Add context-aware functions
+	funcMap["validEpisodes"] = func(episodes []model.Episode) []model.Episode {
+		return p.filterValidEpisodes(ctx, atom, episodes)
+	}
+	
+	funcMap["episodeAuthor"] = func(episode model.Episode) string {
+		if strings.TrimSpace(episode.Author) == "" {
+			return atom.Author
+		}
+		return episode.Author
+	}
+	
+	funcMap["episodeExplicit"] = func(episode model.Episode) string {
+		if episode.Explicit.S == "" {
+			if atom.Explicit.S != "" {
+				return atom.Explicit.S
+			}
+			return "no"
+		}
+		return episode.Explicit.S
+	}
+	
+	return funcMap
+}
+
+// filterValidEpisodes filters out episodes that are missing required fields
+func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, episodes []model.Episode) []model.Episode {
+	l := logger.FromContext(ctx)
+	if l == nil {
+		l = logger.DefaultLogger()
+	}
+	
+	validEpisodes := make([]model.Episode, 0, len(episodes))
+	
+	for i, episode := range episodes {
+		// Validate required fields
+		var missingFields []string
+		
+		if strings.TrimSpace(episode.Output) == "" {
+			missingFields = append(missingFields, "output")
+		}
+		if episode.Duration.Duration == 0 {
+			missingFields = append(missingFields, "duration")
+		}
+		if episode.Length == 0 {
+			missingFields = append(missingFields, "length")
+		}
+		if strings.TrimSpace(episode.Type) == "" {
+			missingFields = append(missingFields, "type")
+		}
+		if strings.TrimSpace(episode.Image) == "" {
+			missingFields = append(missingFields, "image")
+		}
+		
+		// Check author (considering default from atom)
+		effectiveAuthor := episode.Author
+		if strings.TrimSpace(effectiveAuthor) == "" {
+			effectiveAuthor = atom.Author
+		}
+		if strings.TrimSpace(effectiveAuthor) == "" {
+			missingFields = append(missingFields, "author")
+		}
+		
+		if len(missingFields) > 0 {
+			l.Warn("Excluding episode from RSS due to missing required fields",
+				"episode", i+1,
+				"uid", episode.UID,
+				"title", episode.Title,
+				"missingFields", strings.Join(missingFields, ", "),
+				"message", "These fields can be resolved by encoding or re-encoding the episode")
+			continue
+		}
+		
+		validEpisodes = append(validEpisodes, episode)
+	}
+	
+	if len(validEpisodes) != len(episodes) {
+		excludedCount := len(episodes) - len(validEpisodes)
+		l.Info("Episode filtering complete",
+			"totalEpisodes", len(episodes),
+			"validEpisodes", len(validEpisodes),
+			"excludedEpisodes", excludedCount)
+	}
+	
+	return validEpisodes
 }
 
 func mkFuncMap() template.FuncMap {

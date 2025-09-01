@@ -8,7 +8,7 @@ OUTPUT_BUCKET := mkpod-integration-test
 # Build mkpod if it doesn't exist
 MKPOD_BIN := ../bin/mkpod
 
-.PHONY: all clean test setup teardown build-mkpod rebuild encode generate-rss upload-rss make-public make-private verify-outputs test-remove-master-safety test-pubdate-behavior
+.PHONY: all clean test setup teardown build-mkpod rebuild encode generate-rss upload-rss make-public make-private verify-outputs test-remove-master-safety test-pubdate-behavior test-validation-behavior
 
 all: test
 
@@ -145,8 +145,13 @@ test-pubdate-behavior: setup
 	fi
 	@echo "pubDate behavior test completed successfully"
 
+# Test validation behavior (top-level field validation and episode filtering)
+test-validation-behavior: setup
+	@echo "Testing validation behavior..."
+	./test-validation-behavior.sh
+
 # Run complete integration test workflow
-test: setup encode upload-rss verify-outputs test-remove-master-safety test-pubdate-behaviour
+test: setup encode upload-rss verify-outputs test-remove-master-safety test-pubdate-behavior test-validation-behavior
 	@echo "Running complete e2e integration test workflow..."
 	@echo "Complete mkpod workflow test completed successfully!"
 	@echo ""
@@ -195,6 +200,7 @@ help:
 	@echo "  test          - Run complete e2e integration workflow"
 	@echo "  test-remove-master-safety - Test --remove-remote-master safety checks"
 	@echo "  test-pubdate-behavior - Test pubDate field filling behavior"
+	@echo "  test-validation-behavior - Test validation rules and episode filtering"
 	@echo "  clean         - Remove all test files from S3 buckets"
 	@echo "  teardown      - Delete S3 buckets entirely (use with caution)"
 	@echo "  build-mkpod   - Build the mkpod binary (only if missing)"

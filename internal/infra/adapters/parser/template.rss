@@ -38,7 +38,7 @@
 <itunes:category text="{{ .Name }}" />
     {{- end }}
 {{- end }}
-{{- range .Episodes }}
+{{- range validEpisodes .Episodes }}
 {{- if isAfter timeNow .PubDate.Time }}
     <item>
       <guid isPermaLink="true">{{$.Config.BaseURL}}/{{.Output}}</guid>
@@ -47,8 +47,8 @@
       <link>{{.Link}}</link>
       <itunes:episode>{{.UID}}</itunes:episode>
       <itunes:duration>{{.Duration}}</itunes:duration>
-      <itunes:author>{{.Author}}</itunes:author>
-      <itunes:explicit>{{.Explicit}}</itunes:explicit>
+      <itunes:author>{{episodeAuthor .}}</itunes:author>
+      <itunes:explicit>{{episodeExplicit .}}</itunes:explicit>
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}

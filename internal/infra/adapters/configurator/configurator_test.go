@@ -18,11 +18,22 @@ func TestConfiguratorPubDateHandling(t *testing.T) {
 		{
 			name: "missing pubDate should be set to current time",
 			yamlContent: `
+atom: "podcast.rss"
 title: "Test Podcast"
 link: "https://example.com"
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
 config:
   baseURL: "https://example.com"
   image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
   localStorageDir: "./test"
 `,
 			expectCurrent: true,
@@ -30,12 +41,23 @@ config:
 		{
 			name: "empty pubDate should be set to current time",
 			yamlContent: `
+atom: "podcast.rss"
 title: "Test Podcast" 
 link: "https://example.com"
 pubDate: ""
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
 config:
   baseURL: "https://example.com"
   image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
   localStorageDir: "./test"
 `,
 			expectCurrent: true,
@@ -43,12 +65,23 @@ config:
 		{
 			name: "zero date pubDate should be set to current time", 
 			yamlContent: `
+atom: "podcast.rss"
 title: "Test Podcast"
 link: "https://example.com"
 pubDate: "Mon, 01 Jan 0001 00:00:00 +0000"
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
 config:
   baseURL: "https://example.com"
   image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
   localStorageDir: "./test"
 `,
 			expectCurrent: true,
@@ -56,12 +89,23 @@ config:
 		{
 			name: "valid pubDate should be preserved",
 			yamlContent: `
+atom: "podcast.rss"
 title: "Test Podcast"
 link: "https://example.com"
 pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
 config:
   baseURL: "https://example.com"
   image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
   localStorageDir: "./test"
 `,
 			expectCurrent: false,
@@ -141,11 +185,22 @@ func TestConfiguratorSaveUpdatesLastBuildDate(t *testing.T) {
 	defer os.Remove(tmpFile.Name())
 
 	yamlContent := `
+atom: "podcast.rss"
 title: "Test Podcast"
 link: "https://example.com"
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
 config:
   baseURL: "https://example.com"
   image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
   localStorageDir: "./test"
 `
 
