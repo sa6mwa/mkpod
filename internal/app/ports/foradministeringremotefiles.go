@@ -25,6 +25,26 @@ type ForAdministeringRemoteFilesRequest struct {
 	Key string
 	// NewStorageClass for ChangeStorageClass operations (optional)
 	NewStorageClass string
+	// Region where the bucket is located (optional, uses adapter default if empty)
+	Region string
+}
+
+// RemoteFileInfo contains metadata about a remote file
+type RemoteFileInfo struct {
+	// Size in bytes
+	Size int64
+	// ContentType (MIME type)
+	ContentType string
+	// StorageClass (e.g., STANDARD, INTELLIGENT_TIERING)
+	StorageClass string
+	// LastModified timestamp
+	LastModified string
+	// ETag (version identifier)
+	ETag string
+	// Region where the file is stored (e.g., us-east-1, eu-west-1)
+	Region string
+	// Exists indicates if the file exists
+	Exists bool
 }
 
 // ForAdministeringRemoteFiles provides administrative operations for remote files
@@ -39,6 +59,8 @@ type ForAdministeringRemoteFiles interface {
 	FileExists(ctx context.Context, request *ForAdministeringRemoteFilesRequest) (bool, error)
 	// GetStorageClass returns the current storage class of a remote file
 	GetStorageClass(ctx context.Context, request *ForAdministeringRemoteFilesRequest) (string, error)
+	// GetFileInfo returns comprehensive metadata about a remote file
+	GetFileInfo(ctx context.Context, request *ForAdministeringRemoteFilesRequest) (*RemoteFileInfo, error)
 }
 
 // ValidStorageClasses returns a list of valid AWS S3 storage classes

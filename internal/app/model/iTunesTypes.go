@@ -32,6 +32,10 @@ func (t *ItunesTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		if err != nil {
 			return err
 		}
+		// Handle zero date case - if we parsed successfully but got a zero time, set to current time
+		if newt.IsZero() {
+			newt = time.Now().UTC()
+		}
 	}
 	t.Time = newt
 	return nil

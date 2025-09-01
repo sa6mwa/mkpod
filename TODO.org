@@ -1,6 +1,12 @@
 * TODO
-- [ ] Refactor cmd/mkpod/ to new mkpod under top-level directory using ports and adapters pattern
-- [X] Implement the remove-remote-master from asset bucket feature
-- [ ] Make full e2e integration tests
-- [ ] Ensure it is impossible to remove a remote master if the local master is not available
-  
+1. [X] Refactor cmd/mkpod/ to new mkpod under top-level directory using ports and adapters pattern
+2. [X] Implement the remove-remote-master from asset bucket feature
+3. [ ] Make full e2e integration tests
+4. [X] Ensure it is impossible to remove a remote master if the local master is not available
+5. [X] Top-level pubDate is zero date if not present at parsing, fix it, should be current time if zero
+6. [X] Make the e2e Makefile make-public target work
+7. [ ] Author field is not filled in if it's empty on an episode, should take from top-level and fail if there is no top-level AND episode author
+8. [ ] The explicit field does not seem to be filled in in the podcast.rss, should default to the top-level and always default to "no" if empty everywhere
+9. [ ] When there is no output, duration, length, type, image, and author field in the atom, parsing should fail
+10. [ ] -ffmetadata.txt files remain under /tmp, have them removed when retrieved ffmetadata
+11. [ ] mkpod does not detect that atom field in podspec is empty as there is probably no validator in the new mkpod resulting in no such file or directory error when trying to save the rss

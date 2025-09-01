@@ -68,6 +68,10 @@ func (c *forConfiguring) Load(ctx context.Context) (*model.Atom, error) {
 	if strings.TrimSpace(atom.Encoding.ABR) == "" {
 		atom.Encoding.ABR = "128k"
 	}
+	// Set pubDate to current time if it's zero (missing or zero value)
+	if atom.PubDate.IsZero() {
+		atom.PubDate.Time = time.Now().UTC()
+	}
 	return &atom, nil
 }
 

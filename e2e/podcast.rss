@@ -4,8 +4,8 @@
     <atom:link href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/podcast.rss" rel="self" type="application/rss+xml"/>
     <title>mkpod integration test</title>
     <link>https://qzj.se</link>
-    <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
-    <lastBuildDate>Sat, 30 Aug 2025 22:54:21 +0000</lastBuildDate>
+    <pubDate>Mon, 01 Sep 2025 21:20:49 +0000</pubDate>
+    <lastBuildDate>Mon, 01 Sep 2025 21:21:08 +0000</lastBuildDate>
     <ttl>60</ttl>
     <language>en</language>
     <copyright>Copyright SA6MWA 2025 All Rights Reserved.</copyright>
@@ -34,11 +34,11 @@
     <item>
       <guid isPermaLink="true">https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj029-english.m4a</guid>
       <title>Switching to English</title>
-      <pubDate>Sat, 30 Aug 2025 22:47:56 +0000</pubDate>
+      <pubDate>Mon, 01 Sep 2025 21:21:04 +0000</pubDate>
       <link>https://qzj.se/audio/qzj029-english</link>
       <itunes:episode>1</itunes:episode>
       <itunes:duration>00:13:33</itunes:duration>
-      <itunes:author>SA6MWA</itunes:author>
+      <itunes:author></itunes:author>
       <itunes:explicit></itunes:explicit>
       <itunes:subtitle>QZJ expands scope, now in English with a sharper focus on modern defense, comms, and the systems behind them.</itunes:subtitle>
       <description><![CDATA[<p>This episode is about the evolution of Quebec Zulu Juliett as it shifts from Swedish to English and broadens its scope within the C4ISR domain — Command, Control, Communications, Computers, Intelligence, Surveillance, and Reconnaissance.</p>
@@ -83,17 +83,17 @@
 (12:57) Contact
 </pre>
 ]]></description>
-      <enclosure type="audio/x-m4a" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj029-english.m4a" length="13286440"/>
-      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-3000x3000-english.jpeg"/>
+      <enclosure type="" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj029-english.m4a" length="13286369"/>
+      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/"/>
     </item>
     <item>
-      <guid isPermaLink="true">https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj033-c4isr-computers-data-driven-decisions.m4a</guid>
+      <guid isPermaLink="true">https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/</guid>
       <title>C4ISR Stories: Computers - Data-Driven Decisions for Disaster Defence</title>
-      <pubDate>Sat, 30 Aug 2025 22:47:56 +0000</pubDate>
+      <pubDate>Mon, 01 Sep 2025 21:21:04 +0000</pubDate>
       <link>https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions</link>
       <itunes:episode>2</itunes:episode>
-      <itunes:duration>00:17:26</itunes:duration>
-      <itunes:author>SA6MWA</itunes:author>
+      <itunes:duration>00:00:00</itunes:duration>
+      <itunes:author></itunes:author>
       <itunes:explicit></itunes:explicit>
       <itunes:subtitle>C4ISR explained through short stories, this is about Computers</itunes:subtitle>
       <description><![CDATA[<p>In this episode of C4ISR Stories, titled <strong>Data-Driven Decisions for Disaster Defence</strong>, we explore the transformative role of technology in crisis management through the gripping tale of a flooded town and an improvised coordination cell. Join us as we follow Karin, an IT consultant, who turns chaos into clarity using a laptop and innovative tools to drive effective rescue efforts. Discover how computers, GIS mapping, and live telemetry reshaped decision-making, empowering volunteers to act decisively amidst the flood. This episode highlights the synergy between human ingenuity and technology in disaster response, illustrating how shared understanding can save lives. Tune in for a compelling narrative about navigating the storm with data and determination.</p>
@@ -116,8 +116,8 @@
 (16:06) Outro
 </pre>
 ]]></description>
-      <enclosure type="audio/x-m4a" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/qzj033-c4isr-computers-data-driven-decisions.m4a" length="17058316"/>
-      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/artwork/qzj-3000x3000-english.jpeg"/>
+      <enclosure type="" url="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/" length="0"/>
+      <itunes:image href="https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/"/>
     </item>
   </channel>
 </rss>

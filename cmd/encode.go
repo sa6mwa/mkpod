@@ -116,13 +116,47 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 
 			// First, handle remote master removal if requested
 			if removeRemoteMaster && episode.Input != "" {
-				request := &ports.ForAdministeringRemoteFilesRequest{
-					Store: atom.Config.Aws.Buckets.Input,
-					Key:   episode.Input,
-				}
-				if err := awshandlerAdapter.DeleteRemoteFile(ctx, request); err != nil {
-					l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
-					// Don't fail the entire process for this - just log and continue
+				// Safety check 1: Only remove remote master if local master exists
+				localMasterPath := path.Join(atom.LocalStorageDirExpanded(), episode.Input)
+				localStat, err := os.Stat(localMasterPath)
+				if os.IsNotExist(err) {
+					l.Warn("Skipping remote master removal: local master file does not exist", "localFile", localMasterPath, "remoteFile", episode.Input)
+				} else if err != nil {
+					l.Warn("Failed to check local master file", "error", err, "file", localMasterPath)
+				} else {
+					// Safety check 2: Compare file sizes (local must be at least 50% of remote size)
+					request := &ports.ForAdministeringRemoteFilesRequest{
+						Store: atom.Config.Aws.Buckets.Input,
+						Key:   episode.Input,
+					}
+					remoteInfo, err := awshandlerAdapter.GetFileInfo(ctx, request)
+					if err != nil {
+						l.Warn("Failed to get remote master file info", "error", err, "file", episode.Input)
+					} else if !remoteInfo.Exists {
+						l.Info("Remote master file does not exist, nothing to remove", "file", episode.Input)
+					} else {
+						localSize := localStat.Size()
+						remoteSize := remoteInfo.Size
+						minRequiredSize := remoteSize / 2 // 50% of remote size
+						
+						if localSize < minRequiredSize {
+							l.Warn("Skipping remote master removal: local file is too small compared to remote", 
+								"localFile", localMasterPath, 
+								"localSize", localSize, 
+								"remoteSize", remoteSize, 
+								"minRequired", minRequiredSize)
+						} else {
+							// All safety checks passed, proceed with removal
+							l.Info("Safety checks passed for remote master removal", 
+								"localFile", localMasterPath, 
+								"localSize", localSize, 
+								"remoteSize", remoteSize)
+							if err := awshandlerAdapter.DeleteRemoteFile(ctx, request); err != nil {
+								l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
+								// Don't fail the entire process for this - just log and continue
+							}
+						}
+					}
 				}
 			}
 

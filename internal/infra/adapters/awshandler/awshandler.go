@@ -248,3 +248,65 @@ func (a *forAdministeringRemoteFiles) GetStorageClass(ctx context.Context, reque
 	l.Debug("Got storage class", "path", s3path, "storageClass", storageClass)
 	return storageClass, nil
 }
+
+// GetFileInfo returns comprehensive metadata about a file in S3
+func (a *forAdministeringRemoteFiles) GetFileInfo(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) (*ports.RemoteFileInfo, error) {
+	l := logger.FromContext(ctx)
+	
+	if request == nil {
+		return nil, ErrNilPointerRequest
+	}
+	if request.Store == "" {
+		return nil, ErrEmptyStore
+	}
+	if request.Key == "" {
+		return nil, ErrEmptyKey
+	}
+
+	s3path := "s3://" + path.Join(request.Store, request.Key)
+	
+	result, err := a.s3.HeadObject(&s3.HeadObjectInput{
+		Bucket: aws.String(request.Store),
+		Key:    aws.String(request.Key),
+	})
+	if err != nil {
+		if awsErr, ok := err.(awserr.Error); ok {
+			switch awsErr.Code() {
+			case "NotFound", "NoSuchKey":
+				l.Debug("File does not exist", "path", s3path)
+				return &ports.RemoteFileInfo{Exists: false}, nil
+			default:
+				l.Error("Error getting file info", "error", err, "path", s3path)
+				return nil, err
+			}
+		}
+		return nil, err
+	}
+
+	// Extract information from HeadObject result
+	info := &ports.RemoteFileInfo{
+		Exists: true,
+		Size:   0,
+		StorageClass: ports.StorageClassStandard, // Default
+		Region: a.atom.Config.Aws.Region, // From atom configuration
+	}
+
+	if result.ContentLength != nil {
+		info.Size = *result.ContentLength
+	}
+	if result.ContentType != nil {
+		info.ContentType = *result.ContentType
+	}
+	if result.StorageClass != nil {
+		info.StorageClass = *result.StorageClass
+	}
+	if result.LastModified != nil {
+		info.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
+	}
+	if result.ETag != nil {
+		info.ETag = *result.ETag
+	}
+
+	l.Debug("Got file info", "path", s3path, "size", info.Size, "storageClass", info.StorageClass)
+	return info, nil
+}
