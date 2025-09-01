@@ -15,7 +15,7 @@ import (
 	"github.com/urfave/cli/v2"
 	//"github.com/logrusorgru/aurora"
 
-	"gopkg.in/alessio/shellescape.v1"
+	"al.essio.dev/pkg/shellescape"
 )
 
 //go:embed template.rss

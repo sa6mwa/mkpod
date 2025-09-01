@@ -3,6 +3,7 @@
 \#*\#
 /mkpod
 /bin
+e2e/podcast.rss
 
 # Audio files
 *.flac

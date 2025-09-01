@@ -16,7 +16,7 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/parser"
-	"gopkg.in/alessio/shellescape.v1"
+	"al.essio.dev/pkg/shellescape"
 )
 
 func GetFileContentType(filename string) (contentType string, err error) {

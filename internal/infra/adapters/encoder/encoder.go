@@ -13,6 +13,7 @@ import (
 	"path"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/id3v24"
@@ -55,6 +56,19 @@ func (e *forEncoding) GetEncodedOutputs() []string {
 	return e.encodedOutputs
 }
 
+// applyEpisodeDefaults ensures episode has required fields set with appropriate defaults
+func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) {
+	// Set default PubDate to current time if empty (zero time)
+	if episode.PubDate.IsZero() {
+		episode.PubDate.Time = time.Now().UTC()
+	}
+	
+	// Set default Author to top-level author if empty
+	if strings.TrimSpace(episode.Author) == "" {
+		episode.Author = atom.Author
+	}
+}
+
 func (e *forEncoding) shouldEncode(ctx context.Context, uid int64, filename string) bool {
 	// l := logger.FromContext(ctx)
 	if len(strings.TrimSpace(filename)) < 5 {
@@ -92,6 +106,9 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, p
 	// Iterate over one episode or all episodes depending on value of
 	// uid (<0 == all, -2 == force reencoding even if output field exists)
 	for _, i := range indexes {
+		// Apply defaults to episode fields before encoding
+		applyEpisodeDefaults(atom, &atom.Episodes[i])
+		
 		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
 		inputContentType, err := GetFileContentType(inputPath)
 		if err != nil {
@@ -217,6 +234,13 @@ func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	if err != nil {
 		return err
 	}
+	// Set content type based on output file
+	outputContentType, err := GetFileContentType(path.Join(atom.LocalStorageDirExpanded(), episode.Output))
+	if err != nil {
+		return err
+	}
+	episode.Type = outputContentType
+	
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, duration, size), "output", episode.Output, "duration", duration, "size", size)
 	episode.Length = size
 	episode.Duration.Duration = duration
@@ -296,6 +320,12 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Epi
 	if err != nil {
 		return fmt.Errorf("unable to get duration and size from %s: %w", episode.Output, err)
 	}
+	// Set content type based on output file
+	outputContentType, err := GetFileContentType(outputPath)
+	if err != nil {
+		return err
+	}
+	episode.Type = outputContentType
 
 	// Update episode length and duration
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, duration, size), "output", episode.Output, "duration", duration, "size", size)
@@ -355,6 +385,13 @@ func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Ep
 	if err != nil {
 		return err
 	}
+	// Set content type based on output file
+	outputContentType, err := GetFileContentType(outputPath)
+	if err != nil {
+		return err
+	}
+	episode.Type = outputContentType
+	
 	// Update atom with the length and duration of the encoded mp3.
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, di.Duration, di.Length), "output", episode.Output, "duration", di.Duration, "size", di.Length)
 	episode.Length = di.Length
@@ -408,6 +445,13 @@ func EncodeMP3(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	if err != nil {
 		return err
 	}
+	// Set content type based on output file
+	outputContentType, err := GetFileContentType(outputPath)
+	if err != nil {
+		return err
+	}
+	episode.Type = outputContentType
+	
 	// Update atom with the length and duration of the encoded mp3.
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, di.Duration, di.Length), "output", episode.Output, "duration", di.Duration, "size", di.Length)
 	episode.Length = di.Length

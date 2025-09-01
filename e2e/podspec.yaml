@@ -12,8 +12,6 @@ config:
 atom: podcast.rss
 title: mkpod integration test
 link: https://qzj.se
-pubDate: Mon, 01 Sep 2025 21:20:49 +0000
-lastBuildDate: Mon, 01 Sep 2025 21:21:08 +0000
 ttl: 60
 language: en
 copyright: Copyright SA6MWA 2025 All Rights Reserved.
@@ -46,10 +44,7 @@ encoding:
 episodes:
     - uid: 1
       title: Switching to English
-      pubDate: Mon, 01 Sep 2025 21:21:04 +0000
       link: https://qzj.se/audio/qzj029-english
-      duration: "00:13:33"
-      author: ""
       subtitle: QZJ expands scope, now in English with a sharper focus on modern defense, comms, and the systems behind them.
       description: |-
         This episode is about the evolution of Quebec Zulu Juliett as it shifts from Swedish to English and broadens its scope within the C4ISR domain — Command, Control, Communications, Computers, Intelligence, Surveillance, and Reconnaissance.
@@ -76,11 +71,7 @@ episodes:
         - [Cogs Of War](https://warontherocks.com/category/vertical/cogs-of-war/) ([On Spotify](https://open.spotify.com/show/1yFIpVpxqYvcv0rADoykrp))
 
         **73 DE SA6MWA**
-      type: ""
-      length: 13286369
-      image: ""
       input: masters/qzj029-english.flac
-      output: qzj029-english.m4a
       chapters:
         - title: Intro
           start: "00:00:00.000"
@@ -102,10 +93,7 @@ episodes:
           start: "00:12:57.120"
     - uid: 2
       title: 'C4ISR Stories: Computers - Data-Driven Decisions for Disaster Defence'
-      pubDate: Mon, 01 Sep 2025 21:21:04 +0000
       link: https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions
-      duration: "00:00:00"
-      author: ""
       subtitle: C4ISR explained through short stories, this is about Computers
       description: |-
         In this episode of C4ISR Stories, titled **Data-Driven Decisions for Disaster Defence**, we explore the transformative role of technology in crisis management through the gripping tale of a flooded town and an improvised coordination cell. Join us as we follow Karin, an IT consultant, who turns chaos into clarity using a laptop and innovative tools to drive effective rescue efforts. Discover how computers, GIS mapping, and live telemetry reshaped decision-making, empowering volunteers to act decisively amidst the flood. This episode highlights the synergy between human ingenuity and technology in disaster response, illustrating how shared understanding can save lives. Tune in for a compelling narrative about navigating the storm with data and determination.
@@ -113,9 +101,6 @@ episodes:
         Read more on <https://qzj.se/audio/qzj033-c4isr-computers-data-driven-decisions>
 
         **73 DE SA6MWA**
-      type: ""
-      length: 0
-      image: ""
       input: masters/qzj033-c4isr-computers-data-driven-decisions.flac
       chapters:
         - title: Intro

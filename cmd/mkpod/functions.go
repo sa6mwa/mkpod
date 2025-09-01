@@ -24,7 +24,7 @@ import (
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mp3duration"
 	"golang.org/x/term"
-	"gopkg.in/alessio/shellescape.v1"
+	"al.essio.dev/pkg/shellescape"
 	"gopkg.in/yaml.v3"
 )
 
