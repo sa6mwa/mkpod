@@ -360,7 +360,7 @@ type Atom struct {
 	Atom          string         `yaml:"atom"`
 	Title         string         `yaml:"title"`
 	Link          string         `yaml:"link"`
-	PubDate       ItunesTime     `yaml:"pubDate"`
+	PubDate       ItunesTime     `yaml:"pubDate,omitempty"`
 	LastBuildDate ItunesTime     `yaml:"lastBuildDate"`
 	TTL           int            `yaml:"ttl"`
 	Language      string         `yaml:"language"`
@@ -480,16 +480,16 @@ type Defaults struct {
 type Episode struct {
 	UID              int64            `yaml:"uid"`
 	Title            string           `yaml:"title"`
-	PubDate          ItunesTime       `yaml:"pubDate"`
+	PubDate          ItunesTime       `yaml:"pubDate,omitempty"`
 	Link             string           `yaml:"link"`
-	Duration         ItunesDuration   `yaml:"duration"`
-	Author           string           `yaml:"author"`
+	Duration         ItunesDuration   `yaml:"duration,omitempty"`
+	Author           string           `yaml:"author,omitempty"`
 	Explicit         ItunesExplicit   `yaml:"explicit,omitempty"`
 	Subtitle         string           `yaml:"subtitle"`
 	Description      string           `yaml:"description"`
-	Type             string           `yaml:"type"`
-	Length           int64            `yaml:"length"`
-	Image            string           `yaml:"image"`
+	Type             string           `yaml:"type,omitempty"`
+	Length           int64            `yaml:"length,omitempty"`
+	Image            string           `yaml:"image,omitempty"`
 	Input            string           `yaml:"input"`
 	Output           string           `yaml:"output,omitempty"`
 	Format           string           `yaml:"format,omitempty"`

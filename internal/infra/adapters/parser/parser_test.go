@@ -22,6 +22,7 @@ func TestFilterValidEpisodes(t *testing.T) {
 		{
 			UID:      1,
 			Title:    "Valid Episode",
+			PubDate:  model.ItunesTime{Time: time.Now().UTC()},
 			Output:   "episode1.mp3",
 			Duration: model.ItunesDuration{Duration: time.Hour},
 			Length:   1000000,
@@ -82,6 +83,7 @@ func TestFilterValidEpisodes(t *testing.T) {
 		{
 			UID:      7,
 			Title:    "Missing Author (uses default)",
+			PubDate:  model.ItunesTime{Time: time.Now().UTC()},
 			Output:   "episode7.mp3",
 			Duration: model.ItunesDuration{Duration: time.Hour},
 			Length:   1000000,
@@ -92,12 +94,24 @@ func TestFilterValidEpisodes(t *testing.T) {
 		{
 			UID:      8,
 			Title:    "Missing Author (no default)",
+			PubDate:  model.ItunesTime{Time: time.Now().UTC()},
 			Output:   "episode8.mp3",
 			Duration: model.ItunesDuration{Duration: time.Hour},
 			Length:   1000000,
 			Type:     "audio/mpeg",
 			Image:    "episode8.jpg",
 			// Author: missing, and atom.Author will be empty
+		},
+		{
+			UID:      9,
+			Title:    "", // Empty title - should be excluded
+			PubDate:  model.ItunesTime{Time: time.Now().UTC()},
+			Output:   "episode9.mp3",
+			Duration: model.ItunesDuration{Duration: time.Hour},
+			Length:   1000000,
+			Type:     "audio/mpeg",
+			Image:    "episode9.jpg",
+			Author:   "Episode Author",
 		},
 	}
 
@@ -130,7 +144,8 @@ func TestFilterValidEpisodes(t *testing.T) {
 
 		validEpisodes := parser.filterValidEpisodes(ctx, atomNoAuthor, episodes)
 
-		// Only episode 1 should be valid (has its own author)
+		// Episodes 7 and 8 now have pubDate but no author and no atom default
+		// Only episode 1 should be valid (has its own author and pubDate)
 		expectedValid := 1
 		if len(validEpisodes) != expectedValid {
 			t.Errorf("Expected %d valid episodes, got %d", expectedValid, len(validEpisodes))
@@ -226,6 +241,7 @@ func TestValidEpisodesTemplateFunction(t *testing.T) {
 		{
 			UID:      1,
 			Title:    "Valid Episode",
+			PubDate:  model.ItunesTime{Time: time.Now().UTC()},
 			Output:   "episode1.mp3",
 			Duration: model.ItunesDuration{Duration: time.Hour},
 			Length:   1000000,

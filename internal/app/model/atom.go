@@ -11,7 +11,7 @@ type Atom struct {
 	Atom          string         `yaml:"atom"`
 	Title         string         `yaml:"title"`
 	Link          string         `yaml:"link"`
-	PubDate       ItunesTime     `yaml:"pubDate"`
+	PubDate       ItunesTime     `yaml:"pubDate,omitempty"`
 	LastBuildDate ItunesTime     `yaml:"lastBuildDate"`
 	TTL           int            `yaml:"ttl"`
 	Language      string         `yaml:"language"`

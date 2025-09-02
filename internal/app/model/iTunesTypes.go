@@ -42,7 +42,11 @@ func (t *ItunesTime) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 // Custom marshal function to write time.Time as RFC1123Z (Itunes "RFC2822" time format).
+// Returns nil for zero times to support omitempty behavior.
 func (t ItunesTime) MarshalYAML() (interface{}, error) {
+	if t.IsZero() {
+		return nil, nil
+	}
 	return t.Format(time.RFC1123Z), nil
 }
 
@@ -71,6 +75,9 @@ func (e *ItunesExplicit) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	return nil
 }
 func (e ItunesExplicit) MarshalYAML() (interface{}, error) {
+	if strings.TrimSpace(e.S) == "" {
+		return nil, nil
+	}
 	return e.S, nil
 }
 func (e ItunesExplicit) String() string {
@@ -121,7 +128,11 @@ func (d *ItunesDuration) UnmarshalYAML(unmarshal func(interface{}) error) error 
 }
 
 // Format duration according to Itunes podcast Atom specification (HH:MM:SS).
+// Returns nil for zero durations to support omitempty behavior.
 func (d ItunesDuration) MarshalYAML() (interface{}, error) {
+	if d.Duration == 0 {
+		return nil, nil
+	}
 	return mp3duration.FormatDuration(d.Duration), nil
 }
 

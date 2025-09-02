@@ -13,7 +13,6 @@ import (
 	"path"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/id3v24"
@@ -25,6 +24,8 @@ import (
 
 var (
 	ErrNilPointer error = errors.New("received nil pointer")
+	ErrMissingImage error = errors.New("episode image is required for encoding - no image specified and no defaultPodImage configured")
+	ErrMissingTitle error = errors.New("episode title is required for encoding")
 )
 
 const shell = "/bin/sh"
@@ -57,16 +58,30 @@ func (e *forEncoding) GetEncodedOutputs() []string {
 }
 
 // applyEpisodeDefaults ensures episode has required fields set with appropriate defaults
-func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) {
-	// Set default PubDate to current time if empty (zero time)
-	if episode.PubDate.IsZero() {
-		episode.PubDate.Time = time.Now().UTC()
+func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) error {
+	// Note: pubDate is no longer automatically set during encoding - it will be omitted from YAML if empty
+	
+	// Validate required fields that cannot be defaulted
+	if strings.TrimSpace(episode.Title) == "" {
+		return ErrMissingTitle
 	}
 	
 	// Set default Author to top-level author if empty
 	if strings.TrimSpace(episode.Author) == "" {
 		episode.Author = atom.Author
 	}
+	
+	// Set default Image from atom.Config.DefaultPodImage if empty
+	if strings.TrimSpace(episode.Image) == "" {
+		episode.Image = atom.Config.DefaultPodImage
+	}
+	
+	// Validate that image is set (either was already set or defaulted)
+	if strings.TrimSpace(episode.Image) == "" {
+		return ErrMissingImage
+	}
+	
+	return nil
 }
 
 func (e *forEncoding) shouldEncode(ctx context.Context, uid int64, filename string) bool {
@@ -107,7 +122,9 @@ func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, p
 	// uid (<0 == all, -2 == force reencoding even if output field exists)
 	for _, i := range indexes {
 		// Apply defaults to episode fields before encoding
-		applyEpisodeDefaults(atom, &atom.Episodes[i])
+		if err := applyEpisodeDefaults(atom, &atom.Episodes[i]); err != nil {
+			return err
+		}
 		
 		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
 		inputContentType, err := GetFileContentType(inputPath)

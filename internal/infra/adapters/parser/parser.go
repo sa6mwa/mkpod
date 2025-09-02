@@ -114,6 +114,9 @@ func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, 
 		// Validate required fields
 		var missingFields []string
 
+		if strings.TrimSpace(episode.Title) == "" {
+			missingFields = append(missingFields, "title")
+		}
 		if strings.TrimSpace(episode.Output) == "" {
 			missingFields = append(missingFields, "output")
 		}
@@ -128,6 +131,9 @@ func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, 
 		}
 		if strings.TrimSpace(episode.Image) == "" {
 			missingFields = append(missingFields, "image")
+		}
+		if episode.PubDate.IsZero() {
+			missingFields = append(missingFields, "pubDate")
 		}
 
 		// Check author (considering default from atom)
