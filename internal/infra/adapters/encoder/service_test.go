@@ -157,3 +157,24 @@ func TestSelectEncodeMode(t *testing.T) {
 		})
 	}
 }
+
+func TestEncodeReturnsEmptyResultForMissingEpisode(t *testing.T) {
+	service := New(stubPrompter{answer: true})
+	uid := int64(99)
+
+	result, err := service.Encode(context.Background(), &model.Atom{}, EncodeOptions{
+		EpisodeUID: &uid,
+	}, nil)
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("Encode() returned nil result")
+	}
+	if len(result.SelectedIndexes) != 0 {
+		t.Fatalf("SelectedIndexes = %v, want none", result.SelectedIndexes)
+	}
+	if len(result.EncodedOutputs) != 0 {
+		t.Fatalf("EncodedOutputs = %v, want none", result.EncodedOutputs)
+	}
+}

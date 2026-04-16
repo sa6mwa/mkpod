@@ -100,6 +100,71 @@ func TestApplyDefaultsPreservesExplicitValues(t *testing.T) {
 	}
 }
 
+func TestApplyEpisodeDefaultsForEncoding(t *testing.T) {
+	atom := &model.Atom{
+		Author: "Host",
+		Config: model.Config{
+			DefaultPodImage: "artwork/default.jpg",
+		},
+	}
+	episode := &model.Episode{Title: "Episode"}
+
+	if err := ApplyEpisodeDefaultsForEncoding(atom, episode); err != nil {
+		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v", err)
+	}
+	if episode.Author != "Host" {
+		t.Fatalf("Author = %q, want Host", episode.Author)
+	}
+	if episode.Image != "artwork/default.jpg" {
+		t.Fatalf("Image = %q, want artwork/default.jpg", episode.Image)
+	}
+}
+
+func TestApplyEpisodeDefaultsForEncodingValidatesRequiredFields(t *testing.T) {
+	if err := ApplyEpisodeDefaultsForEncoding(&model.Atom{}, &model.Episode{}); !errors.Is(err, ErrMissingEpisodeTitle) {
+		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v, want %v", err, ErrMissingEpisodeTitle)
+	}
+
+	if err := ApplyEpisodeDefaultsForEncoding(&model.Atom{}, &model.Episode{Title: "Episode"}); !errors.Is(err, ErrMissingEpisodeImage) {
+		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v, want %v", err, ErrMissingEpisodeImage)
+	}
+}
+
+func TestMissingFieldsForRSS(t *testing.T) {
+	now := time.Now().UTC()
+	atom := &model.Atom{Author: "Host"}
+
+	valid := &model.Episode{
+		Title:    "Episode",
+		PubDate:  model.ItunesTime{Time: now},
+		Output:   "episode.mp3",
+		Duration: model.ItunesDuration{Duration: time.Minute},
+		Length:   123,
+		Type:     "audio/mpeg",
+		Image:    "artwork/episode.jpg",
+	}
+	if got := MissingFieldsForRSS(atom, valid); len(got) != 0 {
+		t.Fatalf("MissingFieldsForRSS(valid) = %v, want none", got)
+	}
+
+	missing := &model.Episode{}
+	got := MissingFieldsForRSS(&model.Atom{}, missing)
+	for _, field := range []string{"title", "output", "duration", "length", "type", "image", "pubDate", "author"} {
+		if !containsString(got, field) {
+			t.Fatalf("MissingFieldsForRSS() = %v, expected %q", got, field)
+		}
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestStorePubDateHandling(t *testing.T) {
 	tests := []struct {
 		name          string

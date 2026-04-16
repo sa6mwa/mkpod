@@ -173,14 +173,15 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		processedCount := 0
 
 		if all {
-			if err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+			result, err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
 				All:           true,
 				ForceReencode: askNoQuestions,
-			}, postEncodeFunc); err != nil {
+			}, postEncodeFunc)
+			if err != nil {
 				l.Error("Failed to encode episodes", "error", err)
 				os.Exit(1)
 			}
-			processedCount = len(encoderAdapter.GetEncodedOutputs())
+			processedCount = len(result.EncodedOutputs)
 		} else {
 			// Encode specific episodes by UID
 			for _, uidStr := range args {
@@ -189,14 +190,15 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 					l.Error("Invalid episode UID", "uid", uidStr, "error", err)
 					continue
 				}
-				if err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+				result, err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
 					EpisodeUID: &uid,
-				}, postEncodeFunc); err != nil {
+				}, postEncodeFunc)
+				if err != nil {
 					l.Error("Failed to encode episode", "uid", uid, "error", err)
 					os.Exit(1)
 				}
+				processedCount += len(result.EncodedOutputs)
 			}
-			processedCount = len(encoderAdapter.GetEncodedOutputs())
 		}
 
 		if processedCount == 0 {

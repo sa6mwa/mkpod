@@ -14,6 +14,7 @@ import (
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/spec"
 )
 
 //go:embed template.rss
@@ -100,37 +101,7 @@ func (p *Renderer) filterValidEpisodes(ctx context.Context, atom *model.Atom, ep
 	validEpisodes := make([]model.Episode, 0, len(episodes))
 
 	for i, episode := range episodes {
-		var missingFields []string
-
-		if strings.TrimSpace(episode.Title) == "" {
-			missingFields = append(missingFields, "title")
-		}
-		if strings.TrimSpace(episode.Output) == "" {
-			missingFields = append(missingFields, "output")
-		}
-		if episode.Duration.Duration == 0 {
-			missingFields = append(missingFields, "duration")
-		}
-		if episode.Length == 0 {
-			missingFields = append(missingFields, "length")
-		}
-		if strings.TrimSpace(episode.Type) == "" {
-			missingFields = append(missingFields, "type")
-		}
-		if strings.TrimSpace(episode.Image) == "" {
-			missingFields = append(missingFields, "image")
-		}
-		if episode.PubDate.IsZero() {
-			missingFields = append(missingFields, "pubDate")
-		}
-
-		effectiveAuthor := episode.Author
-		if strings.TrimSpace(effectiveAuthor) == "" {
-			effectiveAuthor = atom.Author
-		}
-		if strings.TrimSpace(effectiveAuthor) == "" {
-			missingFields = append(missingFields, "author")
-		}
+		missingFields := spec.MissingFieldsForRSS(atom, &episode)
 
 		if len(missingFields) > 0 {
 			l.Warn("Excluding episode from RSS due to missing required fields",

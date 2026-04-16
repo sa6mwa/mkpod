@@ -18,13 +18,14 @@ import (
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 	"github.com/sa6mwa/mkpod/internal/media"
+	"github.com/sa6mwa/mkpod/internal/spec"
 	"github.com/sa6mwa/mp3duration"
 )
 
 var (
 	ErrNilPointer   error = errors.New("received nil pointer")
-	ErrMissingImage error = errors.New("episode image is required for encoding - no image specified and no defaultPodImage configured")
-	ErrMissingTitle error = errors.New("episode title is required for encoding")
+	ErrMissingImage error = spec.ErrMissingEpisodeImage
+	ErrMissingTitle error = spec.ErrMissingEpisodeTitle
 )
 
 const shell = "/bin/sh"
@@ -38,6 +39,11 @@ type EncodeOptions struct {
 	ForceReencode bool
 }
 
+type EncodeResult struct {
+	SelectedIndexes []int
+	EncodedOutputs  []string
+}
+
 type encodeMode string
 
 const (
@@ -48,46 +54,18 @@ const (
 )
 
 type Service struct {
-	prompter       asker.Prompter
-	encodedOutputs []string
+	prompter asker.Prompter
 }
 
 func New(prompter asker.Prompter) *Service {
 	return &Service{
-		prompter:       prompter,
-		encodedOutputs: make([]string, 0),
+		prompter: prompter,
 	}
-}
-
-func (e *Service) GetEncodedOutputs() []string {
-	return e.encodedOutputs
 }
 
 // applyEpisodeDefaults ensures episode has required fields set with appropriate defaults
 func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) error {
-	// Note: pubDate is no longer automatically set during encoding - it will be omitted from YAML if empty
-
-	// Validate required fields that cannot be defaulted
-	if strings.TrimSpace(episode.Title) == "" {
-		return ErrMissingTitle
-	}
-
-	// Set default Author to top-level author if empty
-	if strings.TrimSpace(episode.Author) == "" {
-		episode.Author = atom.Author
-	}
-
-	// Set default Image from atom.Config.DefaultPodImage if empty
-	if strings.TrimSpace(episode.Image) == "" {
-		episode.Image = atom.Config.DefaultPodImage
-	}
-
-	// Validate that image is set (either was already set or defaulted)
-	if strings.TrimSpace(episode.Image) == "" {
-		return ErrMissingImage
-	}
-
-	return nil
+	return spec.ApplyEpisodeDefaultsForEncoding(atom, episode)
 }
 
 func (e *Service) shouldEncode(ctx context.Context, options EncodeOptions, filename string) bool {
@@ -180,29 +158,33 @@ func (e *Service) encodeEpisode(ctx context.Context, atom *model.Atom, episode *
 	}
 }
 
-func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOptions, postEncoding PostEncodeFunc) error {
+func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOptions, postEncoding PostEncodeFunc) (*EncodeResult, error) {
 	l := logger.FromContext(ctx)
 	mimetype.SetLimit(1024 * 1024)
 
 	indexes, err := selectEpisodeIndexes(atom, options)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	result := &EncodeResult{
+		SelectedIndexes: indexes,
+		EncodedOutputs:  make([]string, 0, len(indexes)),
 	}
 	if len(indexes) == 0 && options.EpisodeUID != nil {
 		l.Warn("Episode does not exist in pod specification, skipping", "uid", *options.EpisodeUID)
-		return nil
+		return result, nil
 	}
 
 	for _, i := range indexes {
 		// Apply defaults to episode fields before encoding
 		if err := applyEpisodeDefaults(atom, &atom.Episodes[i]); err != nil {
-			return err
+			return nil, err
 		}
 
 		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
 		inputContentType, err := GetFileContentType(inputPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		outputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
@@ -210,21 +192,20 @@ func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOp
 		if e.shouldEncode(ctx, options, outputPath) {
 			wasEncoded = true
 			if err := e.encodeEpisode(ctx, atom, &atom.Episodes[i], inputContentType); err != nil {
-				return err
+				return nil, err
 			}
 
-			// Add episode.Output to e.encodedOutputs
-			e.encodedOutputs = append(e.encodedOutputs, atom.Episodes[i].Output)
+			result.EncodedOutputs = append(result.EncodedOutputs, atom.Episodes[i].Output)
 		}
 
 		// If postEncoding functions is given, call it...
 		if postEncoding != nil {
 			if err := postEncoding(atom, &atom.Episodes[i], wasEncoded); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	return result, nil
 }
 
 // EncodeMP4 encodes episode into an mp4 video (using ffmpeg)
