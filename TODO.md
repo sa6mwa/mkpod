@@ -112,7 +112,7 @@ This file is the working plan for finishing the refactor.
 - [ ] Ensure `force` means "do not prompt" everywhere.
 - [ ] Review `encode --all` semantics and replace implicit magic with explicit language.
 - [ ] Improve error messages for missing tools, invalid config, missing local files, and S3 object mismatches.
-- [ ] Add examples to help output for common workflows.
+- [x] Add examples to help output for common workflows.
 - [ ] Decide whether preprocessing belongs as a long-term subcommand or should remain a thin utility wrapper.
 
 ## Phase 7: Storage Cleanup
@@ -161,7 +161,7 @@ This file is the working plan for finishing the refactor.
 - [x] Document required host dependencies: `ffmpeg`, `ffprobe`, `lame`, AWS credentials/profile expectations.
 - [x] Document the podspec format with a minimal example and one richer example.
 - [x] Document the `init` workflow as the default starting point.
-- [ ] Add a short architecture note describing the simplified design and why the previous ports/adapters split was reduced.
+- [x] Add a short architecture note describing the simplified design and why the previous ports/adapters split was reduced.
 
 ## Existing Items To Carry Forward
 

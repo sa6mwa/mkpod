@@ -17,6 +17,10 @@ var rootCmd = &cobra.Command{
 generating metadata in Apple podcast RSS format (with chapter
 information), and publishing a podcast to an object store. AWS S3 is
 currently the only supported storage backend.`,
+	Example: `  mkpod init ./podcast
+  mkpod preprocess masters/raw.wav
+  mkpod encode --spec ./podcast/podspec.yaml --all
+  mkpod parse --spec ./podcast/podspec.yaml --upload`,
 
 	// Uncomment the following line if your bare application
 	// has an action associated with it:

@@ -46,6 +46,9 @@ none. Limiter settings (except preset "none") will allow you to have
 background audio/music -10 dB. Minus 10.01 dB in fraction is
 0.3158639048423471 or 0.31586 which should produce a mix without
 clipping.`,
+	Example: `  mkpod preprocess masters/raw.wav
+  mkpod preprocess --preset sm7b masters/intro.wav masters/interview.wav
+  mkpod pre --prefix cleaned- masters/episode.wav`,
 	Run: func(cmd *cobra.Command, args []string) {
 		imsg := "Internal error"
 		l := logger.DefaultLogger()

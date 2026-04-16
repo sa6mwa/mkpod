@@ -17,6 +17,9 @@ The main commands are:
 - `mkpod encode` to encode and upload episode media
 - `mkpod parse` to generate `podcast.rss` and optionally upload it
 
+See [docs/architecture.md](docs/architecture.md) for the current simplified
+package and boundary layout.
+
 `mkpod` encodes audio or video *masters* into `mp4` or `mp3`. If the input and
 output is `audio`, `lame` will be used to create an `mp3`. If the input
 content-type starts with `video/` and the `format` field for the episode is not

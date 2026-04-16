@@ -55,6 +55,11 @@ Usage:
 
 The --all flag will only encode episodes that need it (missing output file,
 duration, or length). Use --all --force to re-encode all episodes regardless.`,
+	Example: `  mkpod encode 1
+  mkpod encode 1 2 3
+  mkpod encode --spec ./podcast/podspec.yaml --all
+  mkpod encode --spec ./podcast/podspec.yaml --all --force
+  mkpod encode --spec ./podcast/podspec.yaml --all --remove-remote-master`,
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
 		imsg := "Internal error"

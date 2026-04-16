@@ -46,6 +46,10 @@ var parseCmd = &cobra.Command{
 the RSS feed (podcast.rss). This command reads the configuration,
 validates the podcast metadata, and generates the RSS XML file.
 Optionally, it can upload the RSS file to the configured S3 bucket.`,
+	Example: `  mkpod parse
+  mkpod parse --spec ./podcast/podspec.yaml
+  mkpod parse --spec ./podcast/podspec.yaml --dry-run
+  mkpod parse --spec ./podcast/podspec.yaml --upload`,
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
 		imsg := "Internal error"

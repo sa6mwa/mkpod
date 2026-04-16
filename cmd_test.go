@@ -45,6 +45,21 @@ func TestCLICommands(t *testing.T) {
 			args:     []string{"init", "--help"},
 			expected: "Initialize a new mkpod workspace",
 		},
+		{
+			name:     "root help includes examples",
+			args:     []string{"--help"},
+			expected: "Examples:",
+		},
+		{
+			name:     "parse help includes upload example",
+			args:     []string{"parse", "--help"},
+			expected: "mkpod parse --spec ./podcast/podspec.yaml --upload",
+		},
+		{
+			name:     "encode help includes remove-remote-master example",
+			args:     []string{"encode", "--help"},
+			expected: "mkpod encode --spec ./podcast/podspec.yaml --all --remove-remote-master",
+		},
 	}
 
 	for _, tt := range tests {

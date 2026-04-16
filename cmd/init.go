@@ -23,9 +23,12 @@ var (
 
 var initCmd = &cobra.Command{
 	Use:   "init <directory>",
-	Short: "Initialize a podcast workspace",
+	Short: "Initialize a new mkpod workspace",
 	Long: `Initialize a new mkpod workspace by creating a directory structure
 and a starter podspec.yaml template in the target directory.`,
+	Example: `  mkpod init .
+  mkpod init ~/podcast
+  mkpod init /srv/podcasts/my-show`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return ErrTargetDirRequired
