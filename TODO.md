@@ -140,7 +140,7 @@ This file is the working plan for finishing the refactor.
   - [x] `mkpod init`
 - [x] Add integration tests that invoke the Cobra command tree directly instead of relying only on `go run .`.
 - [ ] Keep a small number of black-box CLI smoke tests for installed-binary behavior.
-- [ ] Add encoder integration tests that use tiny fixture media files and verify observable outputs.
+- [x] Add encoder integration tests that use tiny fixture media files and verify observable outputs.
 - [x] Add RSS golden-file tests for representative podcast specs.
 
 ## Phase 9: E2E Test Strategy
