@@ -1,15 +1,12 @@
 package encoder
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -27,9 +24,6 @@ var (
 	ErrMissingImage error = spec.ErrMissingEpisodeImage
 	ErrMissingTitle error = spec.ErrMissingEpisodeTitle
 )
-
-const shell = "/bin/sh"
-const shellCommandOption = "-c"
 
 type PostEncodeFunc func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error
 
@@ -217,25 +211,10 @@ func EncodeMP4(ctx context.Context, atom *model.Podcast, episode *model.Episode)
 	if err := media.EnsureToolAvailable(atom.FFmpegPathExpanded()); err != nil {
 		return err
 	}
-	tmpl, err := template.New("ffmpeg").Funcs(defaultFuncMap()).Parse(ffmpegCommandTemplate)
-	if err != nil {
-		return err
-	}
 	episode.Output = ExtensionToBaseMp4(episode.Input)
-	values := templateValues{
-		Podcast: atom,
-		Episode: episode,
-	}
-	buf := &bytes.Buffer{}
-	if err := tmpl.Execute(buf, values); err != nil {
-		return err
-	}
-	l.Info("Executing encoder", "command", buf.String())
-	cmd := exec.CommandContext(ctx, shell, shellCommandOption, buf.String())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	args := buildMP4Args(atom, episode)
+	l.Info("Executing encoder", "tool", atom.FFmpegPathExpanded(), "args", args)
+	if err := runCommand(ctx, atom.FFmpegPathExpanded(), args); err != nil {
 		return fmt.Errorf("unable to encode %q: %w", episode.Input, err)
 	}
 	// Update atom with the length and duration of the encoded mp4
@@ -266,17 +245,8 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Podcast, episode *model.
 	if err := media.EnsureToolAvailable(atom.FFmpegPathExpanded()); err != nil {
 		return err
 	}
-	tmpl, err := template.New("ffmpeg").Funcs(defaultFuncMap()).Parse(ffmpegToM4ACommandTemplate)
-	if err != nil {
-		return err
-	}
-
 	format = strings.TrimSpace(strings.ToLower(format))
 	episode.Output = ExtensionToBaseFormat(episode.Input, format)
-	values := templateValues{
-		Podcast: atom,
-		Episode: episode,
-	}
 	rplcr := strings.NewReplacer("\n", " ", "\r", "")
 	lang := atom.Encoding.Language
 	if episode.EncodingLanguage != "" {
@@ -310,20 +280,9 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Podcast, episode *model.
 	}
 	defer cleanupMetadata()
 
-	values.MetadataFile = metadataFile
-
-	// Parse template (with metadatafile added to input values)
-	buf := &bytes.Buffer{}
-	if err := tmpl.Execute(buf, values); err != nil {
-		return err
-	}
-
-	l.Info("Executing encoder", "command", buf.String(), "input", episode.Input, "output", episode.Output)
-	cmd := exec.CommandContext(ctx, shell, shellCommandOption, buf.String())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	args := buildFFmpegAudioArgs(atom, episode, metadataFile)
+	l.Info("Executing encoder", "tool", atom.FFmpegPathExpanded(), "args", args, "input", episode.Input, "output", episode.Output)
+	if err := runCommand(ctx, atom.FFmpegPathExpanded(), args); err != nil {
 		return fmt.Errorf("unable to encode %q: %w", episode.Input, err)
 	}
 
@@ -371,28 +330,11 @@ func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Podcast, episode *model
 	if err := media.EnsureToolAvailable(atom.LamepathExpanded()); err != nil {
 		return err
 	}
-	tmpl, err := template.New("ffmpegToLame").Funcs(defaultFuncMap()).Parse(ffmpegToAudioCommandTemplate)
-	if err != nil {
-		return err
-	}
-
 	episode.Output = ExtensionToBaseMp3(episode.Input)
-	values := templateValues{
-		Podcast: atom,
-		Episode: episode,
-	}
-
-	buf := &bytes.Buffer{}
-	if err := tmpl.Execute(buf, values); err != nil {
-		return err
-	}
-
-	l.Info("Executing encoder", "command", buf.String(), "input", episode.Input, "output", episode.Output)
-	cmd := exec.CommandContext(ctx, shell, shellCommandOption, buf.String())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	ffmpegArgs := buildFFmpegToWavArgs(atom, episode)
+	lameArgs := buildLamePipeArgs(atom, episode)
+	l.Info("Executing encoder pipeline", "ffmpeg", ffmpegArgs, "lame", lameArgs, "input", episode.Input, "output", episode.Output)
+	if err := runPipeline(ctx, atom.FFmpegPathExpanded(), ffmpegArgs, atom.LamepathExpanded(), lameArgs); err != nil {
 		return fmt.Errorf("unable to encode %q: %w", episode.Input, err)
 	}
 
@@ -438,25 +380,10 @@ func EncodeMP3(ctx context.Context, atom *model.Podcast, episode *model.Episode)
 	if err := media.EnsureToolAvailable(atom.LamepathExpanded()); err != nil {
 		return err
 	}
-	tmpl, err := template.New("ffmpegToLame").Funcs(defaultFuncMap()).Parse(lameCommandTemplate)
-	if err != nil {
-		return err
-	}
 	episode.Output = ExtensionToBaseMp3(episode.Input)
-	values := templateValues{
-		Podcast: atom,
-		Episode: episode,
-	}
-	buf := &bytes.Buffer{}
-	if err := tmpl.Execute(buf, values); err != nil {
-		return err
-	}
-	l.Info("Executing encoder", "command", buf.String(), "input", episode.Input, "output", episode.Output)
-	cmd := exec.CommandContext(ctx, shell, shellCommandOption, buf.String())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	args := buildLameArgs(atom, episode)
+	l.Info("Executing encoder", "tool", atom.LamepathExpanded(), "args", args, "input", episode.Input, "output", episode.Output)
+	if err := runCommand(ctx, atom.LamepathExpanded(), args); err != nil {
 		return fmt.Errorf("unable to encode %q: %w", episode.Input, err)
 	}
 	// Add ID3v2.4 tag (artist, album, title, chapters, etc.).

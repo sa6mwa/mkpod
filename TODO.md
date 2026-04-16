@@ -68,7 +68,7 @@ This file is the working plan for finishing the refactor.
 - [x] Default to host-provided `ffmpeg`, `ffprobe`, and `lame` from `PATH`.
 - [x] Make explicit tool paths optional overrides in config, not required fields.
 - [x] Add startup/tool validation that reports actionable errors when required binaries are missing.
-- [ ] Refactor command construction so shell strings are minimized or removed in favor of direct `exec.CommandContext` argument lists.
+- [x] Refactor command construction so shell strings are minimized or removed in favor of direct `exec.CommandContext` argument lists.
 - [x] Clean up temporary ffmetadata files after AAC encoding completes.
 - [x] Add tests around command generation and temp-file cleanup.
 

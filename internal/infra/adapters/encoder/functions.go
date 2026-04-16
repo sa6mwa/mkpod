@@ -1,23 +1,18 @@
 package encoder
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
-	"text/template"
 	"time"
 
-	"al.essio.dev/pkg/shellescape"
 	"github.com/alfg/mp4"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/media"
-	"github.com/sa6mwa/mkpod/internal/rss"
 )
 
 func GetFileContentType(filename string) (contentType string, err error) {
@@ -72,29 +67,22 @@ func Mp4Duration(filename string) (int64, time.Duration, error) {
 	}
 	if mp4 != nil && mp4.Moov != nil && mp4.Moov.Mvhd != nil {
 		return info.Size(), time.Duration(mp4.Moov.Mvhd.Duration) * time.Millisecond, nil
-	} else {
-		return 0, 0, fmt.Errorf("%s does not contain a Moov Mvhd box (maybe not an mp4?)", filename)
 	}
+	return 0, 0, fmt.Errorf("%s does not contain a Moov Mvhd box (maybe not an mp4?)", filename)
 }
 
 // FFprobe runs ffprobe on filename and returns an FFprobeJSON with
-// format filled in or returns error if something failed. Full command
-// executed via shell (probably /bin/sh) and shellCommandOption (-c):
-//
-//	ffprobe -v error -show_format -print_format json filename
+// format filled in or returns error if something failed.
 func FFprobe(filename string) (*model.FFprobeJSON, error) {
 	if err := media.EnsureToolAvailable("ffprobe"); err != nil {
 		return nil, err
 	}
-	ffprobeCmd := fmt.Sprintf("ffprobe -v error -show_format -print_format json %s", shellescape.Quote(filename))
-	cmd := exec.Command(shell, shellCommandOption, ffprobeCmd)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	if err := cmd.Run(); err != nil {
+	out, err := runCommandOutput("ffprobe", []string{"-v", "error", "-show_format", "-print_format", "json", filename})
+	if err != nil {
 		return nil, err
 	}
 	var result model.FFprobeJSON
-	if err := json.NewDecoder(&out).Decode(&result); err != nil {
+	if err := json.Unmarshal(out, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -112,15 +100,4 @@ func GetSizeAndDurationViaFFprobe(filename string) (time.Duration, int64, error)
 		return 0, fi.Size(), err
 	}
 	return ffprobejson.Format.Duration.Duration, fi.Size(), nil
-}
-
-func defaultFuncMap() template.FuncMap {
-	return template.FuncMap{
-		"escape": func(s string) string {
-			return shellescape.Quote(s)
-		},
-		"markdown": func(s string) string {
-			return rss.MarkdownToHTML(s)
-		},
-	}
 }

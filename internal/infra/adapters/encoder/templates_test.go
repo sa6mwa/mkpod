@@ -1,77 +1,104 @@
 package encoder
 
 import (
-	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
-	"text/template"
+	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
-func TestAACTemplatesUseBuiltInFFmpegEncoder(t *testing.T) {
-	values := templateValues{
-		Podcast: &model.Podcast{
-			Config: model.Config{
-				LocalStorageDir: "/tmp/pod",
-			},
-			Link: "https://example.com/show",
-			Encoding: struct {
-				PreferredFormat string `yaml:"preferredFormat,omitempty"`
-				Bitrate         int    `yaml:"bitrate"`
-				Lamepath        string `yaml:"lamepath"`
-				FFmpegPath      string `yaml:"ffmpegpath"`
-				CRF             int    `yaml:"crf"`
-				ABR             string `yaml:"abr"`
-				Coverfront      string `yaml:"coverfront"`
-				Genre           string `yaml:"genre"`
-				Language        string `yaml:"language"`
-			}{
-				Lamepath:   "lame",
-				FFmpegPath: "ffmpeg",
-				CRF:        28,
-				ABR:        "128k",
-				Coverfront: "artwork/cover.jpg",
-				Genre:      "Podcast",
-				Language:   "eng",
-			},
+func TestAACArgsUseBuiltInFFmpegEncoder(t *testing.T) {
+	podcast := &model.Podcast{
+		Config: model.Config{LocalStorageDir: "/tmp/pod"},
+		Encoding: struct {
+			PreferredFormat string `yaml:"preferredFormat,omitempty"`
+			Bitrate         int    `yaml:"bitrate"`
+			Lamepath        string `yaml:"lamepath"`
+			FFmpegPath      string `yaml:"ffmpegpath"`
+			CRF             int    `yaml:"crf"`
+			ABR             string `yaml:"abr"`
+			Coverfront      string `yaml:"coverfront"`
+			Genre           string `yaml:"genre"`
+			Language        string `yaml:"language"`
+		}{
+			Lamepath:   "lame",
+			FFmpegPath: "ffmpeg",
+			CRF:        28,
+			ABR:        "128k",
+			Coverfront: "artwork/cover.jpg",
+			Genre:      "Podcast",
+			Language:   "eng",
 		},
-		Episode: &model.Episode{
-			UID:    1,
-			Title:  "Episode 1",
-			Input:  "masters/episode.wav",
-			Output: "episode.m4a",
-		},
-		MetadataFile: "/tmp/mkpod-ffmetadata.txt",
+	}
+	episode := &model.Episode{
+		UID:    1,
+		Title:  "Episode 1",
+		Input:  "masters/episode.wav",
+		Output: "episode.m4a",
 	}
 
-	tests := []struct {
-		name     string
-		template string
-	}{
-		{name: "video AAC template", template: ffmpegCommandTemplate},
-		{name: "m4a AAC template", template: ffmpegToM4ACommandTemplate},
+	videoArgs := buildMP4Args(podcast, &model.Episode{Input: episode.Input, Output: "episode.mp4"})
+	audioArgs := buildFFmpegAudioArgs(podcast, episode, "/tmp/mkpod-ffmetadata.txt")
+
+	assertAACArgs := func(t *testing.T, args []string) {
+		t.Helper()
+		joined := strings.Join(args, " ")
+		if !strings.Contains(joined, "-c:a aac") {
+			t.Fatalf("args %q do not use built-in AAC encoder", joined)
+		}
+		if strings.Contains(joined, "libfdk_aac") {
+			t.Fatalf("args %q still reference libfdk_aac", joined)
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := template.New("cmd").Funcs(defaultFuncMap()).Parse(tt.template)
-			if err != nil {
-				t.Fatalf("Parse() error = %v", err)
-			}
+	assertAACArgs(t, videoArgs)
+	assertAACArgs(t, audioArgs)
 
-			var buf bytes.Buffer
-			if err := tmpl.Execute(&buf, values); err != nil {
-				t.Fatalf("Execute() error = %v", err)
-			}
+	if got, want := audioArgs[len(audioArgs)-1], filepath.Join("/tmp/pod", "episode.m4a"); got != want {
+		t.Fatalf("audio output path = %q, want %q", got, want)
+	}
+}
 
-			command := buf.String()
-			if !strings.Contains(command, "-c:a aac") {
-				t.Fatalf("command %q does not use built-in AAC encoder", command)
-			}
-			if strings.Contains(command, "libfdk_aac") {
-				t.Fatalf("command %q still references libfdk_aac", command)
-			}
-		})
+func TestLamePipeArgsIncludeExpectedMetadata(t *testing.T) {
+	podcast := &model.Podcast{
+		Author: "Podcast Author",
+		Title:  "Podcast Title",
+		Link:   "https://example.com/show",
+		Config: model.Config{LocalStorageDir: "/tmp/pod"},
+		Encoding: struct {
+			PreferredFormat string `yaml:"preferredFormat,omitempty"`
+			Bitrate         int    `yaml:"bitrate"`
+			Lamepath        string `yaml:"lamepath"`
+			FFmpegPath      string `yaml:"ffmpegpath"`
+			CRF             int    `yaml:"crf"`
+			ABR             string `yaml:"abr"`
+			Coverfront      string `yaml:"coverfront"`
+			Genre           string `yaml:"genre"`
+			Language        string `yaml:"language"`
+		}{
+			Bitrate:    128,
+			Coverfront: "artwork/cover.jpg",
+			Genre:      "Podcast",
+			Language:   "eng",
+		},
+	}
+	episode := &model.Episode{
+		UID:              7,
+		Title:            "Episode 7",
+		Subtitle:         "Subtitle",
+		Input:            "masters/episode.wav",
+		Output:           "episode.mp3",
+		EncodingLanguage: "swe",
+	}
+	episode.PubDate.Time = time.Date(2024, time.January, 2, 15, 4, 0, 0, time.UTC)
+
+	args := buildLamePipeArgs(podcast, episode)
+	joined := strings.Join(args, " ")
+	for _, expected := range []string{"--tt Episode 7", "--ta Podcast Author", "--tl Podcast Title", "--tv TLAN=swe", "--tv WOAR=https://example.com/show"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("args %q missing %q", joined, expected)
+		}
 	}
 }

@@ -1,16 +1,12 @@
 package preprocessor
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 
-	"al.essio.dev/pkg/shellescape"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 	"github.com/sa6mwa/mkpod/internal/media"
 )
@@ -21,8 +17,6 @@ var (
 
 const defaultPrefix = "preprocessed-"
 const defaultPreset = "sm7b"
-const shell = "/bin/sh"
-const shellCommandOption = "-c"
 const defaultTool = "ffmpeg"
 
 func New(config *Config) *Processor {
@@ -43,14 +37,7 @@ func New(config *Config) *Processor {
 			config.Tool = defaultTool
 		}
 	}
-	return &Processor{
-		config: *config,
-		funcMap: template.FuncMap{
-			"escape": func(s string) string {
-				return shellescape.Quote(s)
-			},
-		},
-	}
+	return &Processor{config: *config}
 }
 
 // Preprocessor configuration.
@@ -65,14 +52,8 @@ type Config struct {
 	Tool string
 }
 
-type Variables struct {
-	Config
-	Input string
-}
-
 type Processor struct {
-	config  Config
-	funcMap template.FuncMap
+	config Config
 }
 
 func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error {
@@ -84,34 +65,26 @@ func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error 
 		return err
 	}
 
-	tmpl, err := template.New("PreProcessing").Funcs(p.funcMap).Parse(preProcessingTemplate)
+	filter, err := filterForPreset(p.config.Preset)
 	if err != nil {
 		return err
 	}
 
-	var variables Variables
-	variables.Prefix = p.config.Prefix
-	variables.Preset = p.config.Preset
-	variables.Tool = p.config.Tool
-
 	var fcount int
 	var lastInput, lastOutput string
 	for _, input := range mediaFilePaths {
-		variables.Input = input
-		buf := &bytes.Buffer{}
-		if err := tmpl.Execute(buf, variables); err != nil {
-			return err
-		}
-		l.Info("Preprocessing", "file", input, "output", variables.Prefix+input, "command", buf.String())
-		cmd := exec.CommandContext(ctx, shell, shellCommandOption, buf.String())
+		output := p.config.Prefix + input
+		args := []string{"-y", "-i", input, "-vn", "-ac", "2", "-filter_complex", filter, output}
+		l.Info("Preprocessing", "file", input, "output", output, "tool", p.config.Tool, "args", args)
+		cmd := exec.CommandContext(ctx, p.config.Tool, args...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("unable to pre-process %q using external tool (%s): %w", input, variables.Tool, err)
+			return fmt.Errorf("unable to pre-process %q using external tool (%s): %w", input, p.config.Tool, err)
 		}
 		lastInput = input
-		lastOutput = variables.Prefix + input
+		lastOutput = output
 		fcount++
 	}
 	if fcount == 1 {
