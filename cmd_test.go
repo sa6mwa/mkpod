@@ -33,7 +33,7 @@ func TestCLICommands(t *testing.T) {
 		{
 			name:     "encode help",
 			args:     []string{"encode", "--help"},
-			expected: "Encode and upload single or all output files",
+			expected: "Encode and upload episode media defined in the podcast specification",
 		},
 		{
 			name:     "encode help shows remove-remote-master flag",
@@ -181,12 +181,31 @@ func TestEncodeFailsForEpisodeMissingTitle(t *testing.T) {
 	}
 }
 
+func TestEncodeRequiresUIDOrAll(t *testing.T) {
+	output, err := cmdTest("", "encode")
+	if err == nil {
+		t.Fatalf("mkpod encode unexpectedly succeeded\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "select one or more episode UIDs or use --all") {
+		t.Fatalf("expected encode usage error, got: %s", output)
+	}
+}
+
+func TestParseRejectsPositionalArguments(t *testing.T) {
+	output, err := cmdTest("", "parse", "extra")
+	if err == nil {
+		t.Fatalf("mkpod parse unexpectedly succeeded\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "parse does not take positional arguments") {
+		t.Fatalf("expected parse argument error, got: %s", output)
+	}
+}
 func TestPreprocessFailsWithoutInputFiles(t *testing.T) {
 	output, err := cmdTest("", "preprocess")
 	if err == nil {
 		t.Fatalf("mkpod preprocess unexpectedly succeeded\nOutput: %s", output)
 	}
-	if !strings.Contains(output, "no file(s) to preprocess given as arguments") {
+	if !strings.Contains(output, "provide one or more audio files to preprocess") {
 		t.Fatalf("expected preprocess argument error, got: %s", output)
 	}
 }

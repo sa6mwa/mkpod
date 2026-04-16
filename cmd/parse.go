@@ -77,7 +77,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		}
 
 		if len(args) > 0 {
-			l.Error("Syntax error", "error", "this command does not take any arguments")
+			l.Error("Syntax error", "error", "parse does not take positional arguments")
 			os.Exit(1)
 		}
 
@@ -88,7 +88,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
-			l.Error("Failed to load configuration", "error", err, "specfile", specFile)
+			l.Error("Failed to load podcast spec", "error", err, "specfile", specFile)
 			os.Exit(1)
 		}
 

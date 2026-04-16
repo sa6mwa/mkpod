@@ -64,7 +64,7 @@ clipping.`,
 		}
 
 		if len(args) == 0 {
-			l.Error(imsg, "error", "no file(s) to preprocess given as arguments")
+			l.Error("Syntax error", "error", "provide one or more audio files to preprocess")
 			os.Exit(1)
 		}
 
@@ -76,7 +76,7 @@ clipping.`,
 		ctx := context.Background()
 
 		if err := preprocess.Process(ctx, args); err != nil {
-			l.Error("Error pre-processing", "error", err)
+			l.Error("Failed to preprocess audio", "error", err)
 			os.Exit(1)
 		}
 	},

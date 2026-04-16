@@ -43,18 +43,17 @@ var encodeCmd = &cobra.Command{
 	Aliases: []string{"e"},
 	Use:     "encode [episode-uids...] | --all",
 	Short:   "Encode and upload single or all episodes in podspec.yaml",
-	Long: `Encode and upload single or all output files defined in the podcast
-specification. This command will encode audio/video master files into
-the specified output formats (MP3, M4A, M4B, MP4) and optionally upload
-them to the configured S3 bucket.
+	Long: `Encode and upload episode media defined in the podcast specification.
+This command encodes local master files into the configured output
+formats (MP3, M4A, M4B, MP4) and can upload the resulting files to S3.
 
 Usage:
   encode 1 2 3     # Encode episodes with UIDs 1, 2, and 3
-  encode --all     # Encode any episode with empty output, missing duration or length
-  encode -af       # Encode all episodes (force re-encode without prompting)
+  encode --all     # Encode episodes whose local output file is missing
+  encode -af       # Re-encode every episode without prompting
 
-The --all flag will only encode episodes that need it (missing output file,
-duration, or length). Use --all --force to re-encode all episodes regardless.`,
+The --all flag skips episodes whose local output file already exists.
+Use --all --force to re-encode all episodes regardless.`,
 	Example: `  mkpod encode 1
   mkpod encode 1 2 3
   mkpod encode --spec ./podcast/podspec.yaml --all
@@ -71,7 +70,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		}
 
 		if len(args) == 0 && !all {
-			l.Error("Syntax error", "error", "You need to select one or several episode UIDs to encode as argument(s) to this command or use the all-option --all")
+			l.Error("Syntax error", "error", "select one or more episode UIDs or use --all")
 			os.Exit(1)
 		}
 
@@ -98,7 +97,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
-			l.Error("Failed to load configuration", "error", err, "specfile", specFile)
+			l.Error("Failed to load podcast spec", "error", err, "specfile", specFile)
 			os.Exit(1)
 		}
 
@@ -270,7 +269,7 @@ func init() {
 
 	// Add flags matching the old mkpod encode command
 	encodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Main configuration file for generating the RSS atom")
-	encodeCmd.Flags().BoolP("all", "a", false, "Encode any episode with an empty output filename, missing duration or missing length")
-	encodeCmd.Flags().BoolP("force", "f", false, "Do not ask whether to re-encode, just do it. Combined with the \"all\" flag, all episodes will be re-encoded")
+	encodeCmd.Flags().BoolP("all", "a", false, "Encode episodes whose local output file is missing")
+	encodeCmd.Flags().BoolP("force", "f", false, "Do not prompt. Combined with --all, re-encode every episode even if a local output already exists")
 	encodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file before uploading local master input file. Unless the force option is given, there is a yes/no prompt before proceeding")
 }
