@@ -1,4 +1,3 @@
-// asker implements the ports.ForAsking interface.
 package asker
 
 import (
@@ -7,28 +6,31 @@ import (
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 	"golang.org/x/term"
 )
 
-type forAsking struct {
+type Prompter interface {
+	Ask(ctx context.Context, format string, a ...any) bool
+}
+
+type Service struct {
 	dryrun bool
 	force  bool
 }
 
-func New(dryrun, force bool) ports.ForAsking {
-	return &forAsking{
+func New(dryrun, force bool) *Service {
+	return &Service{
 		dryrun: dryrun,
 		force:  force,
 	}
 }
 
-func (p *forAsking) Ask(ctx context.Context, format string, a ...any) bool {
+func (p *Service) Ask(ctx context.Context, format string, a ...any) bool {
 	l := logger.FromContext(ctx)
 	if p.dryrun {
 		l.Info(fmt.Sprintf("%s No", fmt.Sprintf(format, a...)))
-		return true
+		return false
 	}
 	if p.force {
 		l.Info(fmt.Sprintf("%s Yes", fmt.Sprintf(format, a...)))
@@ -37,7 +39,7 @@ func (p *forAsking) Ask(ctx context.Context, format string, a ...any) bool {
 	return p.yes(ctx, format, a...)
 }
 
-func (p *forAsking) yes(ctx context.Context, format string, a ...any) bool {
+func (p *Service) yes(ctx context.Context, format string, a ...any) bool {
 	l := logger.FromContext(ctx)
 	if !p.isTerminal() {
 		l.Warn("Stdout is not a terminal, will answer no", "question", fmt.Sprintf(format, a...))
@@ -62,6 +64,6 @@ func (p *forAsking) yes(ctx context.Context, format string, a ...any) bool {
 	return false
 }
 
-func (p *forAsking) isTerminal() bool {
+func (p *Service) isTerminal() bool {
 	return term.IsTerminal(int(os.Stdout.Fd()))
 }

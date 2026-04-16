@@ -1,5 +1,3 @@
-// The preprocessor adapter implements the ports.ForPreprocessing
-// interface.
 package preprocessor
 
 import (
@@ -13,8 +11,8 @@ import (
 	"os/exec"
 
 	"al.essio.dev/pkg/shellescape"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/media"
 )
 
 var (
@@ -27,11 +25,7 @@ const shell = "/bin/sh"
 const shellCommandOption = "-c"
 const defaultTool = "ffmpeg"
 
-// preprocessor.New returns a local-to-local media file preprocessor
-// adapter for the ports.ForPreprocessing port. If Config is nil,
-// default configuration will be used (preset=sm7b,
-// prefix=preprocessed-).
-func New(config *Config) ports.ForPreprocessing {
+func New(config *Config) *Processor {
 	if config == nil {
 		config = &Config{
 			Preset: defaultPreset,
@@ -49,7 +43,7 @@ func New(config *Config) ports.ForPreprocessing {
 			config.Tool = defaultTool
 		}
 	}
-	return &forPreprocessing{
+	return &Processor{
 		config: *config,
 		funcMap: template.FuncMap{
 			"escape": func(s string) string {
@@ -76,16 +70,18 @@ type Variables struct {
 	Input string
 }
 
-// forPreprocessing implements the ports.ForPreprocessing port (interface).
-type forPreprocessing struct {
+type Processor struct {
 	config  Config
 	funcMap template.FuncMap
 }
 
-func (p *forPreprocessing) Process(ctx context.Context, mediaFilePaths []string) error {
+func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error {
 	l := logger.FromContext(ctx)
 	if len(mediaFilePaths) == 0 {
 		return ErrNoFilesToProcess
+	}
+	if err := media.EnsureToolAvailable(p.config.Tool); err != nil {
+		return err
 	}
 
 	tmpl, err := template.New("PreProcessing").Funcs(p.funcMap).Parse(preProcessingTemplate)
@@ -127,19 +123,19 @@ func (p *forPreprocessing) Process(ctx context.Context, mediaFilePaths []string)
 }
 
 // SetPrefix is a setter for the instance's prefix value. Can be used to over
-func (p *forPreprocessing) SetPrefix(prefix string) ports.ForPreprocessing {
+func (p *Processor) SetPrefix(prefix string) *Processor {
 	p.config.Prefix = prefix
 	return p
 }
 
 // SetPreset is a setter for the instance's preset value.
-func (p *forPreprocessing) SetPreset(preset string) ports.ForPreprocessing {
+func (p *Processor) SetPreset(preset string) *Processor {
 	p.config.Preset = preset
 	return p
 }
 
 // SetFFmpeg is a setter for the instance's path to FFmpeg.
-func (p *forPreprocessing) SetTool(toolPath string) ports.ForPreprocessing {
+func (p *Processor) SetTool(toolPath string) *Processor {
 	p.config.Tool = toolPath
 	return p
 }

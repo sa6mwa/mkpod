@@ -1,6 +1,3 @@
-// encoder is the default file-based encoder of master audio or video
-// files into published mp3, m4a or mp4 outputs. Implements the
-// ports.ForEncoding interface.
 package encoder
 
 import (
@@ -13,196 +10,207 @@ import (
 	"path"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/media"
 	"github.com/sa6mwa/mp3duration"
 )
 
 var (
-	ErrNilPointer error = errors.New("received nil pointer")
+	ErrNilPointer   error = errors.New("received nil pointer")
 	ErrMissingImage error = errors.New("episode image is required for encoding - no image specified and no defaultPodImage configured")
 	ErrMissingTitle error = errors.New("episode title is required for encoding")
 )
 
 const shell = "/bin/sh"
 const shellCommandOption = "-c"
-const defaultStorageClass = "INTELLIGENT_TIERING"
 
-type forEncoding struct {
-	ports.ForAsking
-	storageClass   string
+type PostEncodeFunc func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error
+
+type EncodeOptions struct {
+	All           bool
+	EpisodeUID    *int64
+	ForceReencode bool
+}
+
+type encodeMode string
+
+const (
+	modeMP3          encodeMode = "mp3"
+	modeMP3ViaFFmpeg encodeMode = "mp3-via-ffmpeg"
+	modeFFmpegAudio  encodeMode = "ffmpeg-audio"
+	modeMP4          encodeMode = "mp4"
+)
+
+type Service struct {
+	prompter       asker.Prompter
 	encodedOutputs []string
 }
 
-// Returns a new encoder adapter implementing the ForEncoding port
-// interface. outputStorageClass is an AWS storage class for the
-// production (output) audio and/or video files (defaults to
-// INTELLIGENT_TIERING if empty).
-func New(askerAdapter ports.ForAsking, outputStorageClass string) ports.ForEncoding {
-	if strings.TrimSpace(outputStorageClass) == "" {
-		outputStorageClass = defaultStorageClass
-	}
-	return &forEncoding{
-		ForAsking:      askerAdapter,
-		storageClass:   outputStorageClass,
+func New(prompter asker.Prompter) *Service {
+	return &Service{
+		prompter:       prompter,
 		encodedOutputs: make([]string, 0),
 	}
 }
 
-func (e *forEncoding) GetEncodedOutputs() []string {
+func (e *Service) GetEncodedOutputs() []string {
 	return e.encodedOutputs
 }
 
 // applyEpisodeDefaults ensures episode has required fields set with appropriate defaults
 func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) error {
 	// Note: pubDate is no longer automatically set during encoding - it will be omitted from YAML if empty
-	
+
 	// Validate required fields that cannot be defaulted
 	if strings.TrimSpace(episode.Title) == "" {
 		return ErrMissingTitle
 	}
-	
+
 	// Set default Author to top-level author if empty
 	if strings.TrimSpace(episode.Author) == "" {
 		episode.Author = atom.Author
 	}
-	
+
 	// Set default Image from atom.Config.DefaultPodImage if empty
 	if strings.TrimSpace(episode.Image) == "" {
 		episode.Image = atom.Config.DefaultPodImage
 	}
-	
+
 	// Validate that image is set (either was already set or defaulted)
 	if strings.TrimSpace(episode.Image) == "" {
 		return ErrMissingImage
 	}
-	
+
 	return nil
 }
 
-func (e *forEncoding) shouldEncode(ctx context.Context, uid int64, filename string) bool {
+func (e *Service) shouldEncode(ctx context.Context, options EncodeOptions, filename string) bool {
 	// l := logger.FromContext(ctx)
 	if len(strings.TrimSpace(filename)) < 5 {
 		return true
-	} else if uid == -2 {
+	} else if options.ForceReencode {
 		return true
 	} else if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return true
-	} else if uid == -1 {
+	} else if options.All {
 		return false
 	}
-	return e.Ask(ctx, "Re-encode %s?", filename)
+	return e.prompter.Ask(ctx, "Re-encode %s?", filename)
 }
 
-func (e *forEncoding) Encode(ctx context.Context, atom *model.Atom, uid int64, postEncoding ports.PostEncodeFunc) error {
-	var indexes []int = make([]int, 0)
-
-	l := logger.FromContext(ctx)
-	mimetype.SetLimit(1024 * 1024)
-
-	if uid < 0 {
-		// Iterate all episodes into the indexes slice
+func selectEpisodeIndexes(atom *model.Atom, options EncodeOptions) ([]int, error) {
+	if atom == nil {
+		return nil, ErrNilPointer
+	}
+	if options.All {
+		indexes := make([]int, 0, len(atom.Episodes))
 		for i := range atom.Episodes {
 			indexes = append(indexes, i)
 		}
-	} else {
-		if idx := atom.ContainsEpisode(uid); idx >= 0 {
-			indexes = append(indexes, int(idx))
-		} else {
-			l.Warn("Episode does not exist in pod specification, skipping", "uid", uid)
-			return nil
+		return indexes, nil
+	}
+	if options.EpisodeUID == nil {
+		return nil, errors.New("episode UID is required when encoding without --all")
+	}
+	if idx := atom.ContainsEpisode(*options.EpisodeUID); idx >= 0 {
+		return []int{int(idx)}, nil
+	}
+	return nil, nil
+}
+
+func selectEncodeMode(inputContentType, episodeFormat, preferredFormat string) (encodeMode, string, error) {
+	format := strings.TrimSpace(strings.ToLower(episodeFormat))
+	preferred := strings.TrimSpace(strings.ToLower(preferredFormat))
+
+	if strings.HasPrefix(inputContentType, "video/") {
+		switch format {
+		case "", "video", "mp4":
+			return modeMP4, "", nil
+		case "audio":
+			if preferred == "m4a" || preferred == "m4b" {
+				return modeFFmpegAudio, preferred, nil
+			}
+			return modeMP3ViaFFmpeg, "", nil
+		case "mp3":
+			return modeMP3ViaFFmpeg, "", nil
+		case "m4a", "m4b":
+			return modeFFmpegAudio, format, nil
+		default:
+			return "", "", fmt.Errorf("invalid or unsupported format %q", format)
 		}
 	}
 
-	// Iterate over one episode or all episodes depending on value of
-	// uid (<0 == all, -2 == force reencoding even if output field exists)
+	switch format {
+	case "", "audio":
+		if preferred == "m4a" || preferred == "m4b" {
+			return modeFFmpegAudio, preferred, nil
+		}
+		return modeMP3, "", nil
+	case "mp3":
+		return modeMP3, "", nil
+	case "m4a", "m4b":
+		return modeFFmpegAudio, format, nil
+	default:
+		return "", "", fmt.Errorf("invalid or unsupported format %q", format)
+	}
+}
+
+func (e *Service) encodeEpisode(ctx context.Context, atom *model.Atom, episode *model.Episode, inputContentType string) error {
+	mode, formatArg, err := selectEncodeMode(inputContentType, episode.Format, atom.Encoding.PreferredFormat)
+	if err != nil {
+		return err
+	}
+	switch mode {
+	case modeMP4:
+		return EncodeMP4(ctx, atom, episode)
+	case modeMP3ViaFFmpeg:
+		return EncodeMP3ViaFFmpeg(ctx, atom, episode)
+	case modeFFmpegAudio:
+		return EncodeFFmpegAudio(ctx, atom, episode, formatArg)
+	case modeMP3:
+		return EncodeMP3(ctx, atom, episode)
+	default:
+		return fmt.Errorf("unsupported encode mode %q", mode)
+	}
+}
+
+func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOptions, postEncoding PostEncodeFunc) error {
+	l := logger.FromContext(ctx)
+	mimetype.SetLimit(1024 * 1024)
+
+	indexes, err := selectEpisodeIndexes(atom, options)
+	if err != nil {
+		return err
+	}
+	if len(indexes) == 0 && options.EpisodeUID != nil {
+		l.Warn("Episode does not exist in pod specification, skipping", "uid", *options.EpisodeUID)
+		return nil
+	}
+
 	for _, i := range indexes {
 		// Apply defaults to episode fields before encoding
 		if err := applyEpisodeDefaults(atom, &atom.Episodes[i]); err != nil {
 			return err
 		}
-		
+
 		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
 		inputContentType, err := GetFileContentType(inputPath)
 		if err != nil {
 			return err
 		}
-		format := strings.TrimSpace(strings.ToLower(atom.Episodes[i].Format))
 
 		outputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
 		wasEncoded := false
-		if e.shouldEncode(ctx, uid, outputPath) {
+		if e.shouldEncode(ctx, options, outputPath) {
 			wasEncoded = true
-			// If input content type is video/* and format is not "audio",
-			// we are to encode it using ffmpeg to an mp4. If format is
-			// "audio", drop the video stream and encode an mp3 (audio
-			// only).
-			if strings.HasPrefix(inputContentType, "video/") {
-				// If episode format is video or mp4, it's a video episode.
-				switch format {
-				case "", "video", "mp4":
-					//continue here, implement EncodeMP4 function
-					if err := EncodeMP4(ctx, atom, &atom.Episodes[i]); err != nil {
-						return err
-					}
-				case "audio":
-					if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
-						// Encode into m4a or m4b
-						if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
-							return err
-						}
-					} else {
-						// Encode mp3 via ffmpeg (piped into lame)
-						if err := EncodeMP3ViaFFmpeg(ctx, atom, &atom.Episodes[i]); err != nil {
-							return err
-						}
-					}
-				case "mp3":
-					// Encode mp3 via ffmpeg
-					if err := EncodeMP3ViaFFmpeg(ctx, atom, &atom.Episodes[i]); err != nil {
-						return err
-					}
-				case "m4a", "m4b":
-					// Encode m4a or m4b
-					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
-						return err
-					}
-				default:
-					return fmt.Errorf("invalid or unsupported format %q", format)
-				}
-			} else {
-				// ...else, assume it's audio only and encode it to either
-				// mp3 using lame or m4a/m4b using ffmpeg
-				switch format {
-				case "", "audio":
-					if strings.EqualFold(atom.Encoding.PreferredFormat, "m4a") || strings.EqualFold(atom.Encoding.PreferredFormat, "m4b") {
-						// Encode into m4a or m4b
-						if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], atom.Encoding.PreferredFormat); err != nil {
-							return err
-						}
-					} else {
-						// Encode mp3 using lame
-						if err := EncodeMP3(ctx, atom, &atom.Episodes[i]); err != nil {
-							return err
-						}
-					}
-				case "mp3":
-					// Encode mp3 using lame
-					if err := EncodeMP3(ctx, atom, &atom.Episodes[i]); err != nil {
-						return err
-					}
-				case "m4a", "m4b":
-					// Encode m4a or m4b
-					if err := EncodeFFmpegAudio(ctx, atom, &atom.Episodes[i], format); err != nil {
-						return err
-					}
-				default:
-					return fmt.Errorf("invalid or unsupported format %q", format)
-				}
+			if err := e.encodeEpisode(ctx, atom, &atom.Episodes[i], inputContentType); err != nil {
+				return err
 			}
 
 			// Add episode.Output to e.encodedOutputs
@@ -224,6 +232,9 @@ func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
+	}
+	if err := media.EnsureToolAvailable(atom.FFmpegPathExpanded()); err != nil {
+		return err
 	}
 	tmpl, err := template.New("ffmpeg").Funcs(defaultFuncMap()).Parse(ffmpegCommandTemplate)
 	if err != nil {
@@ -257,7 +268,7 @@ func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 		return err
 	}
 	episode.Type = outputContentType
-	
+
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, duration, size), "output", episode.Output, "duration", duration, "size", size)
 	episode.Length = size
 	episode.Duration.Duration = duration
@@ -270,6 +281,9 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Epi
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
+	}
+	if err := media.EnsureToolAvailable(atom.FFmpegPathExpanded()); err != nil {
+		return err
 	}
 	tmpl, err := template.New("ffmpeg").Funcs(defaultFuncMap()).Parse(ffmpegToM4ACommandTemplate)
 	if err != nil {
@@ -309,10 +323,11 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Epi
 		return fmt.Errorf("unable to get duration and size from input file: %w", err)
 	}
 	// Generate metadata /w chapters (if any)
-	metadataFile, err := id3v24.WriteFFmpegMetadataFile(duration, trackInfo)
+	metadataFile, cleanupMetadata, err := writeFFmpegMetadataFile(duration, trackInfo)
 	if err != nil {
 		return fmt.Errorf("unable to generate ffmetadata file: %w", err)
 	}
+	defer cleanupMetadata()
 
 	values.MetadataFile = metadataFile
 
@@ -351,12 +366,29 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Epi
 	return nil
 }
 
+func writeFFmpegMetadataFile(duration time.Duration, trackInfo id3v24.TrackInfo) (string, func(), error) {
+	metadataFile, err := id3v24.WriteFFmpegMetadataFile(duration, trackInfo)
+	if err != nil {
+		return "", func() {}, err
+	}
+
+	return metadataFile, func() {
+		_ = os.Remove(metadataFile)
+	}, nil
+}
+
 // EncodeMP3ViaFFmpeg encodes episode.Input through ffmpeg piped into
 // lame as an mp3.
 func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Episode) error {
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
+	}
+	if err := media.EnsureToolAvailable(atom.FFmpegPathExpanded()); err != nil {
+		return err
+	}
+	if err := media.EnsureToolAvailable(atom.LamepathExpanded()); err != nil {
+		return err
 	}
 	tmpl, err := template.New("ffmpegToLame").Funcs(defaultFuncMap()).Parse(ffmpegToAudioCommandTemplate)
 	if err != nil {
@@ -408,7 +440,7 @@ func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Ep
 		return err
 	}
 	episode.Type = outputContentType
-	
+
 	// Update atom with the length and duration of the encoded mp3.
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, di.Duration, di.Length), "output", episode.Output, "duration", di.Duration, "size", di.Length)
 	episode.Length = di.Length
@@ -421,6 +453,9 @@ func EncodeMP3(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
+	}
+	if err := media.EnsureToolAvailable(atom.LamepathExpanded()); err != nil {
+		return err
 	}
 	tmpl, err := template.New("ffmpegToLame").Funcs(defaultFuncMap()).Parse(lameCommandTemplate)
 	if err != nil {
@@ -468,7 +503,7 @@ func EncodeMP3(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 		return err
 	}
 	episode.Type = outputContentType
-	
+
 	// Update atom with the length and duration of the encoded mp3.
 	l.Info(fmt.Sprintf("%s is %s long and %d bytes", episode.Output, di.Duration, di.Length), "output", episode.Output, "duration", di.Duration, "size", di.Length)
 	episode.Length = di.Length

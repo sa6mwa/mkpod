@@ -10,35 +10,74 @@ import (
 
 func TestItunesTime_UnmarshalYAML(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		expectCurrent bool  // true if we expect current time, false if we expect specific time
-		expectedTime *time.Time // specific time to expect, only used if expectCurrent is false
-		shouldError bool
+		name          string
+		input         string
+		expectCurrent bool       // true if we expect current time, false if we expect specific time
+		expectedTime  *time.Time // specific time to expect, only used if expectCurrent is false
+		shouldError   bool
 	}{
 		{
-			name:        "empty string should set to current time",
-			input:       `pubDate: ""`,
+			name:          "empty string should set to current time",
+			input:         `pubDate: ""`,
 			expectCurrent: true,
 		},
 		{
-			name:        "today string should set to current time",
-			input:       `pubDate: "today"`,
+			name:          "today string should set to current time",
+			input:         `pubDate: "today"`,
 			expectCurrent: true,
 		},
 		{
-			name:        "now string should set to current time",
-			input:       `pubDate: "now"`,
+			name:          "now string should set to current time",
+			input:         `pubDate: "now"`,
 			expectCurrent: true,
 		},
 		{
-			name:        "zero date string should set to current time",
-			input:       `pubDate: "Mon, 01 Jan 0001 00:00:00 +0000"`,
+			name:          "zero date string should set to current time",
+			input:         `pubDate: "Mon, 01 Jan 0001 00:00:00 +0000"`,
 			expectCurrent: true,
 		},
 		{
-			name:        "valid RFC1123Z time should be preserved",
-			input:       `pubDate: "Mon, 02 Jan 2006 15:04:05 -0700"`,
+			name:          "yesterday string should resolve to previous day",
+			input:         `pubDate: "yesterday"`,
+			expectCurrent: false,
+			expectedTime: func() *time.Time {
+				t := startOfRelativeDay(time.Now().UTC(), -1)
+				return &t
+			}(),
+		},
+		{
+			name:          "HHMM string should resolve to today at given time",
+			input:         `pubDate: "1530"`,
+			expectCurrent: false,
+			expectedTime: func() *time.Time {
+				now := time.Now().UTC()
+				t := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, time.UTC)
+				return &t
+			}(),
+		},
+		{
+			name:          "HH:MM string should resolve to today at given time",
+			input:         `pubDate: "15:30"`,
+			expectCurrent: false,
+			expectedTime: func() *time.Time {
+				now := time.Now().UTC()
+				t := time.Date(now.Year(), now.Month(), now.Day(), 15, 30, 0, 0, time.UTC)
+				return &t
+			}(),
+		},
+		{
+			name:          "yesterday HHMM string should resolve to previous day at given time",
+			input:         `pubDate: "yesterday 1530"`,
+			expectCurrent: false,
+			expectedTime: func() *time.Time {
+				base := startOfRelativeDay(time.Now().UTC(), -1)
+				t := time.Date(base.Year(), base.Month(), base.Day(), 15, 30, 0, 0, time.UTC)
+				return &t
+			}(),
+		},
+		{
+			name:          "valid RFC1123Z time should be preserved",
+			input:         `pubDate: "Mon, 02 Jan 2006 15:04:05 -0700"`,
 			expectCurrent: false,
 			expectedTime: func() *time.Time {
 				t, _ := time.Parse(time.RFC1123Z, "Mon, 02 Jan 2006 15:04:05 -0700")
@@ -46,8 +85,8 @@ func TestItunesTime_UnmarshalYAML(t *testing.T) {
 			}(),
 		},
 		{
-			name:        "another valid RFC1123Z time should be preserved",
-			input:       `pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"`,
+			name:          "another valid RFC1123Z time should be preserved",
+			input:         `pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"`,
 			expectCurrent: false,
 			expectedTime: func() *time.Time {
 				t, _ := time.Parse(time.RFC1123Z, "Fri, 25 Mar 2022 16:00:13 +0000")
@@ -68,7 +107,7 @@ func TestItunesTime_UnmarshalYAML(t *testing.T) {
 			}
 
 			err := yaml.Unmarshal([]byte(tt.input), &testStruct)
-			
+
 			if tt.shouldError {
 				if err == nil {
 					t.Errorf("expected error but got none")
@@ -120,7 +159,7 @@ func TestItunesTime_String(t *testing.T) {
 
 	result := itunesTime.String()
 	expected := "Fri, 25 Mar 2022 16:00:13 +0000"
-	
+
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
@@ -129,7 +168,7 @@ func TestItunesTime_String(t *testing.T) {
 func TestItunesTime_ZeroValueHandling(t *testing.T) {
 	// Test that when we unmarshal a zero time, it gets set to current time
 	zeroTimeRFC1123Z := time.Time{}.Format(time.RFC1123Z)
-	
+
 	var testStruct struct {
 		PubDate ItunesTime `yaml:"pubDate"`
 	}
@@ -158,8 +197,8 @@ func TestItunesTime_ZeroValueHandling(t *testing.T) {
 
 func TestAtomPubDateFieldHandling(t *testing.T) {
 	tests := []struct {
-		name     string
-		yamlInput string
+		name          string
+		yamlInput     string
 		expectCurrent bool
 	}{
 		{
@@ -180,7 +219,7 @@ pubDate: ""
 			expectCurrent: true,
 		},
 		{
-			name: "zero date pubDate should get current time", 
+			name: "zero date pubDate should get current time",
 			yamlInput: `
 title: "Test Podcast"
 link: "https://example.com"

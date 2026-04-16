@@ -30,13 +30,11 @@ import (
 	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/awshandler"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/configurator"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/encoder"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/uploader"
+	"github.com/sa6mwa/mkpod/internal/spec"
+	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 	"github.com/spf13/cobra"
 )
 
@@ -92,7 +90,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		ctx = logger.WithDefaultLogger(ctx)
 
 		// Load configuration
-		config := configurator.New(specFile)
+		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
 			l.Error("Failed to load configuration", "error", err, "specfile", specFile)
@@ -101,19 +99,10 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 
 		// Create adapters
 		askerAdapter := asker.New(false, askNoQuestions)
-		encoderAdapter := encoder.New(askerAdapter, "INTELLIGENT_TIERING")
-		uploaderAdapter := uploader.New(atom)
-		// Always create awshandlerAdapter for file existence checks
-		awshandlerAdapter := awshandler.New(atom, askerAdapter)
-
-		// Create combined post-processing function
-		// Track which episodes were encoded vs just processed
-		encodedEpisodes := make(map[string]bool)
+		encoderAdapter := encoder.New(askerAdapter)
+		storageClient := s3store.New(atom, askerAdapter)
 
 		postEncodeFunc := func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error {
-			// Track if this episode was encoded
-			encodedEpisodes[episode.Output] = wasEncoded
-
 			// First, handle remote master removal if requested
 			if removeRemoteMaster && episode.Input != "" {
 				// Safety check 1: Only remove remote master if local master exists
@@ -125,11 +114,11 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 					l.Warn("Failed to check local master file", "error", err, "file", localMasterPath)
 				} else {
 					// Safety check 2: Compare file sizes (local must be at least 50% of remote size)
-					request := &ports.ForAdministeringRemoteFilesRequest{
+					request := &s3store.ObjectRequest{
 						Store: atom.Config.Aws.Buckets.Input,
 						Key:   episode.Input,
 					}
-					remoteInfo, err := awshandlerAdapter.GetFileInfo(ctx, request)
+					remoteInfo, err := storageClient.GetFileInfo(ctx, request)
 					if err != nil {
 						l.Warn("Failed to get remote master file info", "error", err, "file", episode.Input)
 					} else if !remoteInfo.Exists {
@@ -138,20 +127,20 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 						localSize := localStat.Size()
 						remoteSize := remoteInfo.Size
 						minRequiredSize := remoteSize / 2 // 50% of remote size
-						
+
 						if localSize < minRequiredSize {
-							l.Warn("Skipping remote master removal: local file is too small compared to remote", 
-								"localFile", localMasterPath, 
-								"localSize", localSize, 
-								"remoteSize", remoteSize, 
+							l.Warn("Skipping remote master removal: local file is too small compared to remote",
+								"localFile", localMasterPath,
+								"localSize", localSize,
+								"remoteSize", remoteSize,
 								"minRequired", minRequiredSize)
 						} else {
 							// All safety checks passed, proceed with removal
-							l.Info("Safety checks passed for remote master removal", 
-								"localFile", localMasterPath, 
-								"localSize", localSize, 
+							l.Info("Safety checks passed for remote master removal",
+								"localFile", localMasterPath,
+								"localSize", localSize,
 								"remoteSize", remoteSize)
-							if err := awshandlerAdapter.DeleteRemoteFile(ctx, request); err != nil {
+							if err := storageClient.DeleteRemoteFile(ctx, request); err != nil {
 								l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
 								// Don't fail the entire process for this - just log and continue
 							}
@@ -162,7 +151,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 
 			// Check if local output file exists but is missing from output bucket
 			if episode.Output != "" {
-				shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, askerAdapter, awshandlerAdapter, wasEncoded)
+				shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, askerAdapter, storageClient, wasEncoded)
 				if err != nil {
 					return fmt.Errorf("failed to check for missing output file: %w", err)
 				}
@@ -170,12 +159,12 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 				if shouldUpload {
 					// Use full local path for upload
 					localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
-					request := &ports.ForUploadingRequest{
-						Store: atom.Config.Aws.Buckets.Output,
-						To:    episode.Output,
-						From:  localPath,
+					request := &s3store.UploadRequest{
+						Store:    atom.Config.Aws.Buckets.Output,
+						Key:      episode.Output,
+						Filename: localPath,
 					}
-					return uploaderAdapter.Upload(ctx, request, nil)
+					return storageClient.UploadFile(ctx, request)
 				}
 			}
 			return nil
@@ -184,13 +173,10 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		processedCount := 0
 
 		if all {
-			// Determine UID based on force flag
-			var encodeUID int64 = -1 // Default: process all but don't re-encode existing
-			if askNoQuestions {
-				encodeUID = -2 // Force re-encode everything
-			}
-
-			if err := encoderAdapter.Encode(ctx, atom, encodeUID, postEncodeFunc); err != nil {
+			if err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+				All:           true,
+				ForceReencode: askNoQuestions,
+			}, postEncodeFunc); err != nil {
 				l.Error("Failed to encode episodes", "error", err)
 				os.Exit(1)
 			}
@@ -203,7 +189,9 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 					l.Error("Invalid episode UID", "uid", uidStr, "error", err)
 					continue
 				}
-				if err := encoderAdapter.Encode(ctx, atom, uid, postEncodeFunc); err != nil {
+				if err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+					EpisodeUID: &uid,
+				}, postEncodeFunc); err != nil {
 					l.Error("Failed to encode episode", "uid", uid, "error", err)
 					os.Exit(1)
 				}
@@ -229,7 +217,11 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 }
 
 // checkForMissingOutputFile checks if a local output file exists but is missing from the output bucket
-func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *model.Episode, askerAdapter ports.ForAsking, awshandlerAdapter ports.ForAdministeringRemoteFiles, wasEncoded bool) (bool, error) {
+func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *model.Episode, askerAdapter interface {
+	Ask(context.Context, string, ...any) bool
+}, storageClient interface {
+	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)
+}, wasEncoded bool) (bool, error) {
 	l := logger.FromContext(ctx)
 
 	// Build full local path
@@ -243,12 +235,12 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *m
 	}
 
 	// Check if remote file exists
-	if awshandlerAdapter != nil {
-		request := &ports.ForAdministeringRemoteFilesRequest{
+	if storageClient != nil {
+		request := &s3store.ObjectRequest{
 			Store: atom.Config.Aws.Buckets.Output,
 			Key:   episode.Output,
 		}
-		exists, err := awshandlerAdapter.FileExists(ctx, request)
+		exists, err := storageClient.FileExists(ctx, request)
 		if err != nil {
 			return false, fmt.Errorf("failed to check remote file: %w", err)
 		}
@@ -270,7 +262,7 @@ func init() {
 	rootCmd.AddCommand(encodeCmd)
 
 	// Add flags matching the old mkpod encode command
-	encodeCmd.Flags().StringP("spec", "s", configurator.DefaultSpecfile, "Main configuration file for generating the RSS atom")
+	encodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Main configuration file for generating the RSS atom")
 	encodeCmd.Flags().BoolP("all", "a", false, "Encode any episode with an empty output filename, missing duration or missing length")
 	encodeCmd.Flags().BoolP("force", "f", false, "Do not ask whether to re-encode, just do it. Combined with the \"all\" flag, all episodes will be re-encoded")
 	encodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file before uploading local master input file. Unless the force option is given, there is a yes/no prompt before proceeding")

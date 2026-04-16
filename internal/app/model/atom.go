@@ -69,7 +69,7 @@ func resolvetilde(path string) string {
 	if strings.HasPrefix(path, "~/") {
 		dirname, err := os.UserHomeDir()
 		if err != nil {
-			panic(err)
+			return path
 		}
 		return filepath.Join(dirname, path[2:])
 	}

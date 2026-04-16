@@ -1,4 +1,4 @@
-package parser
+package rss
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"al.essio.dev/pkg/shellescape"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 )
 
@@ -24,20 +23,17 @@ var (
 	ErrNilPointerAtom error = errors.New("received nil pointer to atom")
 )
 
-// parser.New returns a file-based podcast.rss generator that
-// implements the ports.ForParsing interface.
-func New() ports.ForParsing {
-	return &forParsing{
+func New() *Renderer {
+	return &Renderer{
 		funcMap: mkFuncMap(),
 	}
 }
 
-// forParsing implements the ports.ForParsing port (interface).
-type forParsing struct {
+type Renderer struct {
 	funcMap template.FuncMap
 }
 
-func (p *forParsing) WriteRSS(ctx context.Context, atom *model.Atom) error {
+func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Atom) error {
 	if atom == nil {
 		return ErrNilPointerAtom
 	}
@@ -49,14 +45,11 @@ func (p *forParsing) WriteRSS(ctx context.Context, atom *model.Atom) error {
 	return writeRSS(ctx, f, p, atom)
 }
 
-func (p *forParsing) WriteRSSToStdout(ctx context.Context, atom *model.Atom) error {
+func (p *Renderer) WriteRSSToStdout(ctx context.Context, atom *model.Atom) error {
 	return writeRSS(ctx, os.Stdout, p, atom)
 }
 
-// Functions...
-
-func writeRSS(ctx context.Context, w io.Writer, p *forParsing, atom *model.Atom) error {
-	// Create template with context-aware function map
+func writeRSS(ctx context.Context, w io.Writer, p *Renderer, atom *model.Atom) error {
 	funcMapWithContext := p.mkFuncMapWithContext(ctx, atom)
 
 	t, err := template.New("template.rss").Funcs(funcMapWithContext).Parse(rssTemplate)
@@ -66,17 +59,14 @@ func writeRSS(ctx context.Context, w io.Writer, p *forParsing, atom *model.Atom)
 	return t.Execute(w, atom)
 }
 
-// mkFuncMapWithContext creates a function map with context-aware functions
-func (p *forParsing) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) template.FuncMap {
+func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) template.FuncMap {
 	l := logger.FromContext(ctx)
 	if l == nil {
 		l = logger.DefaultLogger()
 	}
 
-	// Start with base function map
 	funcMap := mkFuncMap()
 
-	// Add context-aware functions
 	funcMap["validEpisodes"] = func(episodes []model.Episode) []model.Episode {
 		return p.filterValidEpisodes(ctx, atom, episodes)
 	}
@@ -101,8 +91,7 @@ func (p *forParsing) mkFuncMapWithContext(ctx context.Context, atom *model.Atom)
 	return funcMap
 }
 
-// filterValidEpisodes filters out episodes that are missing required fields
-func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, episodes []model.Episode) []model.Episode {
+func (p *Renderer) filterValidEpisodes(ctx context.Context, atom *model.Atom, episodes []model.Episode) []model.Episode {
 	l := logger.FromContext(ctx)
 	if l == nil {
 		l = logger.DefaultLogger()
@@ -111,7 +100,6 @@ func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, 
 	validEpisodes := make([]model.Episode, 0, len(episodes))
 
 	for i, episode := range episodes {
-		// Validate required fields
 		var missingFields []string
 
 		if strings.TrimSpace(episode.Title) == "" {
@@ -136,7 +124,6 @@ func (p *forParsing) filterValidEpisodes(ctx context.Context, atom *model.Atom, 
 			missingFields = append(missingFields, "pubDate")
 		}
 
-		// Check author (considering default from atom)
 		effectiveAuthor := episode.Author
 		if strings.TrimSpace(effectiveAuthor) == "" {
 			effectiveAuthor = atom.Author
@@ -181,7 +168,7 @@ func mkFuncMap() template.FuncMap {
 			if t1.IsZero() || t2.IsZero() {
 				return false
 			}
-			return (t1 == t2 || t1.After(t2))
+			return t1 == t2 || t1.After(t2)
 		},
 		"markdown": func(s string) string {
 			return MarkdownToHTML(s)

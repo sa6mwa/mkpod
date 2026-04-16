@@ -12,11 +12,12 @@ import (
 	"text/template"
 	"time"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/alfg/mp4"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/parser"
-	"al.essio.dev/pkg/shellescape"
+	"github.com/sa6mwa/mkpod/internal/media"
+	"github.com/sa6mwa/mkpod/internal/rss"
 )
 
 func GetFileContentType(filename string) (contentType string, err error) {
@@ -82,6 +83,9 @@ func Mp4Duration(filename string) (int64, time.Duration, error) {
 //
 //	ffprobe -v error -show_format -print_format json filename
 func FFprobe(filename string) (*model.FFprobeJSON, error) {
+	if err := media.EnsureToolAvailable("ffprobe"); err != nil {
+		return nil, err
+	}
 	ffprobeCmd := fmt.Sprintf("ffprobe -v error -show_format -print_format json %s", shellescape.Quote(filename))
 	cmd := exec.Command(shell, shellCommandOption, ffprobeCmd)
 	var out bytes.Buffer
@@ -116,7 +120,7 @@ func defaultFuncMap() template.FuncMap {
 			return shellescape.Quote(s)
 		},
 		"markdown": func(s string) string {
-			return parser.MarkdownToHTML(s)
+			return rss.MarkdownToHTML(s)
 		},
 	}
 }

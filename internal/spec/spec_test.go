@@ -1,19 +1,111 @@
-package configurator
+package spec
 
 import (
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
-func TestConfiguratorPubDateHandling(t *testing.T) {
+func TestValidateRejectsMissingRequiredFields(t *testing.T) {
+	err := Validate(&model.Atom{})
+	if err == nil {
+		t.Fatal("Validate() unexpectedly returned nil")
+	}
+
+	for _, field := range []string{
+		"author",
+		"config.baseURL",
+		"config.image",
+		"config.defaultPodImage",
+		"atom",
+		"title",
+		"ttl",
+		"language",
+		"copyright",
+		"webMaster",
+		"description",
+		"subtitle",
+		"ownerName",
+		"ownerEmail",
+	} {
+		if !strings.Contains(err.Error(), field) {
+			t.Fatalf("Validate() error %q does not include missing field %q", err, field)
+		}
+	}
+}
+
+func TestValidateRejectsNilAtom(t *testing.T) {
+	err := Validate(nil)
+	if !errors.Is(err, ErrNilAtom) {
+		t.Fatalf("Validate(nil) error = %v, want %v", err, ErrNilAtom)
+	}
+}
+
+func TestApplyDefaultsSetsMediaDefaultsAndPubDate(t *testing.T) {
+	now := time.Date(2026, 4, 16, 19, 15, 0, 0, time.UTC)
+	atom := &model.Atom{}
+
+	if err := ApplyDefaults(atom, now); err != nil {
+		t.Fatalf("ApplyDefaults() error = %v", err)
+	}
+	if atom.Encoding.CRF != 28 {
+		t.Fatalf("CRF = %d, want 28", atom.Encoding.CRF)
+	}
+	if atom.Encoding.ABR != "128k" {
+		t.Fatalf("ABR = %q, want 128k", atom.Encoding.ABR)
+	}
+	if atom.Encoding.FFmpegPath != "ffmpeg" {
+		t.Fatalf("FFmpegPath = %q, want ffmpeg", atom.Encoding.FFmpegPath)
+	}
+	if atom.Encoding.Lamepath != "lame" {
+		t.Fatalf("Lamepath = %q, want lame", atom.Encoding.Lamepath)
+	}
+	if !atom.PubDate.Time.Equal(now) {
+		t.Fatalf("PubDate = %v, want %v", atom.PubDate.Time, now)
+	}
+}
+
+func TestApplyDefaultsPreservesExplicitValues(t *testing.T) {
+	now := time.Date(2026, 4, 16, 19, 20, 0, 0, time.UTC)
+	pubDate := time.Date(2022, 3, 25, 16, 0, 13, 0, time.UTC)
+	atom := &model.Atom{}
+	atom.Encoding.CRF = 21
+	atom.Encoding.ABR = "96k"
+	atom.Encoding.FFmpegPath = "/usr/bin/ffmpeg"
+	atom.Encoding.Lamepath = "/usr/bin/lame"
+	atom.PubDate.Time = pubDate
+
+	if err := ApplyDefaults(atom, now); err != nil {
+		t.Fatalf("ApplyDefaults() error = %v", err)
+	}
+	if atom.Encoding.CRF != 21 {
+		t.Fatalf("CRF = %d, want 21", atom.Encoding.CRF)
+	}
+	if atom.Encoding.ABR != "96k" {
+		t.Fatalf("ABR = %q, want 96k", atom.Encoding.ABR)
+	}
+	if atom.Encoding.FFmpegPath != "/usr/bin/ffmpeg" {
+		t.Fatalf("FFmpegPath = %q", atom.Encoding.FFmpegPath)
+	}
+	if atom.Encoding.Lamepath != "/usr/bin/lame" {
+		t.Fatalf("Lamepath = %q", atom.Encoding.Lamepath)
+	}
+	if !atom.PubDate.Time.Equal(pubDate) {
+		t.Fatalf("PubDate = %v, want %v", atom.PubDate.Time, pubDate)
+	}
+}
+
+func TestStorePubDateHandling(t *testing.T) {
 	tests := []struct {
-		name           string
-		yamlContent    string
-		expectCurrent  bool
-		shouldError    bool
+		name          string
+		yamlContent   string
+		expectCurrent bool
+		shouldError   bool
 	}{
 		{
 			name: "missing pubDate should be set to current time",
@@ -42,7 +134,7 @@ config:
 			name: "empty pubDate should be set to current time",
 			yamlContent: `
 atom: "podcast.rss"
-title: "Test Podcast" 
+title: "Test Podcast"
 link: "https://example.com"
 pubDate: ""
 ttl: 60
@@ -63,7 +155,7 @@ config:
 			expectCurrent: true,
 		},
 		{
-			name: "zero date pubDate should be set to current time", 
+			name: "zero date pubDate should be set to current time",
 			yamlContent: `
 atom: "podcast.rss"
 title: "Test Podcast"
@@ -114,48 +206,36 @@ config:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a temporary file
 			tmpFile, err := os.CreateTemp("", "test-podspec-*.yaml")
 			if err != nil {
 				t.Fatalf("failed to create temp file: %v", err)
 			}
 			defer os.Remove(tmpFile.Name())
 
-			// Write test YAML content
-			_, err = tmpFile.WriteString(strings.TrimSpace(tt.yamlContent))
-			if err != nil {
+			if _, err := tmpFile.WriteString(strings.TrimSpace(tt.yamlContent)); err != nil {
 				t.Fatalf("failed to write to temp file: %v", err)
 			}
 			tmpFile.Close()
 
-			// Create configurator with temp file
-			configurator := New(tmpFile.Name())
-			
-			// Load the atom
-			ctx := context.Background()
-			atom, err := configurator.Load(ctx)
-			
+			store := New(tmpFile.Name())
+			atom, err := store.Load(context.Background())
 			if tt.shouldError {
 				if err == nil {
 					t.Error("expected error but got none")
 				}
 				return
 			}
-
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-
 			if atom == nil {
 				t.Fatal("atom is nil")
 			}
 
 			if tt.expectCurrent {
-				// Should not be zero
 				if atom.PubDate.IsZero() {
 					t.Error("expected pubDate to be set to current time, but it's still zero")
 				} else {
-					// Check that the time is recent (within the last 5 seconds)
 					now := time.Now().UTC()
 					diff := now.Sub(atom.PubDate.Time)
 					if diff < 0 {
@@ -166,7 +246,6 @@ config:
 					}
 				}
 			} else {
-				// Should be the specific time from the YAML
 				expectedTime, _ := time.Parse(time.RFC1123Z, "Fri, 25 Mar 2022 16:00:13 +0000")
 				if !atom.PubDate.Time.Equal(expectedTime) {
 					t.Errorf("expected %v, got %v", expectedTime, atom.PubDate.Time)
@@ -176,8 +255,7 @@ config:
 	}
 }
 
-func TestConfiguratorSaveUpdatesLastBuildDate(t *testing.T) {
-	// Create a temporary file
+func TestStoreSaveUpdatesLastBuildDate(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test-podspec-*.yaml")
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
@@ -204,39 +282,84 @@ config:
   localStorageDir: "./test"
 `
 
-	// Write initial content
-	_, err = tmpFile.WriteString(strings.TrimSpace(yamlContent))
-	if err != nil {
+	if _, err := tmpFile.WriteString(strings.TrimSpace(yamlContent)); err != nil {
 		t.Fatalf("failed to write to temp file: %v", err)
 	}
 	tmpFile.Close()
 
-	// Create configurator
-	configurator := New(tmpFile.Name())
+	store := New(tmpFile.Name())
 	ctx := context.Background()
-
-	// Load the atom
-	atom, err := configurator.Load(ctx)
+	atom, err := store.Load(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Save the atom
 	beforeSave := time.Now().UTC()
-	err = configurator.Save(ctx, atom)
+	err = store.Save(ctx, atom)
 	if err != nil {
 		t.Fatalf("unexpected error saving: %v", err)
 	}
 	afterSave := time.Now().UTC()
 
-	// Load again to check lastBuildDate was updated
-	atom2, err := configurator.Load(ctx)
+	atom2, err := store.Load(ctx)
 	if err != nil {
 		t.Fatalf("unexpected error on second load: %v", err)
 	}
 
-	// LastBuildDate should be between beforeSave and afterSave (with 1 second tolerance for precision)
 	if atom2.LastBuildDate.Time.Before(beforeSave.Add(-1*time.Second)) || atom2.LastBuildDate.Time.After(afterSave.Add(1*time.Second)) {
 		t.Errorf("lastBuildDate %v should be between %v and %v", atom2.LastBuildDate.Time, beforeSave, afterSave)
+	}
+}
+
+func TestStoreDefaultsMediaToolsToPATH(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-podspec-*.yaml")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	yamlContent := `
+atom: "podcast.rss"
+title: "Test Podcast"
+link: "https://example.com"
+ttl: 60
+language: "en"
+copyright: "Test Copyright"
+webMaster: "test@example.com"
+description: "Test Description"
+subtitle: "Test Subtitle"
+ownerName: "Test Owner"
+ownerEmail: "owner@example.com"
+author: "Test Author"
+config:
+  baseURL: "https://example.com"
+  image: "https://example.com/image.jpg"
+  defaultPodImage: "default.jpg"
+  localStorageDir: "./test"
+encoding:
+  bitrate: 128
+  crf: 28
+  abr: "128k"
+  coverfront: "default.jpg"
+  genre: "Podcast"
+  language: "eng"
+`
+
+	if _, err := tmpFile.WriteString(strings.TrimSpace(yamlContent)); err != nil {
+		t.Fatalf("failed to write to temp file: %v", err)
+	}
+	tmpFile.Close()
+
+	store := New(tmpFile.Name())
+	atom, err := store.Load(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if atom.Encoding.FFmpegPath != "ffmpeg" {
+		t.Fatalf("FFmpegPath = %q, want %q", atom.Encoding.FFmpegPath, "ffmpeg")
+	}
+	if atom.Encoding.Lamepath != "lame" {
+		t.Fatalf("Lamepath = %q, want %q", atom.Encoding.Lamepath, "lame")
 	}
 }

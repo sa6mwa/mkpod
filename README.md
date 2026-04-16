@@ -1,22 +1,21 @@
 # mkpod
 
 `mkpod` is a CLI to help automate publishing an audio and/or video podcast to
-an Amazon S3 bucket. The CLI comes with the Amazon Go SDK, but depends on the
-external tools `ffmpeg` and `lame` to encode masters to pod content.
+an Amazon S3 bucket. It uses the AWS Go SDK and depends on host-provided
+`ffmpeg`, `ffprobe`, and `lame` for media inspection and encoding.
 
 The CLI uses the input from a YAML configuration file called `podspec.yaml` (an
-example is provided). AWS configuration, output directories, meta data and
-information about the episodes are all entered into `podcast.yaml`. The
+example is provided). AWS configuration, output directories, metadata and
+information about the episodes are all entered into `podspec.yaml`. The
 intention is for you to store this file in a private VCS (could also be public,
 does not contain credentials).
 
-Each process has it's own sub-command, there are currently two sub-commands:
-`encode` and `parse`. Encoding produces output files (`mp3` or `mp4`) and
-uploads them to the `output` AWS S3 bucket specified in `podspec.yaml` while
-the `parse` sub-command produces a `podcast.rss` XML file compatible with the
-Apple Podcast XML format. Running `mkpod p -u` will both parse and allow you to
-upload the `podcast.rss` file to the `output` AWS S3 bucket effectively
-updating the podcast feed.
+The main commands are:
+
+- `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
+- `mkpod preprocess` to run microphone/raw audio through ffmpeg filters
+- `mkpod encode` to encode and upload episode media
+- `mkpod parse` to generate `podcast.rss` and optionally upload it
 
 `mkpod` encodes audio or video *masters* into `mp4` or `mp3`. If the input and
 output is `audio`, `lame` will be used to create an `mp3`. If the input
@@ -27,33 +26,26 @@ to `audio`, `ffmpeg` will be used to extract the audio as `pcm_s16le` (`wav`)
 piped into `lame` stored as an `mp3` (without the video stream, the episode
 will be an audio-only episode).
 
-## Example
+For AAC-based outputs (`m4a`, `m4b`, and MP4 audio tracks), mkpod now uses
+ffmpeg's built-in `aac` encoder rather than `libfdk_aac`.
+
+## Quick Start
 
 ```console
+$ mkpod init ./podcast
+$ cd podcast
 $ ls
-podspec.yaml
+artwork  masters  podspec.yaml
 
 $ mkpod -h
-NAME:
-   mkpod - Tool to render a podcast rss feed from spec, automate mp3/mp4 encoding and publish to Amazon S3.
+Generate and encode podcasts and publish to a cloud object store
 
-USAGE:
-   mkpod [global options] command [command options]
+$ mkpod init --help
+$ mkpod parse --help
+$ mkpod encode --help
 
-COMMANDS:
-   preprocess, pre  Run an audiofile (e.g a raw microphone track) through pre-processing
-   parse, p         Parse Go template using specification yaml
-   encode, e        Encode and upload single or all output files in podspec.yaml
-   help, h          Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --help, -h  show help
-
-COPYRIGHT:
-   Copyright SA6MWA 2022-2023 sa6mwa@gmail.com, https://github.com/sa6mwa/mkpod
-
-# Pre-process raw microphone track
-$ mkpod pre --profile qzj MIC1.WAV
+# Pre-process a raw microphone track
+$ mkpod pre MIC1.WAV
 
 # Encode all episodes in podspec.yaml
 $ mkpod e -a
@@ -68,11 +60,64 @@ $ mkpod p -u
 $ git add podspec.yaml ; git commit -m 'Update pod' ; git push
 ```
 
-## Build ffmpeg with libfdk_aac
+## Host Dependencies
 
-`mkpod` uses `libfdk_aac` to encode `mp4`. In the [scripts/](scripts) directory
-you will find a build script that should work for various Ubuntu/Debian Linux
-distributions.
+Install these tools from your OS or distribution packages:
+
+- `ffmpeg`
+- `ffprobe`
+- `lame`
+
+By default mkpod looks them up on `PATH`. You can still override the binary
+paths in `podspec.yaml` via `encoding.ffmpegpath` and `encoding.lamepath` if
+needed.
+
+## Minimal `podspec.yaml`
+
+```yaml
+config:
+  baseURL: https://example-podcast-bucket.s3.us-east-1.amazonaws.com
+  image: https://example-podcast-bucket.s3.us-east-1.amazonaws.com/artwork/podcast-cover.jpg
+  defaultPodImage: artwork/podcast-cover.jpg
+  aws:
+    profile: default
+    region: us-east-1
+    buckets:
+      input: example-podcast-assets
+      output: example-podcast-bucket
+  localStorageDir: /absolute/path/to/your/podcast
+atom: podcast.rss
+title: my-podcast
+link: https://example.com/my-podcast
+ttl: 60
+language: en
+copyright: Copyright Example
+webMaster: you@example.com
+description: Replace this description with your podcast summary.
+subtitle: Replace this subtitle.
+ownerName: Your Name
+ownerEmail: you@example.com
+author: Your Name
+explicit: "no"
+keywords: podcast
+categories:
+  - name: Technology
+    subcategories: []
+encoding:
+  preferredFormat: mp3
+  bitrate: 128
+  lamepath: lame
+  ffmpegpath: ffmpeg
+  crf: 28
+  abr: 128k
+  coverfront: artwork/podcast-cover.jpg
+  genre: Podcast
+  language: eng
+episodes: []
+```
+
+Use `mkpod init <directory>` to generate this starter layout automatically and
+then edit the values for your real podcast and S3 buckets.
 
 ## AWS access policy
 

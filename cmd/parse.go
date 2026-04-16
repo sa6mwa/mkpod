@@ -29,12 +29,11 @@ import (
 	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/configurator"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/parser"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/uploader"
+	"github.com/sa6mwa/mkpod/internal/rss"
+	"github.com/sa6mwa/mkpod/internal/spec"
+	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +79,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		ctx = logger.WithDefaultLogger(ctx)
 
 		// Load configuration
-		config := configurator.New(specFile)
+		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
 			l.Error("Failed to load configuration", "error", err, "specfile", specFile)
@@ -95,7 +94,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 
 		// Create adapters
 		askerAdapter := asker.New(dryRun, askNoQuestions)
-		parserAdapter := parser.New()
+		parserAdapter := rss.New()
 
 		// Ask if user wants to refresh lastBuildDate
 		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.Atom, specFile) {
@@ -126,28 +125,28 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 
 		// Upload if requested
 		if upload && !dryRun {
-			uploaderAdapter := uploader.New(atom)
+			storageClient := s3store.New(atom, askerAdapter)
 
 			// Check and upload podcast image if needed
-			if err := checkAndUploadPodcastImage(ctx, atom, askerAdapter, uploaderAdapter); err != nil {
+			if err := checkAndUploadPodcastImage(ctx, atom, askerAdapter, storageClient); err != nil {
 				l.Warn("Failed to check/upload podcast image", "error", err)
 				// Don't exit on podcast image error - this is not critical
 			}
 
 			// Show diff first
-			if err := uploaderAdapter.Diff(ctx, atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
+			if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
 				l.Error("Failed to show diff", "error", err)
 				// Don't exit on diff error, continue with upload
 			}
 
 			if askerAdapter.Ask(ctx, "Upload new %s?", atom.Atom) {
-				request := &ports.ForUploadingRequest{
+				request := &s3store.UploadRequest{
 					Store:       atom.Config.Aws.Buckets.Output,
-					To:          atom.Atom,
-					From:        atom.Atom,
+					Key:         atom.Atom,
+					Filename:    atom.Atom,
 					ContentType: "text/xml",
 				}
-				if err := uploaderAdapter.Upload(ctx, request, nil); err != nil {
+				if err := storageClient.UploadFile(ctx, request); err != nil {
 					l.Error("Failed to upload RSS", "error", err)
 					os.Exit(1)
 				}
@@ -163,7 +162,12 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 }
 
 // checkAndUploadPodcastImage checks if podcast images referenced in URLs exist in S3 and uploads missing ones
-func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdapter ports.ForAsking, uploaderAdapter ports.ForUploading) error {
+func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdapter interface {
+	Ask(context.Context, string, ...any) bool
+}, uploaderAdapter interface {
+	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)
+	UploadFile(context.Context, *s3store.UploadRequest) error
+}) error {
 	l := logger.FromContext(ctx)
 
 	// Extract bucket domain from output bucket URL
@@ -183,6 +187,9 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 
 		// Extract the S3 key from the URL
 		s3Key := strings.TrimPrefix(imageURL, bucketDomain+"/")
+		if strings.TrimSpace(localImagePath) == "" {
+			localImagePath = s3Key
+		}
 
 		// Build the full path using localStorageDir from config
 		fullLocalPath := localImagePath
@@ -204,8 +211,18 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 			return nil
 		}
 
-		// TODO: Check if remote file exists in S3 (would need AWS handler)
-		// For now, just ask if user wants to upload
+		exists, err := uploaderAdapter.FileExists(ctx, &s3store.ObjectRequest{
+			Store: atom.Config.Aws.Buckets.Output,
+			Key:   s3Key,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to check remote image %s: %w", s3Key, err)
+		}
+		if exists {
+			l.Info("Image already exists in S3, skipping upload", "s3Key", s3Key, "type", imageType)
+			return nil
+		}
+
 		if askerAdapter.Ask(ctx, "Upload %s image %s to S3?", imageType, localImagePath) {
 			// Determine content type based on file extension
 			contentType := "image/jpeg"
@@ -213,13 +230,13 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdap
 				contentType = "image/png"
 			}
 
-			request := &ports.ForUploadingRequest{
+			request := &s3store.UploadRequest{
 				Store:       atom.Config.Aws.Buckets.Output,
-				To:          s3Key,
-				From:        fullLocalPath,
+				Key:         s3Key,
+				Filename:    fullLocalPath,
 				ContentType: contentType,
 			}
-			return uploaderAdapter.Upload(ctx, request, nil)
+			return uploaderAdapter.UploadFile(ctx, request)
 		}
 
 		return nil
@@ -261,7 +278,7 @@ func init() {
 	// is called directly, e.g.:
 	// parseCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	parseCmd.Flags().StringP("spec", "s", configurator.DefaultSpecfile, "Main configuration file for generating the RSS atom")
+	parseCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Main configuration file for generating the RSS atom")
 	parseCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to \"output\" Amazon AWS S3 bucket defined in spec file")
 	parseCmd.Flags().BoolP("force", "f", false, "Force, do not ask if to proceed with an action, just do it")
 	parseCmd.Flags().BoolP("dry-run", "n", false, "Behaves like the force option without modifying or producing anything. Will output RSS to stdout instead of file")

@@ -1,6 +1,4 @@
-// awshandler is the AWS S3 remote file administration adapter that
-// implements the ForAdministeringRemoteFiles port interface.
-package awshandler
+package s3store
 
 import (
 	"context"
@@ -10,47 +8,101 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/app/ports"
+	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
 	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
 )
 
 var (
-	ErrNilPointerRequest = errors.New("received nil pointer as request")
-	ErrEmptyStore        = errors.New("empty store/bucket name")
-	ErrEmptyKey          = errors.New("empty key/file name")
-	ErrFileNotFound      = errors.New("file not found in remote storage")
+	ErrNilPointerRequest   = errors.New("received nil pointer as request")
+	ErrEmptyStore          = errors.New("empty store/bucket name")
+	ErrEmptyKey            = errors.New("empty key/file name")
+	ErrEmptyFilename       = errors.New("empty or missing filename given")
+	ErrFileNotFound        = errors.New("file not found in remote storage")
 	ErrInvalidStorageClass = errors.New("invalid storage class")
 )
 
-type forAdministeringRemoteFiles struct {
-	ports.ForAsking
-	atom    *model.Atom
-	session *session.Session
-	s3      *s3.S3
+const (
+	StorageClassStandard           = "STANDARD"
+	StorageClassReducedRedundancy  = "REDUCED_REDUNDANCY"
+	StorageClassStandardIA         = "STANDARD_IA"
+	StorageClassOnezoneIA          = "ONEZONE_IA"
+	StorageClassIntelligentTiering = "INTELLIGENT_TIERING"
+	StorageClassGlacier            = "GLACIER"
+	StorageClassDeepArchive        = "DEEP_ARCHIVE"
+	StorageClassGlacierIR          = "GLACIER_IR"
+	DefaultStorageClass            = StorageClassIntelligentTiering
+)
+
+type ObjectRequest struct {
+	Store           string
+	Key             string
+	NewStorageClass string
+	Region          string
 }
 
-// New creates a new AWS S3 remote file administration adapter
-func New(atom *model.Atom, asker ports.ForAsking) ports.ForAdministeringRemoteFiles {
+type FileInfo struct {
+	Size         int64
+	ContentType  string
+	StorageClass string
+	LastModified string
+	ETag         string
+	Region       string
+	Exists       bool
+}
+
+type Client struct {
+	prompter asker.Prompter
+	atom     *model.Atom
+	session  *session.Session
+	s3       *awss3.S3
+}
+
+func New(atom *model.Atom, prompter asker.Prompter) *Client {
 	s := session.Must(session.NewSessionWithOptions(session.Options{
 		Profile: atom.Config.Aws.Profile,
 		Config: aws.Config{
 			Region: aws.String(atom.Config.Aws.Region),
 		},
 	}))
-	return &forAdministeringRemoteFiles{
-		ForAsking: asker,
-		atom:      atom,
-		session:   s,
-		s3:        s3.New(s),
+	return &Client{
+		prompter: prompter,
+		atom:     atom,
+		session:  s,
+		s3:       awss3.New(s),
 	}
 }
 
-// DeleteRemoteFile removes a file from S3 storage
-func (a *forAdministeringRemoteFiles) DeleteRemoteFile(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) error {
+func NewAdminClient(atom *model.Atom, prompter asker.Prompter) *Client {
+	return New(atom, prompter)
+}
+
+func ValidStorageClasses() []string {
+	return []string{
+		StorageClassStandard,
+		StorageClassReducedRedundancy,
+		StorageClassStandardIA,
+		StorageClassOnezoneIA,
+		StorageClassIntelligentTiering,
+		StorageClassGlacier,
+		StorageClassDeepArchive,
+		StorageClassGlacierIR,
+	}
+}
+
+func IsValidStorageClass(storageClass string) bool {
+	for _, valid := range ValidStorageClasses() {
+		if storageClass == valid {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *Client) DeleteRemoteFile(ctx context.Context, request *ObjectRequest) error {
 	l := logger.FromContext(ctx)
-	
+
 	if request == nil {
 		return ErrNilPointerRequest
 	}
@@ -63,8 +115,7 @@ func (a *forAdministeringRemoteFiles) DeleteRemoteFile(ctx context.Context, requ
 
 	s3path := "s3://" + path.Join(request.Store, request.Key)
 	l.Info("About to delete remote file", "path", s3path)
-	
-	// Check if file exists first
+
 	exists, err := a.FileExists(ctx, request)
 	if err != nil {
 		return err
@@ -74,14 +125,12 @@ func (a *forAdministeringRemoteFiles) DeleteRemoteFile(ctx context.Context, requ
 		return nil
 	}
 
-	// Ask for confirmation unless forced
-	if !a.Ask(ctx, "Delete remote file %s?", s3path) {
+	if !a.prompter.Ask(ctx, "Delete remote file %s?", s3path) {
 		l.Info("Deletion cancelled by user", "path", s3path)
 		return nil
 	}
 
-	// Perform deletion
-	_, err = a.s3.DeleteObject(&s3.DeleteObjectInput{
+	_, err = a.s3.DeleteObject(&awss3.DeleteObjectInput{
 		Bucket: aws.String(request.Store),
 		Key:    aws.String(request.Key),
 	})
@@ -94,10 +143,9 @@ func (a *forAdministeringRemoteFiles) DeleteRemoteFile(ctx context.Context, requ
 	return nil
 }
 
-// ChangeStorageClass changes the storage class of a file in S3
-func (a *forAdministeringRemoteFiles) ChangeStorageClass(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) error {
+func (a *Client) ChangeStorageClass(ctx context.Context, request *ObjectRequest) error {
 	l := logger.FromContext(ctx)
-	
+
 	if request == nil {
 		return ErrNilPointerRequest
 	}
@@ -108,15 +156,13 @@ func (a *forAdministeringRemoteFiles) ChangeStorageClass(ctx context.Context, re
 		return ErrEmptyKey
 	}
 	if request.NewStorageClass == "" {
-		request.NewStorageClass = ports.DefaultStorageClass
+		request.NewStorageClass = DefaultStorageClass
 	}
-	if !ports.IsValidStorageClass(request.NewStorageClass) {
+	if !IsValidStorageClass(request.NewStorageClass) {
 		return ErrInvalidStorageClass
 	}
 
 	s3path := "s3://" + path.Join(request.Store, request.Key)
-	
-	// Check if file exists
 	exists, err := a.FileExists(ctx, request)
 	if err != nil {
 		return err
@@ -125,32 +171,22 @@ func (a *forAdministeringRemoteFiles) ChangeStorageClass(ctx context.Context, re
 		return ErrFileNotFound
 	}
 
-	// Get current storage class
 	currentClass, err := a.GetStorageClass(ctx, request)
 	if err != nil {
 		return err
 	}
-
 	if currentClass == request.NewStorageClass {
-		l.Info("Storage class already matches, no change needed", 
-			"path", s3path, 
-			"storageClass", currentClass)
+		l.Info("Storage class already matches, no change needed", "path", s3path, "storageClass", currentClass)
 		return nil
 	}
 
-	l.Info("Changing storage class", 
-		"path", s3path, 
-		"from", currentClass, 
-		"to", request.NewStorageClass)
-
-	// Ask for confirmation unless forced
-	if !a.Ask(ctx, "Change storage class of %s from %s to %s?", s3path, currentClass, request.NewStorageClass) {
+	l.Info("Changing storage class", "path", s3path, "from", currentClass, "to", request.NewStorageClass)
+	if !a.prompter.Ask(ctx, "Change storage class of %s from %s to %s?", s3path, currentClass, request.NewStorageClass) {
 		l.Info("Storage class change cancelled by user", "path", s3path)
 		return nil
 	}
 
-	// Copy object to itself with new storage class
-	_, err = a.s3.CopyObject(&s3.CopyObjectInput{
+	_, err = a.s3.CopyObject(&awss3.CopyObjectInput{
 		Bucket:       aws.String(request.Store),
 		Key:          aws.String(request.Key),
 		CopySource:   aws.String(path.Join(request.Store, request.Key)),
@@ -161,17 +197,13 @@ func (a *forAdministeringRemoteFiles) ChangeStorageClass(ctx context.Context, re
 		return err
 	}
 
-	l.Info("Successfully changed storage class", 
-		"path", s3path, 
-		"from", currentClass, 
-		"to", request.NewStorageClass)
+	l.Info("Successfully changed storage class", "path", s3path, "from", currentClass, "to", request.NewStorageClass)
 	return nil
 }
 
-// FileExists checks if a file exists in S3 storage
-func (a *forAdministeringRemoteFiles) FileExists(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) (bool, error) {
+func (a *Client) FileExists(ctx context.Context, request *ObjectRequest) (bool, error) {
 	l := logger.FromContext(ctx)
-	
+
 	if request == nil {
 		return false, ErrNilPointerRequest
 	}
@@ -183,8 +215,7 @@ func (a *forAdministeringRemoteFiles) FileExists(ctx context.Context, request *p
 	}
 
 	s3path := "s3://" + path.Join(request.Store, request.Key)
-	
-	_, err := a.s3.HeadObject(&s3.HeadObjectInput{
+	_, err := a.s3.HeadObject(&awss3.HeadObjectInput{
 		Bucket: aws.String(request.Store),
 		Key:    aws.String(request.Key),
 	})
@@ -206,10 +237,9 @@ func (a *forAdministeringRemoteFiles) FileExists(ctx context.Context, request *p
 	return true, nil
 }
 
-// GetStorageClass returns the current storage class of a file in S3
-func (a *forAdministeringRemoteFiles) GetStorageClass(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) (string, error) {
+func (a *Client) GetStorageClass(ctx context.Context, request *ObjectRequest) (string, error) {
 	l := logger.FromContext(ctx)
-	
+
 	if request == nil {
 		return "", ErrNilPointerRequest
 	}
@@ -221,8 +251,7 @@ func (a *forAdministeringRemoteFiles) GetStorageClass(ctx context.Context, reque
 	}
 
 	s3path := "s3://" + path.Join(request.Store, request.Key)
-	
-	result, err := a.s3.HeadObject(&s3.HeadObjectInput{
+	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
 		Bucket: aws.String(request.Store),
 		Key:    aws.String(request.Key),
 	})
@@ -240,19 +269,17 @@ func (a *forAdministeringRemoteFiles) GetStorageClass(ctx context.Context, reque
 		return "", err
 	}
 
-	storageClass := ports.StorageClassStandard // Default if not specified
+	storageClass := StorageClassStandard
 	if result.StorageClass != nil {
 		storageClass = *result.StorageClass
 	}
-
 	l.Debug("Got storage class", "path", s3path, "storageClass", storageClass)
 	return storageClass, nil
 }
 
-// GetFileInfo returns comprehensive metadata about a file in S3
-func (a *forAdministeringRemoteFiles) GetFileInfo(ctx context.Context, request *ports.ForAdministeringRemoteFilesRequest) (*ports.RemoteFileInfo, error) {
+func (a *Client) GetFileInfo(ctx context.Context, request *ObjectRequest) (*FileInfo, error) {
 	l := logger.FromContext(ctx)
-	
+
 	if request == nil {
 		return nil, ErrNilPointerRequest
 	}
@@ -264,8 +291,7 @@ func (a *forAdministeringRemoteFiles) GetFileInfo(ctx context.Context, request *
 	}
 
 	s3path := "s3://" + path.Join(request.Store, request.Key)
-	
-	result, err := a.s3.HeadObject(&s3.HeadObjectInput{
+	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
 		Bucket: aws.String(request.Store),
 		Key:    aws.String(request.Key),
 	})
@@ -274,7 +300,7 @@ func (a *forAdministeringRemoteFiles) GetFileInfo(ctx context.Context, request *
 			switch awsErr.Code() {
 			case "NotFound", "NoSuchKey":
 				l.Debug("File does not exist", "path", s3path)
-				return &ports.RemoteFileInfo{Exists: false}, nil
+				return &FileInfo{Exists: false}, nil
 			default:
 				l.Error("Error getting file info", "error", err, "path", s3path)
 				return nil, err
@@ -283,14 +309,12 @@ func (a *forAdministeringRemoteFiles) GetFileInfo(ctx context.Context, request *
 		return nil, err
 	}
 
-	// Extract information from HeadObject result
-	info := &ports.RemoteFileInfo{
-		Exists: true,
-		Size:   0,
-		StorageClass: ports.StorageClassStandard, // Default
-		Region: a.atom.Config.Aws.Region, // From atom configuration
+	info := &FileInfo{
+		Exists:       true,
+		Size:         0,
+		StorageClass: StorageClassStandard,
+		Region:       a.atom.Config.Aws.Region,
 	}
-
 	if result.ContentLength != nil {
 		info.Size = *result.ContentLength
 	}
