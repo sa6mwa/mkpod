@@ -2,15 +2,15 @@
 # Uses real S3 buckets for testing complete workflows
 
 # S3 bucket configuration (matching podspec.yaml terminology)
-INPUT_BUCKET := mkpod-integration-test-assets
-OUTPUT_BUCKET := mkpod-integration-test
+INPUT_BUCKET ?= mkpod-integration-test-assets
+OUTPUT_BUCKET ?= mkpod-integration-test
 
 # Build mkpod if it doesn't exist
-MKPOD_BIN := ../bin/mkpod
+MKPOD_BIN ?= ../bin/mkpod
 
-.PHONY: all clean test setup teardown build-mkpod rebuild encode generate-rss upload-rss make-public make-private verify-outputs test-remove-master-safety test-pubdate-behavior test-validation-behavior
+.PHONY: all clean acceptance-aws acceptance-remove-master acceptance-pubdate acceptance-validation setup teardown build-mkpod rebuild encode generate-rss upload-rss make-public make-private verify-outputs
 
-all: test
+all: acceptance-aws
 
 # Build mkpod binary only if it doesn't exist
 build-mkpod:
@@ -112,13 +112,13 @@ verify-outputs:
 	@aws s3 ls s3://$(OUTPUT_BUCKET)/podcast.rss > /dev/null && echo "✓ podcast.rss found" || echo "✗ podcast.rss missing"
 	@aws s3 ls s3://$(OUTPUT_BUCKET)/ | grep -q "\.m4a" && echo "✓ m4a files found" || echo "✗ m4a files missing"
 
-# Test remote master removal safety checks
-test-remove-master-safety: setup
+# AWS acceptance test: remote master removal safety checks
+acceptance-remove-master: setup
 	@echo "Running remote master removal safety tests..."
-	./test-remove-master-safety.sh
+	./acceptance-remove-master.sh
 
-# Test pubDate field filling behavior
-test-pubdate-behavior: setup
+# AWS acceptance test: pubDate field filling behavior
+acceptance-pubdate: setup
 	@echo "Testing pubDate field filling behavior..."
 	@echo "Starting with original podspec (no pubDate)..."
 	if [ -f "original-podspec.yaml" ]; then \
@@ -145,14 +145,14 @@ test-pubdate-behavior: setup
 	fi
 	@echo "pubDate behavior test completed successfully"
 
-# Test validation behavior (top-level field validation and episode filtering)
-test-validation-behavior: setup
+# AWS acceptance test: top-level validation and episode filtering
+acceptance-validation: setup
 	@echo "Testing validation behavior..."
-	./test-validation-behavior.sh
+	./acceptance-validation.sh
 
-# Run complete integration test workflow
-test: setup encode upload-rss verify-outputs test-remove-master-safety test-pubdate-behavior test-validation-behavior
-	@echo "Running complete e2e integration test workflow..."
+# Run complete AWS acceptance workflow
+acceptance-aws: setup encode upload-rss verify-outputs acceptance-remove-master acceptance-pubdate acceptance-validation
+	@echo "Running complete AWS acceptance workflow..."
 	@echo "Complete mkpod workflow test completed successfully!"
 	@echo ""
 	@echo "To make the bucket public for testing, run: make make-public"
@@ -194,13 +194,13 @@ help:
 	@echo "  encode        - Run mkpod encode (handles all uploads)"
 	@echo "  generate-rss  - Generate podcast.rss from podspec.yaml"
 	@echo "  upload-rss    - Upload podcast.rss to output bucket"
+	@echo "  acceptance-aws - Run the full AWS acceptance workflow"
+	@echo "  acceptance-remove-master - Test --remove-remote-master safety checks"
+	@echo "  acceptance-pubdate - Test pubDate field filling behavior"
+	@echo "  acceptance-validation - Test validation rules and episode filtering"
 	@echo "  make-public   - Make output bucket temporarily read-only public"
 	@echo "  make-private  - Make output bucket private again"
 	@echo "  verify-outputs- Verify outputs in S3 buckets"
-	@echo "  test          - Run complete e2e integration workflow"
-	@echo "  test-remove-master-safety - Test --remove-remote-master safety checks"
-	@echo "  test-pubdate-behavior - Test pubDate field filling behavior"
-	@echo "  test-validation-behavior - Test validation rules and episode filtering"
 	@echo "  clean         - Remove all test files from S3 buckets"
 	@echo "  teardown      - Delete S3 buckets entirely (use with caution)"
 	@echo "  build-mkpod   - Build the mkpod binary (only if missing)"

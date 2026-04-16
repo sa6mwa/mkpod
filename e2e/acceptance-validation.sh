@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# E2E test for mkpod validation behavior
+# AWS acceptance test for mkpod validation behavior
 # Tests both top-level field validation and episode filtering during RSS generation
 
 set -e
@@ -110,7 +110,6 @@ fi
 
 echo ""
 echo "Adding missing author field to make top-level validation pass..."
-# Add the missing author field
 sed -i 's/# author: MISSING - should cause validation failure/author: Test Author/' "$TEST_PODSPEC"
 echo "✓ Added author field to test podspec"
 
@@ -120,7 +119,6 @@ echo "Test 2: Testing episode validation and filtering during RSS generation..."
 echo "Running mkpod parse with --dry-run to see episode filtering..."
 OUTPUT=$($MKPOD_BIN parse --spec "$TEST_PODSPEC" --dry-run 2>&1 || true)
 
-# Check for warning messages about excluded episodes
 if echo "$OUTPUT" | grep -q "Excluding episode from RSS due to missing required fields"; then
     echo "✓ PASS: Found expected warning about excluding invalid episodes"
 else
@@ -130,7 +128,6 @@ else
     exit 1
 fi
 
-# Check that episode 2 (missing fields) is mentioned in warnings
 if echo "$OUTPUT" | grep -q "uid=2.*Missing Fields Episode.*missingFields="; then
     echo "✓ PASS: Episode 2 (Missing Fields Episode) was correctly excluded with detailed field info"
 else
@@ -140,7 +137,6 @@ else
     exit 1
 fi
 
-# Check for episode filtering summary
 if echo "$OUTPUT" | grep -q "Episode filtering complete.*excludedEpisodes=[1-9]"; then
     echo "✓ PASS: Found episode filtering summary"
 else
@@ -155,7 +151,6 @@ echo ""
 echo "Test 3: Testing that valid episodes appear in RSS output..."
 RSS_OUTPUT=$($MKPOD_BIN parse --spec "$TEST_PODSPEC" --dry-run 2>/dev/null || true)
 
-# Check that the valid episode (UID 1) appears in RSS
 if echo "$RSS_OUTPUT" | grep -q "Valid Episode"; then
     echo "✓ PASS: Valid episode (UID 1) appears in RSS output"
 else
@@ -165,7 +160,6 @@ else
     exit 1
 fi
 
-# Check that episode using defaults (UID 3) appears in RSS  
 if echo "$RSS_OUTPUT" | grep -q "Episode Using Defaults"; then
     echo "✓ PASS: Episode using defaults (UID 3) appears in RSS output"
 else
@@ -173,7 +167,6 @@ else
     exit 1
 fi
 
-# Check that missing fields episode (UID 2) does NOT appear in RSS
 if echo "$RSS_OUTPUT" | grep -q "Missing Fields Episode"; then
     echo "✗ FAIL: Invalid episode (UID 2) should not appear in RSS output"
     exit 1
@@ -185,7 +178,6 @@ fi
 echo ""
 echo "Test 4: Testing that default values are correctly applied in RSS..."
 
-# Check that episode 3 gets default author in RSS
 if echo "$RSS_OUTPUT" | grep -q "<itunes:author>Test Author</itunes:author>"; then
     echo "✓ PASS: Default author is applied to episodes with empty author"
 else
@@ -212,7 +204,6 @@ fi
 echo ""
 echo "Test 6: Testing various missing top-level fields..."
 
-# Test missing baseURL
 echo "Testing missing config.baseURL..."
 sed -i 's/baseURL: https:/# baseURL: https:/' "$TEST_PODSPEC"
 if $MKPOD_BIN parse --spec "$TEST_PODSPEC" --dry-run >/dev/null 2>&1; then
@@ -222,10 +213,8 @@ else
     echo "✓ PASS: Correctly failed due to missing baseURL"
 fi
 
-# Restore baseURL
 sed -i 's/# baseURL: https:/baseURL: https:/' "$TEST_PODSPEC"
 
-# Test missing title
 echo "Testing missing title..."
 sed -i 's/title: mkpod validation test/# title: mkpod validation test/' "$TEST_PODSPEC"
 if $MKPOD_BIN parse --spec "$TEST_PODSPEC" --dry-run >/dev/null 2>&1; then
@@ -235,10 +224,8 @@ else
     echo "✓ PASS: Correctly failed due to missing title"
 fi
 
-# Restore title
 sed -i 's/# title: mkpod validation test/title: mkpod validation test/' "$TEST_PODSPEC"
 
-# Clean up
 echo ""
 echo "Cleaning up test files..."
 rm -f "$TEST_PODSPEC"
@@ -246,13 +233,3 @@ rm -f podcast.rss
 
 echo ""
 echo "=== All validation behavior tests passed! ==="
-echo ""
-echo "Summary of tested validation rules:"
-echo "1. ✓ Top-level field validation (fails on missing required fields)"
-echo "2. ✓ Episode filtering during RSS generation (excludes invalid episodes)"
-echo "3. ✓ Clear warning messages for excluded episodes"
-echo "4. ✓ Valid episodes appear in RSS output"
-echo "5. ✓ Invalid episodes excluded from RSS output"
-echo "6. ✓ Default values applied (author, explicit)"
-echo "7. ✓ Correct episode count in final RSS"
-echo "8. ✓ Various top-level field validation scenarios"

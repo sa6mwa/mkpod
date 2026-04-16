@@ -151,7 +151,7 @@ This file is the working plan for finishing the refactor.
   - [ ] opt-in AWS acceptance tests
 - [ ] Replace brittle shell-grep assertions with clearer structured assertions where practical.
 - [ ] Add a documented test fixture lifecycle for the AWS buckets.
-- [ ] Make e2e target names reflect intent: `acceptance-aws`, `acceptance-remove-master`, etc.
+- [x] Make e2e target names reflect intent: `acceptance-aws`, `acceptance-remove-master`, etc.
 - [ ] Ensure e2e tests can bootstrap a fresh test workspace via `mkpod init`.
 
 ## Phase 10: Documentation
