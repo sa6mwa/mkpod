@@ -44,7 +44,9 @@ var parseCmd = &cobra.Command{
 	Short:   "Parse podspec.yaml into podcast RSS feed",
 	Long: `Parse the podcast specification file (podspec.yaml) and generate
 the RSS feed (podcast.rss). This command reads the configuration,
-validates the podcast metadata, and generates the RSS XML file.
+validates the podcast metadata, and generates the RSS XML file. Episodes
+that are still missing required RSS fields are skipped with warnings so
+the feed can still be rendered from valid episodes.
 Optionally, it can upload the RSS file to the configured S3 bucket.`,
 	Example: `  mkpod parse
   mkpod parse --spec ./podcast/podspec.yaml

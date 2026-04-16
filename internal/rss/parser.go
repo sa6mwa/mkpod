@@ -98,22 +98,14 @@ func (p *Renderer) filterValidEpisodes(ctx context.Context, atom *model.Atom, ep
 		l = logger.DefaultLogger()
 	}
 
-	validEpisodes := make([]model.Episode, 0, len(episodes))
-
-	for i, episode := range episodes {
-		missingFields := spec.MissingFieldsForRSS(atom, &episode)
-
-		if len(missingFields) > 0 {
-			l.Warn("Excluding episode from RSS due to missing required fields",
-				"episode", i+1,
-				"uid", episode.UID,
-				"title", episode.Title,
-				"missingFields", strings.Join(missingFields, ", "),
-				"message", "These fields can be resolved by encoding or re-encoding the episode")
-			continue
-		}
-
-		validEpisodes = append(validEpisodes, episode)
+	validEpisodes, issues := spec.RenderableEpisodes(atom, episodes)
+	for _, issue := range issues {
+		l.Warn("Excluding episode from RSS due to missing required fields",
+			"episode", issue.Index+1,
+			"uid", issue.UID,
+			"title", issue.Title,
+			"missingFields", strings.Join(issue.MissingFields, ", "),
+			"message", "These fields can be resolved by encoding or re-encoding the episode")
 	}
 
 	if len(validEpisodes) != len(episodes) {

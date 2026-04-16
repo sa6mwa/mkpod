@@ -156,6 +156,43 @@ func TestMissingFieldsForRSS(t *testing.T) {
 	}
 }
 
+func TestRenderableEpisodesSkipsInvalidEpisodes(t *testing.T) {
+	now := time.Now().UTC()
+	atom := &model.Atom{Author: "Host"}
+	episodes := []model.Episode{
+		{
+			UID:      1,
+			Title:    "Valid",
+			PubDate:  model.ItunesTime{Time: now},
+			Output:   "valid.mp3",
+			Duration: model.ItunesDuration{Duration: time.Minute},
+			Length:   123,
+			Type:     "audio/mpeg",
+			Image:    "cover.jpg",
+		},
+		{
+			UID:      2,
+			Title:    "Invalid",
+			PubDate:  model.ItunesTime{Time: now},
+			Duration: model.ItunesDuration{Duration: time.Minute},
+			Length:   123,
+			Type:     "audio/mpeg",
+			Image:    "cover.jpg",
+		},
+	}
+
+	renderable, issues := RenderableEpisodes(atom, episodes)
+	if len(renderable) != 1 || renderable[0].UID != 1 {
+		t.Fatalf("RenderableEpisodes() renderable = %v, want only UID 1", renderable)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("RenderableEpisodes() issues = %v, want 1 issue", issues)
+	}
+	if issues[0].UID != 2 || !containsString(issues[0].MissingFields, "output") {
+		t.Fatalf("RenderableEpisodes() issue = %+v, want UID 2 missing output", issues[0])
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

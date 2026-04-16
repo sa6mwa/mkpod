@@ -12,6 +12,18 @@ var (
 	ErrMissingEpisodeTitle = errors.New("episode title is required for encoding")
 )
 
+// ParsePolicySkipInvalidEpisodes defines the current feed-generation policy:
+// invalid episodes are excluded from RSS output and reported as warnings
+// instead of failing the entire parse operation.
+const ParsePolicySkipInvalidEpisodes = "skip-invalid-episodes-with-warnings"
+
+type EpisodeValidationIssue struct {
+	Index         int
+	UID           int64
+	Title         string
+	MissingFields []string
+}
+
 func ApplyEpisodeDefaultsForEncoding(atom *model.Atom, episode *model.Episode) error {
 	if atom == nil || episode == nil {
 		return ErrNilAtom
@@ -68,4 +80,25 @@ func MissingFieldsForRSS(atom *model.Atom, episode *model.Episode) []string {
 	}
 
 	return missingFields
+}
+
+func RenderableEpisodes(atom *model.Atom, episodes []model.Episode) ([]model.Episode, []EpisodeValidationIssue) {
+	validEpisodes := make([]model.Episode, 0, len(episodes))
+	issues := make([]EpisodeValidationIssue, 0)
+
+	for i, episode := range episodes {
+		missingFields := MissingFieldsForRSS(atom, &episode)
+		if len(missingFields) > 0 {
+			issues = append(issues, EpisodeValidationIssue{
+				Index:         i,
+				UID:           episode.UID,
+				Title:         episode.Title,
+				MissingFields: missingFields,
+			})
+			continue
+		}
+		validEpisodes = append(validEpisodes, episode)
+	}
+
+	return validEpisodes, issues
 }

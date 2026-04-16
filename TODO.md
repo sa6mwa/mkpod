@@ -79,11 +79,11 @@ This file is the working plan for finishing the refactor.
 - [x] Split pure validation/defaulting from file I/O.
 - [ ] Define a clear rule set for:
   - [ ] required top-level fields
-  - [ ] required episode fields before encode
-  - [ ] required episode fields before RSS emission
+  - [x] required episode fields before encode
+  - [x] required episode fields before RSS emission
   - [ ] which fields are defaulted from top-level values
 - [ ] Centralize all defaulting logic instead of spreading it across spec, parser, and encoder.
-- [ ] Decide whether `parse` should fail on invalid episodes or render only valid episodes with warnings; document and test the policy.
+- [x] Decide whether `parse` should fail on invalid episodes or render only valid episodes with warnings; document and test the policy.
 - [x] Review path expansion helpers and remove `panic`-based behavior from tilde expansion.
 - [ ] Normalize path joining and base URL handling.
 

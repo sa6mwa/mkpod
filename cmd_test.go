@@ -191,6 +191,58 @@ func TestPreprocessFailsWithoutInputFiles(t *testing.T) {
 	}
 }
 
+func TestParseSkipsInvalidEpisodesButSucceeds(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "podcast")
+
+	if _, err := cmdTest("", "init", target); err != nil {
+		t.Fatalf("mkpod init failed: %v", err)
+	}
+
+	specPath := filepath.Join(target, "podspec.yaml")
+	specContent, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+
+	updated := strings.Replace(string(specContent), "episodes: []", `episodes:
+    - uid: 1
+      title: "Good Episode"
+      pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"
+      link: "https://example.com/my-podcast/episodes/1"
+      duration: "00:05:00"
+      subtitle: "Valid episode"
+      description: "This one should render"
+      type: "audio/mpeg"
+      length: 12345
+      image: "artwork/podcast-cover.jpg"
+      output: "episode1.mp3"
+    - uid: 2
+      title: "Bad Episode"
+      pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"
+      link: "https://example.com/my-podcast/episodes/2"
+      subtitle: "Invalid episode"
+      description: "Missing output, duration, type, length, image"
+`, 1)
+
+	if err := os.WriteFile(specPath, []byte(updated), 0o644); err != nil {
+		t.Fatalf("write updated spec: %v", err)
+	}
+
+	output, err := cmdTest("", "parse", "--spec", specPath, "--dry-run")
+	if err != nil {
+		t.Fatalf("mkpod parse unexpectedly failed\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "Excluding episode from RSS due to missing required fields") {
+		t.Fatalf("expected warning about skipped invalid episode, got: %s", output)
+	}
+	if !strings.Contains(output, "<title>Good Episode</title>") {
+		t.Fatalf("expected valid episode in RSS output, got: %s", output)
+	}
+	if strings.Contains(output, "<title>Bad Episode</title>") {
+		t.Fatalf("invalid episode should not be rendered in RSS output: %s", output)
+	}
+}
+
 func cmdTest(_ string, args ...string) (string, error) {
 	command := exec.Command("go", append([]string{"run", "."}, args...)...)
 	output, err := command.CombinedOutput()
