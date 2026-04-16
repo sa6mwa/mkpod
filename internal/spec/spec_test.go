@@ -11,6 +11,33 @@ import (
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
+func TestRequiredFieldLists(t *testing.T) {
+	wantTopLevel := []string{
+		"author",
+		"config.baseURL",
+		"config.image",
+		"config.defaultPodImage",
+		"atom",
+		"title",
+		"ttl",
+		"language",
+		"copyright",
+		"webMaster",
+		"description",
+		"subtitle",
+		"ownerName",
+		"ownerEmail",
+	}
+	if strings.Join(RequiredTopLevelFields, ",") != strings.Join(wantTopLevel, ",") {
+		t.Fatalf("RequiredTopLevelFields = %v, want %v", RequiredTopLevelFields, wantTopLevel)
+	}
+
+	wantEpisodeDefaults := []string{"author", "explicit", "image"}
+	if strings.Join(EpisodeFieldsDefaultedFromTopLevel, ",") != strings.Join(wantEpisodeDefaults, ",") {
+		t.Fatalf("EpisodeFieldsDefaultedFromTopLevel = %v, want %v", EpisodeFieldsDefaultedFromTopLevel, wantEpisodeDefaults)
+	}
+}
+
 func TestValidateRejectsMissingRequiredFields(t *testing.T) {
 	err := Validate(&model.Podcast{})
 	if err == nil {

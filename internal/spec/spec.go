@@ -63,53 +63,51 @@ func Validate(atom *model.Podcast) error {
 
 	var missingFields []string
 
-	if strings.TrimSpace(atom.Author) == "" {
-		missingFields = append(missingFields, "author")
-	}
-	if strings.TrimSpace(atom.Config.BaseURL) == "" {
-		missingFields = append(missingFields, "config.baseURL")
-	}
-	if strings.TrimSpace(atom.Config.Image) == "" {
-		missingFields = append(missingFields, "config.image")
-	}
-	if strings.TrimSpace(atom.Config.DefaultPodImage) == "" {
-		missingFields = append(missingFields, "config.defaultPodImage")
-	}
-	if strings.TrimSpace(atom.FeedFile) == "" {
-		missingFields = append(missingFields, "atom")
-	}
-	if strings.TrimSpace(atom.Title) == "" {
-		missingFields = append(missingFields, "title")
-	}
-	if atom.TTL == 0 {
-		missingFields = append(missingFields, "ttl")
-	}
-	if strings.TrimSpace(atom.Language) == "" {
-		missingFields = append(missingFields, "language")
-	}
-	if strings.TrimSpace(atom.Copyright) == "" {
-		missingFields = append(missingFields, "copyright")
-	}
-	if strings.TrimSpace(atom.WebMaster) == "" {
-		missingFields = append(missingFields, "webMaster")
-	}
-	if strings.TrimSpace(atom.Description) == "" {
-		missingFields = append(missingFields, "description")
-	}
-	if strings.TrimSpace(atom.Subtitle) == "" {
-		missingFields = append(missingFields, "subtitle")
-	}
-	if strings.TrimSpace(atom.OwnerName) == "" {
-		missingFields = append(missingFields, "ownerName")
-	}
-	if strings.TrimSpace(atom.OwnerEmail) == "" {
-		missingFields = append(missingFields, "ownerEmail")
+	for _, field := range RequiredTopLevelFields {
+		if isMissingTopLevelField(atom, field) {
+			missingFields = append(missingFields, field)
+		}
 	}
 
 	if len(missingFields) > 0 {
 		return fmt.Errorf("required fields are missing or empty: %s", strings.Join(missingFields, ", "))
 	}
 	return nil
+}
+
+func isMissingTopLevelField(podcast *model.Podcast, field string) bool {
+	switch field {
+	case "author":
+		return strings.TrimSpace(podcast.Author) == ""
+	case "config.baseURL":
+		return strings.TrimSpace(podcast.Config.BaseURL) == ""
+	case "config.image":
+		return strings.TrimSpace(podcast.Config.Image) == ""
+	case "config.defaultPodImage":
+		return strings.TrimSpace(podcast.Config.DefaultPodImage) == ""
+	case "atom":
+		return strings.TrimSpace(podcast.FeedFile) == ""
+	case "title":
+		return strings.TrimSpace(podcast.Title) == ""
+	case "ttl":
+		return podcast.TTL == 0
+	case "language":
+		return strings.TrimSpace(podcast.Language) == ""
+	case "copyright":
+		return strings.TrimSpace(podcast.Copyright) == ""
+	case "webMaster":
+		return strings.TrimSpace(podcast.WebMaster) == ""
+	case "description":
+		return strings.TrimSpace(podcast.Description) == ""
+	case "subtitle":
+		return strings.TrimSpace(podcast.Subtitle) == ""
+	case "ownerName":
+		return strings.TrimSpace(podcast.OwnerName) == ""
+	case "ownerEmail":
+		return strings.TrimSpace(podcast.OwnerEmail) == ""
+	default:
+		panic("unknown required top-level field: " + field)
+	}
 }
 
 func ApplyDefaults(atom *model.Podcast, now time.Time) error {

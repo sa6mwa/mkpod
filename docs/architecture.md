@@ -28,6 +28,7 @@ keeps the boundaries that pay for themselves and removes the rest.
 - Keep command orchestration visible in the CLI layer rather than hiding it
   behind generic abstractions.
 - Put validation and defaults into testable pure functions where possible.
+- Keep required top-level fields and top-level-derived episode defaults explicit in `internal/spec`.
 
 ## Why this is simpler
 
