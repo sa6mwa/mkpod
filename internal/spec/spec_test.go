@@ -120,6 +120,40 @@ func TestApplyEpisodeDefaultsForEncoding(t *testing.T) {
 	}
 }
 
+func TestEffectiveEpisodeDefaults(t *testing.T) {
+	atom := &model.Atom{
+		Author:   "Host",
+		Explicit: model.ItunesExplicit{S: "yes"},
+		Config: model.Config{
+			DefaultPodImage: "artwork/default.jpg",
+		},
+	}
+	episode := &model.Episode{}
+
+	if got := EffectiveEpisodeAuthor(atom, episode); got != "Host" {
+		t.Fatalf("EffectiveEpisodeAuthor() = %q, want Host", got)
+	}
+	if got := EffectiveEpisodeExplicit(atom, episode); got != "yes" {
+		t.Fatalf("EffectiveEpisodeExplicit() = %q, want yes", got)
+	}
+	if got := EffectiveEpisodeImage(atom, episode); got != "artwork/default.jpg" {
+		t.Fatalf("EffectiveEpisodeImage() = %q, want artwork/default.jpg", got)
+	}
+
+	episode.Author = "Guest"
+	episode.Explicit = model.ItunesExplicit{S: "no"}
+	episode.Image = "artwork/custom.jpg"
+	if got := EffectiveEpisodeAuthor(atom, episode); got != "Guest" {
+		t.Fatalf("EffectiveEpisodeAuthor() = %q, want Guest", got)
+	}
+	if got := EffectiveEpisodeExplicit(atom, episode); got != "no" {
+		t.Fatalf("EffectiveEpisodeExplicit() = %q, want no", got)
+	}
+	if got := EffectiveEpisodeImage(atom, episode); got != "artwork/custom.jpg" {
+		t.Fatalf("EffectiveEpisodeImage() = %q, want artwork/custom.jpg", got)
+	}
+}
+
 func TestApplyEpisodeDefaultsForEncodingValidatesRequiredFields(t *testing.T) {
 	if err := ApplyEpisodeDefaultsForEncoding(&model.Atom{}, &model.Episode{}); !errors.Is(err, ErrMissingEpisodeTitle) {
 		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v, want %v", err, ErrMissingEpisodeTitle)

@@ -73,20 +73,11 @@ func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) t
 	}
 
 	funcMap["episodeAuthor"] = func(episode model.Episode) string {
-		if strings.TrimSpace(episode.Author) == "" {
-			return atom.Author
-		}
-		return episode.Author
+		return spec.EffectiveEpisodeAuthor(atom, &episode)
 	}
 
 	funcMap["episodeExplicit"] = func(episode model.Episode) string {
-		if episode.Explicit.S == "" {
-			if atom.Explicit.S != "" {
-				return atom.Explicit.S
-			}
-			return "no"
-		}
-		return episode.Explicit.S
+		return spec.EffectiveEpisodeExplicit(atom, &episode)
 	}
 
 	return funcMap

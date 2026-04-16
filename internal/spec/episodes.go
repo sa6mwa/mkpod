@@ -24,6 +24,39 @@ type EpisodeValidationIssue struct {
 	MissingFields []string
 }
 
+func EffectiveEpisodeAuthor(atom *model.Atom, episode *model.Episode) string {
+	if atom == nil || episode == nil {
+		return ""
+	}
+	if strings.TrimSpace(episode.Author) != "" {
+		return episode.Author
+	}
+	return atom.Author
+}
+
+func EffectiveEpisodeExplicit(atom *model.Atom, episode *model.Episode) string {
+	if atom == nil || episode == nil {
+		return "no"
+	}
+	if episode.Explicit.S != "" {
+		return episode.Explicit.S
+	}
+	if atom.Explicit.S != "" {
+		return atom.Explicit.S
+	}
+	return "no"
+}
+
+func EffectiveEpisodeImage(atom *model.Atom, episode *model.Episode) string {
+	if atom == nil || episode == nil {
+		return ""
+	}
+	if strings.TrimSpace(episode.Image) != "" {
+		return episode.Image
+	}
+	return atom.Config.DefaultPodImage
+}
+
 func ApplyEpisodeDefaultsForEncoding(atom *model.Atom, episode *model.Episode) error {
 	if atom == nil || episode == nil {
 		return ErrNilAtom
@@ -31,12 +64,8 @@ func ApplyEpisodeDefaultsForEncoding(atom *model.Atom, episode *model.Episode) e
 	if strings.TrimSpace(episode.Title) == "" {
 		return ErrMissingEpisodeTitle
 	}
-	if strings.TrimSpace(episode.Author) == "" {
-		episode.Author = atom.Author
-	}
-	if strings.TrimSpace(episode.Image) == "" {
-		episode.Image = atom.Config.DefaultPodImage
-	}
+	episode.Author = EffectiveEpisodeAuthor(atom, episode)
+	episode.Image = EffectiveEpisodeImage(atom, episode)
 	if strings.TrimSpace(episode.Image) == "" {
 		return ErrMissingEpisodeImage
 	}
@@ -71,10 +100,7 @@ func MissingFieldsForRSS(atom *model.Atom, episode *model.Episode) []string {
 		missingFields = append(missingFields, "pubDate")
 	}
 
-	effectiveAuthor := episode.Author
-	if strings.TrimSpace(effectiveAuthor) == "" {
-		effectiveAuthor = atom.Author
-	}
+	effectiveAuthor := EffectiveEpisodeAuthor(atom, episode)
 	if strings.TrimSpace(effectiveAuthor) == "" {
 		missingFields = append(missingFields, "author")
 	}
