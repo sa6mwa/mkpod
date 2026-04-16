@@ -94,10 +94,10 @@ This file is the working plan for finishing the refactor.
 - [x] Support `mkpod init .` and arbitrary paths like `mkpod init ~/podcast`.
 - [ ] Create a predictable starter structure, for example:
   - [ ] target directory
-  - [ ] `podspec.yaml`
-  - [ ] `artwork/`
-  - [ ] `masters/`
-  - [ ] `output/` or document that outputs are written in-place under local storage
+  - [x] `podspec.yaml`
+  - [x] `artwork/`
+  - [x] `masters/`
+  - [x] `output/` or document that outputs are written in-place under local storage
 - [x] Write a minimal but valid YAML template tailored to the current simplified config model.
 - [ ] Decide overwrite policy:
   - [ ] fail if target exists and is non-empty
@@ -131,7 +131,7 @@ This file is the working plan for finishing the refactor.
 - [x] Add unit tests for spec validation and defaulting rules.
 - [x] Add unit tests for episode selection and encode planning logic.
 - [x] Add unit tests for tool discovery and missing-binary failures.
-- [ ] Add unit tests for `init` directory/template generation.
+- [x] Add unit tests for `init` directory/template generation.
 - [x] Add unit tests for S3 safety logic using mocked storage responses.
 - [ ] Add integration tests for:
   - [x] `mkpod parse`

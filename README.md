@@ -122,6 +122,10 @@ episodes: []
 Use `mkpod init <directory>` to generate this starter layout automatically and
 then edit the values for your real podcast and S3 buckets.
 
+`config.localStorageDir` is the workspace root by default. Encoded media files
+and `podcast.rss` are written there unless you choose output paths that place
+them in subdirectories.
+
 ## AWS access policy
 
 For the public podcast bucket, you are going to have to disable `Block

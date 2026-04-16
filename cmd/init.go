@@ -50,7 +50,8 @@ and a starter podspec.yaml template in the target directory.`,
 		cmd.Println("Next steps:")
 		cmd.Println("  1. Edit podspec.yaml with your podcast metadata and S3 bucket names.")
 		cmd.Println("  2. Add artwork under artwork/ and source audio under masters/.")
-		cmd.Println("  3. Run `mkpod parse --spec <dir>/podspec.yaml` or `mkpod encode --spec <dir>/podspec.yaml --all`.")
+		cmd.Println("  3. Encoded outputs and podcast.rss will be written under localStorageDir (this workspace by default).")
+		cmd.Println("  4. Run `mkpod parse --spec <dir>/podspec.yaml` or `mkpod encode --spec <dir>/podspec.yaml --all`.")
 		return nil
 	},
 }
