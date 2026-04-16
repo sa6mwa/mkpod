@@ -3,6 +3,8 @@ package rss
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -79,5 +81,69 @@ func TestWriteRSSRendersValidEpisodesOnly(t *testing.T) {
 	}
 	if !strings.Contains(output, "<itunes:author>Host</itunes:author>") {
 		t.Fatalf("expected author to be rendered in RSS output: %s", output)
+	}
+}
+
+func TestWriteRSSMatchesGoldenFile(t *testing.T) {
+	renderer := New()
+	pubDate := time.Date(2022, 3, 25, 16, 0, 13, 0, time.UTC)
+
+	atom := &model.Atom{
+		Config: model.Config{
+			BaseURL: "https://example.com/podcast",
+			Image:   "https://example.com/podcast/artwork/show.jpg",
+		},
+		Atom:          "podcast.rss",
+		Title:         "Example Show",
+		Link:          "https://example.com/show",
+		PubDate:       model.ItunesTime{Time: pubDate},
+		LastBuildDate: model.ItunesTime{Time: pubDate},
+		TTL:           60,
+		Language:      "en",
+		Copyright:     "Copyright Example",
+		WebMaster:     "webmaster@example.com",
+		Description:   "Show description",
+		Subtitle:      "Show subtitle",
+		OwnerName:     "Owner",
+		OwnerEmail:    "owner@example.com",
+		Author:        "Host",
+		Explicit:      model.ItunesExplicit{S: "no"},
+		Keywords:      "podcast,test",
+		Categories: []model.Category{
+			{Name: "Technology"},
+		},
+		Episodes: []model.Episode{
+			{
+				UID:         1,
+				Title:       "Episode One",
+				PubDate:     model.ItunesTime{Time: pubDate},
+				Link:        "https://example.com/show/episodes/1",
+				Duration:    model.ItunesDuration{Duration: 5*time.Minute + 4*time.Second},
+				Author:      "Guest Host",
+				Subtitle:    "Episode subtitle",
+				Description: "Episode description",
+				Type:        "audio/mpeg",
+				Length:      12345,
+				Image:       "artwork/episode1.jpg",
+				Output:      "episode1.mp3",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := writeRSS(context.Background(), &buf, renderer, atom); err != nil {
+		t.Fatalf("writeRSS() error = %v", err)
+	}
+
+	goldenPath := filepath.Join("testdata", "representative.rss")
+	golden, err := os.ReadFile(goldenPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", goldenPath, err)
+	}
+
+	got := strings.TrimSpace(buf.String())
+	want := strings.TrimSpace(string(golden))
+	if got != want {
+		t.Fatalf("RSS output mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
 	}
 }
