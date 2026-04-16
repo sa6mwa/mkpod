@@ -107,7 +107,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 		encoderAdapter := encoder.New(askerAdapter)
 		storageClient := s3store.New(atom, askerAdapter)
 
-		postEncodeFunc := func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error {
+		postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
 			// First, handle remote master removal if requested
 			if removeRemoteMaster && episode.Input != "" {
 				// Safety check 1: Only remove remote master if local master exists
@@ -224,7 +224,7 @@ duration, or length). Use --all --force to re-encode all episodes regardless.`,
 }
 
 // checkForMissingOutputFile checks if a local output file exists but is missing from the output bucket
-func checkForMissingOutputFile(ctx context.Context, atom *model.Atom, episode *model.Episode, askerAdapter interface {
+func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode *model.Episode, askerAdapter interface {
 	Ask(context.Context, string, ...any) bool
 }, storageClient interface {
 	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)

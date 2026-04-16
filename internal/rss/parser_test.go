@@ -12,7 +12,7 @@ func TestFilterValidEpisodes(t *testing.T) {
 	parser := &Renderer{}
 	ctx := context.Background()
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author:   "Test Author",
 		Explicit: model.ItunesExplicit{S: "no"},
 	}
@@ -127,7 +127,7 @@ func TestFilterValidEpisodes(t *testing.T) {
 	})
 
 	t.Run("Filter episodes when atom author is missing", func(t *testing.T) {
-		atomNoAuthor := &model.Atom{
+		atomNoAuthor := &model.Podcast{
 			Author:   "",
 			Explicit: model.ItunesExplicit{S: "no"},
 		}
@@ -149,7 +149,7 @@ func TestEpisodeTemplateHelpers(t *testing.T) {
 	parser := &Renderer{}
 	ctx := context.Background()
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author:   "Default Author",
 		Explicit: model.ItunesExplicit{S: "yes"},
 	}
@@ -195,7 +195,7 @@ func TestEpisodeTemplateHelpers(t *testing.T) {
 	})
 
 	t.Run("episodeExplicit helper with no atom default", func(t *testing.T) {
-		atomNoExplicit := &model.Atom{
+		atomNoExplicit := &model.Podcast{
 			Author:   "Default Author",
 			Explicit: model.ItunesExplicit{S: ""},
 		}
@@ -215,7 +215,7 @@ func TestValidEpisodesTemplateFunction(t *testing.T) {
 	parser := &Renderer{}
 	ctx := context.Background()
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author:   "Test Author",
 		Explicit: model.ItunesExplicit{S: "no"},
 	}

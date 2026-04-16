@@ -19,13 +19,13 @@ func TestResolveTildeExpandsHome(t *testing.T) {
 	}
 }
 
-func TestAtomExpandedToolPaths(t *testing.T) {
+func TestPodcastExpandedToolPaths(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skipf("UserHomeDir unavailable: %v", err)
 	}
 
-	atom := &Atom{}
+	atom := &Podcast{}
 	atom.Config.LocalStorageDir = "~/show"
 	atom.Encoding.FFmpegPath = "~/bin/ffmpeg"
 	atom.Encoding.Lamepath = "~/bin/lame"

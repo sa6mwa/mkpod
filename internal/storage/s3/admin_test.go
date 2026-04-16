@@ -16,7 +16,7 @@ func (m *mockAsker) Ask(ctx context.Context, format string, a ...any) bool {
 }
 
 func TestNewAdminClient(t *testing.T) {
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			Aws: model.AwsConfig{
 				Profile: "test-profile",
@@ -86,7 +86,7 @@ func TestDefaultStorageClass(t *testing.T) {
 }
 
 func TestAdminRequestValidation(t *testing.T) {
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			Aws: model.AwsConfig{
 				Profile: "test-profile",

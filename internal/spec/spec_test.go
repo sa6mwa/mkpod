@@ -12,7 +12,7 @@ import (
 )
 
 func TestValidateRejectsMissingRequiredFields(t *testing.T) {
-	err := Validate(&model.Atom{})
+	err := Validate(&model.Podcast{})
 	if err == nil {
 		t.Fatal("Validate() unexpectedly returned nil")
 	}
@@ -41,14 +41,14 @@ func TestValidateRejectsMissingRequiredFields(t *testing.T) {
 
 func TestValidateRejectsNilAtom(t *testing.T) {
 	err := Validate(nil)
-	if !errors.Is(err, ErrNilAtom) {
-		t.Fatalf("Validate(nil) error = %v, want %v", err, ErrNilAtom)
+	if !errors.Is(err, ErrNilPodcast) {
+		t.Fatalf("Validate(nil) error = %v, want %v", err, ErrNilPodcast)
 	}
 }
 
 func TestApplyDefaultsSetsMediaDefaultsAndPubDate(t *testing.T) {
 	now := time.Date(2026, 4, 16, 19, 15, 0, 0, time.UTC)
-	atom := &model.Atom{}
+	atom := &model.Podcast{}
 
 	if err := ApplyDefaults(atom, now); err != nil {
 		t.Fatalf("ApplyDefaults() error = %v", err)
@@ -73,7 +73,7 @@ func TestApplyDefaultsSetsMediaDefaultsAndPubDate(t *testing.T) {
 func TestApplyDefaultsPreservesExplicitValues(t *testing.T) {
 	now := time.Date(2026, 4, 16, 19, 20, 0, 0, time.UTC)
 	pubDate := time.Date(2022, 3, 25, 16, 0, 13, 0, time.UTC)
-	atom := &model.Atom{}
+	atom := &model.Podcast{}
 	atom.Encoding.CRF = 21
 	atom.Encoding.ABR = "96k"
 	atom.Encoding.FFmpegPath = "/usr/bin/ffmpeg"
@@ -101,7 +101,7 @@ func TestApplyDefaultsPreservesExplicitValues(t *testing.T) {
 }
 
 func TestApplyEpisodeDefaultsForEncoding(t *testing.T) {
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author: "Host",
 		Config: model.Config{
 			DefaultPodImage: "artwork/default.jpg",
@@ -121,7 +121,7 @@ func TestApplyEpisodeDefaultsForEncoding(t *testing.T) {
 }
 
 func TestEffectiveEpisodeDefaults(t *testing.T) {
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author:   "Host",
 		Explicit: model.ItunesExplicit{S: "yes"},
 		Config: model.Config{
@@ -155,18 +155,18 @@ func TestEffectiveEpisodeDefaults(t *testing.T) {
 }
 
 func TestApplyEpisodeDefaultsForEncodingValidatesRequiredFields(t *testing.T) {
-	if err := ApplyEpisodeDefaultsForEncoding(&model.Atom{}, &model.Episode{}); !errors.Is(err, ErrMissingEpisodeTitle) {
+	if err := ApplyEpisodeDefaultsForEncoding(&model.Podcast{}, &model.Episode{}); !errors.Is(err, ErrMissingEpisodeTitle) {
 		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v, want %v", err, ErrMissingEpisodeTitle)
 	}
 
-	if err := ApplyEpisodeDefaultsForEncoding(&model.Atom{}, &model.Episode{Title: "Episode"}); !errors.Is(err, ErrMissingEpisodeImage) {
+	if err := ApplyEpisodeDefaultsForEncoding(&model.Podcast{}, &model.Episode{Title: "Episode"}); !errors.Is(err, ErrMissingEpisodeImage) {
 		t.Fatalf("ApplyEpisodeDefaultsForEncoding() error = %v, want %v", err, ErrMissingEpisodeImage)
 	}
 }
 
 func TestMissingFieldsForRSS(t *testing.T) {
 	now := time.Now().UTC()
-	atom := &model.Atom{Author: "Host"}
+	atom := &model.Podcast{Author: "Host"}
 
 	valid := &model.Episode{
 		Title:    "Episode",
@@ -182,7 +182,7 @@ func TestMissingFieldsForRSS(t *testing.T) {
 	}
 
 	missing := &model.Episode{}
-	got := MissingFieldsForRSS(&model.Atom{}, missing)
+	got := MissingFieldsForRSS(&model.Podcast{}, missing)
 	for _, field := range []string{"title", "output", "duration", "length", "type", "image", "pubDate", "author"} {
 		if !containsString(got, field) {
 			t.Fatalf("MissingFieldsForRSS() = %v, expected %q", got, field)
@@ -192,7 +192,7 @@ func TestMissingFieldsForRSS(t *testing.T) {
 
 func TestRenderableEpisodesSkipsInvalidEpisodes(t *testing.T) {
 	now := time.Now().UTC()
-	atom := &model.Atom{Author: "Host"}
+	atom := &model.Podcast{Author: "Host"}
 	episodes := []model.Episode{
 		{
 			UID:      1,

@@ -74,8 +74,8 @@ This file is the working plan for finishing the refactor.
 
 ## Phase 4: Spec Model And Validation Cleanup
 
-- [ ] Review the `Atom` naming and decide whether to rename the main aggregate to `Spec`, `Podcast`, or similarly direct terminology.
-- [ ] Keep YAML compatibility where practical even if internal type names change.
+- [x] Rename the internal aggregate to `Podcast`.
+- [x] Keep YAML compatibility where practical even if internal type names change.
 - [x] Split pure validation/defaulting from file I/O.
 - [ ] Define a clear rule set for:
   - [ ] required top-level fields

@@ -16,12 +16,12 @@ func TestWriteRSSRendersValidEpisodesOnly(t *testing.T) {
 	renderer := New()
 	now := time.Now().UTC()
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			BaseURL: "https://example.com/podcast",
 			Image:   "https://example.com/podcast/artwork/show.jpg",
 		},
-		Atom:          "podcast.rss",
+		FeedFile:          "podcast.rss",
 		Title:         "Example Show",
 		Link:          "https://example.com/show",
 		PubDate:       model.ItunesTime{Time: now},
@@ -88,12 +88,12 @@ func TestWriteRSSMatchesGoldenFile(t *testing.T) {
 	renderer := New()
 	pubDate := time.Date(2022, 3, 25, 16, 0, 13, 0, time.UTC)
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			BaseURL: "https://example.com/podcast",
 			Image:   "https://example.com/podcast/artwork/show.jpg",
 		},
-		Atom:          "podcast.rss",
+		FeedFile:          "podcast.rss",
 		Title:         "Example Show",
 		Link:          "https://example.com/show",
 		PubDate:       model.ItunesTime{Time: pubDate},

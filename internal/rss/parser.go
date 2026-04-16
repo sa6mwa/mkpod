@@ -21,7 +21,7 @@ import (
 var rssTemplate string
 
 var (
-	ErrNilPointerAtom error = errors.New("received nil pointer to atom")
+	ErrNilPointerPodcast error = errors.New("received nil pointer to podcast")
 )
 
 func New() *Renderer {
@@ -34,11 +34,11 @@ type Renderer struct {
 	funcMap template.FuncMap
 }
 
-func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Atom) error {
+func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Podcast) error {
 	if atom == nil {
-		return ErrNilPointerAtom
+		return ErrNilPointerPodcast
 	}
-	f, err := os.Create(atom.Atom)
+	f, err := os.Create(atom.FeedFile)
 	if err != nil {
 		return err
 	}
@@ -46,11 +46,11 @@ func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Atom) error {
 	return writeRSS(ctx, f, p, atom)
 }
 
-func (p *Renderer) WriteRSSToStdout(ctx context.Context, atom *model.Atom) error {
+func (p *Renderer) WriteRSSToStdout(ctx context.Context, atom *model.Podcast) error {
 	return writeRSS(ctx, os.Stdout, p, atom)
 }
 
-func writeRSS(ctx context.Context, w io.Writer, p *Renderer, atom *model.Atom) error {
+func writeRSS(ctx context.Context, w io.Writer, p *Renderer, atom *model.Podcast) error {
 	funcMapWithContext := p.mkFuncMapWithContext(ctx, atom)
 
 	t, err := template.New("template.rss").Funcs(funcMapWithContext).Parse(rssTemplate)
@@ -60,7 +60,7 @@ func writeRSS(ctx context.Context, w io.Writer, p *Renderer, atom *model.Atom) e
 	return t.Execute(w, atom)
 }
 
-func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) template.FuncMap {
+func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Podcast) template.FuncMap {
 	l := logger.FromContext(ctx)
 	if l == nil {
 		l = logger.DefaultLogger()
@@ -83,7 +83,7 @@ func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Atom) t
 	return funcMap
 }
 
-func (p *Renderer) filterValidEpisodes(ctx context.Context, atom *model.Atom, episodes []model.Episode) []model.Episode {
+func (p *Renderer) filterValidEpisodes(ctx context.Context, atom *model.Podcast, episodes []model.Episode) []model.Episode {
 	l := logger.FromContext(ctx)
 	if l == nil {
 		l = logger.DefaultLogger()

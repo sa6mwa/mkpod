@@ -24,7 +24,7 @@ type EpisodeValidationIssue struct {
 	MissingFields []string
 }
 
-func EffectiveEpisodeAuthor(atom *model.Atom, episode *model.Episode) string {
+func EffectiveEpisodeAuthor(atom *model.Podcast, episode *model.Episode) string {
 	if atom == nil || episode == nil {
 		return ""
 	}
@@ -34,7 +34,7 @@ func EffectiveEpisodeAuthor(atom *model.Atom, episode *model.Episode) string {
 	return atom.Author
 }
 
-func EffectiveEpisodeExplicit(atom *model.Atom, episode *model.Episode) string {
+func EffectiveEpisodeExplicit(atom *model.Podcast, episode *model.Episode) string {
 	if atom == nil || episode == nil {
 		return "no"
 	}
@@ -47,7 +47,7 @@ func EffectiveEpisodeExplicit(atom *model.Atom, episode *model.Episode) string {
 	return "no"
 }
 
-func EffectiveEpisodeImage(atom *model.Atom, episode *model.Episode) string {
+func EffectiveEpisodeImage(atom *model.Podcast, episode *model.Episode) string {
 	if atom == nil || episode == nil {
 		return ""
 	}
@@ -57,9 +57,9 @@ func EffectiveEpisodeImage(atom *model.Atom, episode *model.Episode) string {
 	return atom.Config.DefaultPodImage
 }
 
-func ApplyEpisodeDefaultsForEncoding(atom *model.Atom, episode *model.Episode) error {
+func ApplyEpisodeDefaultsForEncoding(atom *model.Podcast, episode *model.Episode) error {
 	if atom == nil || episode == nil {
-		return ErrNilAtom
+		return ErrNilPodcast
 	}
 	if strings.TrimSpace(episode.Title) == "" {
 		return ErrMissingEpisodeTitle
@@ -72,7 +72,7 @@ func ApplyEpisodeDefaultsForEncoding(atom *model.Atom, episode *model.Episode) e
 	return nil
 }
 
-func MissingFieldsForRSS(atom *model.Atom, episode *model.Episode) []string {
+func MissingFieldsForRSS(atom *model.Podcast, episode *model.Episode) []string {
 	if atom == nil || episode == nil {
 		return []string{"atom"}
 	}
@@ -108,7 +108,7 @@ func MissingFieldsForRSS(atom *model.Atom, episode *model.Episode) []string {
 	return missingFields
 }
 
-func RenderableEpisodes(atom *model.Atom, episodes []model.Episode) ([]model.Episode, []EpisodeValidationIssue) {
+func RenderableEpisodes(atom *model.Podcast, episodes []model.Episode) ([]model.Episode, []EpisodeValidationIssue) {
 	validEpisodes := make([]model.Episode, 0, len(episodes))
 	issues := make([]EpisodeValidationIssue, 0)
 

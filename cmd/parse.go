@@ -93,9 +93,9 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		}
 
 		if upload {
-			l.Info("About to generate RSS and upload to S3", "atom", atom.Atom, "bucket", atom.Config.Aws.Buckets.Output)
+			l.Info("About to generate RSS and upload to S3", "atom", atom.FeedFile, "bucket", atom.Config.Aws.Buckets.Output)
 		} else {
-			l.Info("About to generate RSS", "atom", atom.Atom)
+			l.Info("About to generate RSS", "atom", atom.FeedFile)
 		}
 
 		// Create adapters
@@ -103,7 +103,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		parserAdapter := rss.New()
 
 		// Ask if user wants to refresh lastBuildDate
-		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.Atom, specFile) {
+		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.FeedFile, specFile) {
 			atom.LastBuildDate.Time = time.Now().UTC()
 
 			// Save updated configuration
@@ -123,10 +123,10 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 			}
 		} else {
 			if err := parserAdapter.WriteRSS(ctx, atom); err != nil {
-				l.Error("Failed to write RSS file", "error", err, "file", atom.Atom)
+				l.Error("Failed to write RSS file", "error", err, "file", atom.FeedFile)
 				os.Exit(1)
 			}
-			l.Info("Successfully generated RSS", "file", atom.Atom)
+			l.Info("Successfully generated RSS", "file", atom.FeedFile)
 		}
 
 		// Upload if requested
@@ -140,16 +140,16 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 			}
 
 			// Show diff first
-			if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.Atom, atom.Atom); err != nil {
+			if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, atom.FeedFile); err != nil {
 				l.Error("Failed to show diff", "error", err)
 				// Don't exit on diff error, continue with upload
 			}
 
-			if askerAdapter.Ask(ctx, "Upload new %s?", atom.Atom) {
+			if askerAdapter.Ask(ctx, "Upload new %s?", atom.FeedFile) {
 				request := &s3store.UploadRequest{
 					Store:       atom.Config.Aws.Buckets.Output,
-					Key:         atom.Atom,
-					Filename:    atom.Atom,
+					Key:         atom.FeedFile,
+					Filename:    atom.FeedFile,
 					ContentType: "text/xml",
 				}
 				if err := storageClient.UploadFile(ctx, request); err != nil {
@@ -158,7 +158,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 				}
 			}
 		} else if upload && dryRun {
-			l.Info("Dry run: would upload RSS", "file", atom.Atom, "bucket", atom.Config.Aws.Buckets.Output)
+			l.Info("Dry run: would upload RSS", "file", atom.FeedFile, "bucket", atom.Config.Aws.Buckets.Output)
 			// In dry run, also show what images would be checked/uploaded
 			if err := checkAndUploadPodcastImage(ctx, atom, askerAdapter, nil); err != nil {
 				l.Warn("Failed to check podcast image (dry run)", "error", err)
@@ -168,7 +168,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 }
 
 // checkAndUploadPodcastImage checks if podcast images referenced in URLs exist in S3 and uploads missing ones
-func checkAndUploadPodcastImage(ctx context.Context, atom *model.Atom, askerAdapter interface {
+func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerAdapter interface {
 	Ask(context.Context, string, ...any) bool
 }, uploaderAdapter interface {
 	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)

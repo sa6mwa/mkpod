@@ -14,7 +14,7 @@ import (
 
 var DefaultSpecfile = "podspec.yaml"
 
-var ErrNilAtom = errors.New("received nil pointer to atom")
+var ErrNilPodcast = errors.New("received nil pointer to podcast")
 
 func New(filename string) *Store {
 	if filename == "" {
@@ -27,12 +27,12 @@ type Store struct {
 	specFile string
 }
 
-func (s *Store) Load(ctx context.Context) (*model.Atom, error) {
+func (s *Store) Load(ctx context.Context) (*model.Podcast, error) {
 	f, err := os.Open(s.specFile)
 	if err != nil {
 		return nil, err
 	}
-	var atom model.Atom
+	var atom model.Podcast
 	if err := yaml.NewDecoder(f).Decode(&atom); err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (s *Store) Load(ctx context.Context) (*model.Atom, error) {
 	return &atom, nil
 }
 
-func (s *Store) Save(ctx context.Context, atom *model.Atom) error {
+func (s *Store) Save(ctx context.Context, atom *model.Podcast) error {
 	atom.LastBuildDate.Time = time.Now().UTC()
 	f, err := os.Create(s.specFile)
 	if err != nil {
@@ -56,9 +56,9 @@ func (s *Store) Save(ctx context.Context, atom *model.Atom) error {
 	return nil
 }
 
-func Validate(atom *model.Atom) error {
+func Validate(atom *model.Podcast) error {
 	if atom == nil {
-		return ErrNilAtom
+		return ErrNilPodcast
 	}
 
 	var missingFields []string
@@ -75,7 +75,7 @@ func Validate(atom *model.Atom) error {
 	if strings.TrimSpace(atom.Config.DefaultPodImage) == "" {
 		missingFields = append(missingFields, "config.defaultPodImage")
 	}
-	if strings.TrimSpace(atom.Atom) == "" {
+	if strings.TrimSpace(atom.FeedFile) == "" {
 		missingFields = append(missingFields, "atom")
 	}
 	if strings.TrimSpace(atom.Title) == "" {
@@ -112,9 +112,9 @@ func Validate(atom *model.Atom) error {
 	return nil
 }
 
-func ApplyDefaults(atom *model.Atom, now time.Time) error {
+func ApplyDefaults(atom *model.Podcast, now time.Time) error {
 	if atom == nil {
-		return ErrNilAtom
+		return ErrNilPodcast
 	}
 	if atom.Encoding.CRF == 0 {
 		atom.Encoding.CRF = 28

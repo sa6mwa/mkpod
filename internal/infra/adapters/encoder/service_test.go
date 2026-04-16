@@ -44,7 +44,7 @@ func TestShouldEncodeUsesExplicitOptions(t *testing.T) {
 func TestSelectEpisodeIndexes(t *testing.T) {
 	uid1 := int64(1)
 	uid99 := int64(99)
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Episodes: []model.Episode{
 			{UID: 1},
 			{UID: 2},
@@ -88,7 +88,7 @@ func TestSelectEpisodeIndexes(t *testing.T) {
 }
 
 func TestApplyEpisodeDefaults(t *testing.T) {
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Author: "Host",
 		Config: model.Config{
 			DefaultPodImage: "artwork/default.jpg",
@@ -108,7 +108,7 @@ func TestApplyEpisodeDefaults(t *testing.T) {
 }
 
 func TestApplyEpisodeDefaultsValidatesRequiredFields(t *testing.T) {
-	atom := &model.Atom{}
+	atom := &model.Podcast{}
 	if err := applyEpisodeDefaults(atom, &model.Episode{}); !errors.Is(err, ErrMissingTitle) {
 		t.Fatalf("applyEpisodeDefaults() error = %v, want %v", err, ErrMissingTitle)
 	}
@@ -162,7 +162,7 @@ func TestEncodeReturnsEmptyResultForMissingEpisode(t *testing.T) {
 	service := New(stubPrompter{answer: true})
 	uid := int64(99)
 
-	result, err := service.Encode(context.Background(), &model.Atom{}, EncodeOptions{
+	result, err := service.Encode(context.Background(), &model.Podcast{}, EncodeOptions{
 		EpisodeUID: &uid,
 	}, nil)
 	if err != nil {

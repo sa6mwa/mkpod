@@ -120,8 +120,8 @@ func requireTools(t *testing.T, tools ...string) {
 	}
 }
 
-func testAtom(workdir string) *model.Atom {
-	atom := &model.Atom{
+func testAtom(workdir string) *model.Podcast {
+	atom := &model.Podcast{
 		Config: model.Config{
 			LocalStorageDir: workdir,
 			DefaultPodImage: filepath.ToSlash(filepath.Join("artwork", "cover.jpg")),

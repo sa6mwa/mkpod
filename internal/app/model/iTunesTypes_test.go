@@ -231,7 +231,7 @@ pubDate: "Mon, 01 Jan 0001 00:00:00 +0000"
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var atom Atom
+			var atom Podcast
 			err := yaml.Unmarshal([]byte(strings.TrimSpace(tt.yamlInput)), &atom)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)

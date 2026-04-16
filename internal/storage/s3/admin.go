@@ -54,12 +54,12 @@ type FileInfo struct {
 
 type Client struct {
 	prompter asker.Prompter
-	atom     *model.Atom
+	atom     *model.Podcast
 	session  *session.Session
 	s3       *awss3.S3
 }
 
-func New(atom *model.Atom, prompter asker.Prompter) *Client {
+func New(atom *model.Podcast, prompter asker.Prompter) *Client {
 	s := session.Must(session.NewSessionWithOptions(session.Options{
 		Profile: atom.Config.Aws.Profile,
 		Config: aws.Config{
@@ -74,7 +74,7 @@ func New(atom *model.Atom, prompter asker.Prompter) *Client {
 	}
 }
 
-func NewAdminClient(atom *model.Atom, prompter asker.Prompter) *Client {
+func NewAdminClient(atom *model.Podcast, prompter asker.Prompter) *Client {
 	return New(atom, prompter)
 }
 

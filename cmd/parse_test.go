@@ -42,7 +42,7 @@ func TestCheckAndUploadPodcastImageSkipsExistingRemoteImage(t *testing.T) {
 	mkdirAll(t, filepath.Dir(imagePath))
 	writeFile(t, imagePath, []byte("jpeg"))
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			BaseURL:         "https://example.com/show",
 			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/podcast-cover.jpg",
@@ -81,7 +81,7 @@ func TestCheckAndUploadPodcastImageUploadsMissingRemoteImage(t *testing.T) {
 	mkdirAll(t, filepath.Dir(imagePath))
 	writeFile(t, imagePath, []byte("png"))
 
-	atom := &model.Atom{
+	atom := &model.Podcast{
 		Config: model.Config{
 			BaseURL:         "https://example.com/show",
 			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/podcast-cover.png",

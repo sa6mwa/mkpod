@@ -44,7 +44,7 @@ keeps the boundaries that pay for themselves and removes the rest.
 
 - Storage backends other than AWS S3.
 - Alternative media toolchains beyond `ffmpeg`, `ffprobe`, and `lame`.
-- A renamed replacement for the current `Atom` root model type.
+- The internal aggregate is now `Podcast`; the YAML key remains `atom` for compatibility.
 
 If those become real product requirements later, the current seams are narrow
 enough to evolve without reintroducing the earlier interface sprawl.

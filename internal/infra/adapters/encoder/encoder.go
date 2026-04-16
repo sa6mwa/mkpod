@@ -31,7 +31,7 @@ var (
 const shell = "/bin/sh"
 const shellCommandOption = "-c"
 
-type PostEncodeFunc func(atom *model.Atom, episode *model.Episode, wasEncoded bool) error
+type PostEncodeFunc func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error
 
 type EncodeOptions struct {
 	All           bool
@@ -64,7 +64,7 @@ func New(prompter asker.Prompter) *Service {
 }
 
 // applyEpisodeDefaults ensures episode has required fields set with appropriate defaults
-func applyEpisodeDefaults(atom *model.Atom, episode *model.Episode) error {
+func applyEpisodeDefaults(atom *model.Podcast, episode *model.Episode) error {
 	return spec.ApplyEpisodeDefaultsForEncoding(atom, episode)
 }
 
@@ -82,7 +82,7 @@ func (e *Service) shouldEncode(ctx context.Context, options EncodeOptions, filen
 	return e.prompter.Ask(ctx, "Re-encode %s?", filename)
 }
 
-func selectEpisodeIndexes(atom *model.Atom, options EncodeOptions) ([]int, error) {
+func selectEpisodeIndexes(atom *model.Podcast, options EncodeOptions) ([]int, error) {
 	if atom == nil {
 		return nil, ErrNilPointer
 	}
@@ -139,7 +139,7 @@ func selectEncodeMode(inputContentType, episodeFormat, preferredFormat string) (
 	}
 }
 
-func (e *Service) encodeEpisode(ctx context.Context, atom *model.Atom, episode *model.Episode, inputContentType string) error {
+func (e *Service) encodeEpisode(ctx context.Context, atom *model.Podcast, episode *model.Episode, inputContentType string) error {
 	mode, formatArg, err := selectEncodeMode(inputContentType, episode.Format, atom.Encoding.PreferredFormat)
 	if err != nil {
 		return err
@@ -158,7 +158,7 @@ func (e *Service) encodeEpisode(ctx context.Context, atom *model.Atom, episode *
 	}
 }
 
-func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOptions, postEncoding PostEncodeFunc) (*EncodeResult, error) {
+func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options EncodeOptions, postEncoding PostEncodeFunc) (*EncodeResult, error) {
 	l := logger.FromContext(ctx)
 	mimetype.SetLimit(1024 * 1024)
 
@@ -209,7 +209,7 @@ func (e *Service) Encode(ctx context.Context, atom *model.Atom, options EncodeOp
 }
 
 // EncodeMP4 encodes episode into an mp4 video (using ffmpeg)
-func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) error {
+func EncodeMP4(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
@@ -223,7 +223,7 @@ func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	}
 	episode.Output = ExtensionToBaseMp4(episode.Input)
 	values := templateValues{
-		Atom:    atom,
+		Podcast: atom,
 		Episode: episode,
 	}
 	buf := &bytes.Buffer{}
@@ -258,7 +258,7 @@ func EncodeMP4(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 
 // EncodeFFmpegAudio encodes episode.Input into an m4a or m4b file
 // depending on the value of format.
-func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Episode, format string) error {
+func EncodeFFmpegAudio(ctx context.Context, atom *model.Podcast, episode *model.Episode, format string) error {
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
@@ -274,7 +274,7 @@ func EncodeFFmpegAudio(ctx context.Context, atom *model.Atom, episode *model.Epi
 	format = strings.TrimSpace(strings.ToLower(format))
 	episode.Output = ExtensionToBaseFormat(episode.Input, format)
 	values := templateValues{
-		Atom:    atom,
+		Podcast: atom,
 		Episode: episode,
 	}
 	rplcr := strings.NewReplacer("\n", " ", "\r", "")
@@ -360,7 +360,7 @@ func writeFFmpegMetadataFile(duration time.Duration, trackInfo id3v24.TrackInfo)
 
 // EncodeMP3ViaFFmpeg encodes episode.Input through ffmpeg piped into
 // lame as an mp3.
-func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Episode) error {
+func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
@@ -378,7 +378,7 @@ func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Ep
 
 	episode.Output = ExtensionToBaseMp3(episode.Input)
 	values := templateValues{
-		Atom:    atom,
+		Podcast: atom,
 		Episode: episode,
 	}
 
@@ -430,7 +430,7 @@ func EncodeMP3ViaFFmpeg(ctx context.Context, atom *model.Atom, episode *model.Ep
 }
 
 // EncodeMP3 encodes an mp3 using lame.
-func EncodeMP3(ctx context.Context, atom *model.Atom, episode *model.Episode) error {
+func EncodeMP3(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
 	l := logger.FromContext(ctx)
 	if atom == nil || episode == nil {
 		return ErrNilPointer
@@ -444,7 +444,7 @@ func EncodeMP3(ctx context.Context, atom *model.Atom, episode *model.Episode) er
 	}
 	episode.Output = ExtensionToBaseMp3(episode.Input)
 	values := templateValues{
-		Atom:    atom,
+		Podcast: atom,
 		Episode: episode,
 	}
 	buf := &bytes.Buffer{}

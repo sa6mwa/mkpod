@@ -137,7 +137,7 @@ func ensureEmptyDir(targetDir string) error {
 	return nil
 }
 
-func newInitialSpec(targetDir string) *model.Atom {
+func newInitialSpec(targetDir string) *model.Podcast {
 	podcastName := filepath.Base(targetDir)
 	if podcastName == "." || podcastName == string(filepath.Separator) || strings.TrimSpace(podcastName) == "" {
 		podcastName = "my-podcast"
@@ -145,7 +145,7 @@ func newInitialSpec(targetDir string) *model.Atom {
 
 	baseURL := "https://example-podcast-bucket.s3.us-east-1.amazonaws.com"
 
-	spec := &model.Atom{
+	spec := &model.Podcast{
 		Config: model.Config{
 			BaseURL:         baseURL,
 			Image:           baseURL + "/artwork/podcast-cover.jpg",
@@ -160,7 +160,7 @@ func newInitialSpec(targetDir string) *model.Atom {
 			},
 			LocalStorageDir: targetDir,
 		},
-		Atom:        "podcast.rss",
+		FeedFile:        "podcast.rss",
 		Title:       podcastName,
 		Link:        "https://example.com/" + podcastName,
 		TTL:         60,

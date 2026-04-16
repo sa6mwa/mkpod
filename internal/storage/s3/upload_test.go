@@ -8,7 +8,7 @@ import (
 )
 
 func TestUploadRequestValidation(t *testing.T) {
-	client := New(&model.Atom{
+	client := New(&model.Podcast{
 		Config: model.Config{
 			Aws: model.AwsConfig{
 				Profile: "test-profile",

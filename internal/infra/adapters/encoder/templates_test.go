@@ -11,7 +11,7 @@ import (
 
 func TestAACTemplatesUseBuiltInFFmpegEncoder(t *testing.T) {
 	values := templateValues{
-		Atom: &model.Atom{
+		Podcast: &model.Podcast{
 			Config: model.Config{
 				LocalStorageDir: "/tmp/pod",
 			},
