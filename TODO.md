@@ -103,7 +103,7 @@ This file is the working plan for finishing the refactor.
 - [x] Write a minimal but valid YAML template tailored to the current simplified config model.
 - [x] Decide overwrite policy:
   - [x] fail if target exists and is non-empty
-  - [ ] optional `--force` later if needed
+  - [x] add `--force` to allow re-initializing an existing workspace without deleting unrelated files
 - [x] Print next-step guidance after initialization.
 - [x] Add tests for empty dir init, nested dir creation, existing file conflicts, and path expansion.
 

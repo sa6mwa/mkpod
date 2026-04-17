@@ -134,6 +134,10 @@ episodes: []
 Use `mkpod init <directory>` to generate this starter layout automatically and
 then edit the values for your real podcast and S3 buckets.
 
+If the target directory already exists and contains other files, use
+`mkpod init --force <directory>` to regenerate `podspec.yaml` and create any
+missing standard directories without deleting unrelated files.
+
 `config.localStorageDir` is the workspace root by default. Encoded media files
 and `podcast.rss` are written there unless you choose output paths that place
 them in subdirectories.

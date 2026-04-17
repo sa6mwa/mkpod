@@ -14,7 +14,7 @@ func TestInitWorkspaceCreatesStarterProject(t *testing.T) {
 	parent := t.TempDir()
 	target := filepath.Join(parent, "podcast")
 
-	createdDir, err := initWorkspace(target)
+	createdDir, err := initWorkspace(target, false)
 	if err != nil {
 		t.Fatalf("initWorkspace() error = %v", err)
 	}
@@ -57,9 +57,48 @@ func TestInitWorkspaceRejectsNonEmptyDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err := initWorkspace(target)
+	_, err := initWorkspace(target, false)
 	if !errors.Is(err, ErrTargetNotEmpty) {
 		t.Fatalf("initWorkspace() error = %v, want %v", err, ErrTargetNotEmpty)
+	}
+}
+
+func TestInitWorkspaceForceAllowsExistingDirAndPreservesOtherFiles(t *testing.T) {
+	target := t.TempDir()
+	existingFile := filepath.Join(target, "keep.txt")
+	if err := os.WriteFile(existingFile, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	createdDir, err := initWorkspace(target, true)
+	if err != nil {
+		t.Fatalf("initWorkspace(force) error = %v", err)
+	}
+	if createdDir != target {
+		t.Fatalf("initWorkspace(force) dir = %q, want %q", createdDir, target)
+	}
+
+	for _, path := range []string{
+		existingFile,
+		filepath.Join(target, "artwork"),
+		filepath.Join(target, "masters"),
+		filepath.Join(target, spec.DefaultSpecfile),
+	} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected %s to exist after forced init: %v", path, err)
+		}
+	}
+}
+
+func TestEnsureWorkspaceDirRejectsFileWhenForced(t *testing.T) {
+	parent := t.TempDir()
+	target := filepath.Join(parent, "workspace")
+	if err := os.WriteFile(target, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ensureWorkspaceDir(target, true); err == nil {
+		t.Fatal("ensureWorkspaceDir(force) unexpectedly succeeded for a file path")
 	}
 }
 

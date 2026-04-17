@@ -28,6 +28,7 @@ var initCmd = &cobra.Command{
 and a starter podspec.yaml template in the target directory.`,
 	Example: `  mkpod init .
   mkpod init ~/podcast
+  mkpod init --force ~/existing-podcast
   mkpod init /srv/podcasts/my-show`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
@@ -36,7 +37,12 @@ and a starter podspec.yaml template in the target directory.`,
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		targetDir, err := initWorkspace(args[0])
+		force, err := cmd.Flags().GetBool("force")
+		if err != nil {
+			return err
+		}
+
+		targetDir, err := initWorkspace(args[0], force)
 		if err != nil {
 			return err
 		}
@@ -56,13 +62,13 @@ and a starter podspec.yaml template in the target directory.`,
 	},
 }
 
-func initWorkspace(target string) (string, error) {
+func initWorkspace(target string, force bool) (string, error) {
 	targetDir, err := resolveWorkspacePath(target)
 	if err != nil {
 		return "", err
 	}
 
-	if err := ensureEmptyDir(targetDir); err != nil {
+	if err := ensureWorkspaceDir(targetDir, force); err != nil {
 		return "", err
 	}
 
@@ -137,6 +143,23 @@ func ensureEmptyDir(targetDir string) error {
 	return nil
 }
 
+func ensureWorkspaceDir(targetDir string, force bool) error {
+	if force {
+		info, err := os.Stat(targetDir)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return fmt.Errorf("stat %s: %w", targetDir, err)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("%s exists and is not a directory", targetDir)
+		}
+		return nil
+	}
+	return ensureEmptyDir(targetDir)
+}
+
 func newInitialSpec(targetDir string) *model.Podcast {
 	podcastName := filepath.Base(targetDir)
 	if podcastName == "." || podcastName == string(filepath.Separator) || strings.TrimSpace(podcastName) == "" {
@@ -195,4 +218,5 @@ func newInitialSpec(targetDir string) *model.Podcast {
 
 func init() {
 	rootCmd.AddCommand(initCmd)
+	initCmd.Flags().BoolP("force", "f", false, "Allow initializing an existing workspace directory by overwriting podspec.yaml and creating any missing standard directories")
 }
