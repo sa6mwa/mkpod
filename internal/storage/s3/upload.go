@@ -7,10 +7,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -40,6 +39,9 @@ func (c *Client) UploadFile(ctx context.Context, bucket, key, filename string, o
 	}
 	if strings.TrimSpace(filename) == "" {
 		return ErrEmptyFilename
+	}
+	if err := c.ensureClient(ctx); err != nil {
+		return err
 	}
 	if options == nil {
 		options = &UploadOptions{}
@@ -72,18 +74,19 @@ func (c *Client) UploadFile(ctx context.Context, bucket, key, filename string, o
 	}
 	defer file.Close()
 
-	uploader := s3manager.NewUploader(c.session)
-	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket:       aws.String(bucket),
-		Key:          aws.String(key),
-		ContentType:  aws.String(contentType),
+	storageClassValue := s3types.StorageClass(storageClass)
+	uploader := c.newUploader()
+	result, err := uploader.Upload(ctx, &awss3.PutObjectInput{
+		Bucket:       &bucket,
+		Key:          &key,
+		ContentType:  &contentType,
 		Body:         file,
-		StorageClass: aws.String(storageClass),
+		StorageClass: storageClassValue,
 	})
 	if err != nil {
 		return err
 	}
-	l.Info("Upload succeeded", "location", aws.StringValue(&result.Location))
+	l.Info("Upload succeeded", "location", result.Location)
 	return nil
 }
 
@@ -91,27 +94,25 @@ func (c *Client) UploadFile(ctx context.Context, bucket, key, filename string, o
 // against the given local file.
 func (c *Client) DiffTextObject(ctx context.Context, bucket, key, fileToDiff string) error {
 	l := logger.FromContext(ctx)
+	if err := c.ensureClient(ctx); err != nil {
+		return err
+	}
 
 	fileContent, err := os.ReadFile(fileToDiff)
 	if err != nil {
 		return err
 	}
 
-	downloader := s3manager.NewDownloader(c.session)
-	buf := aws.NewWriteAtBuffer([]byte{})
-	size, err := downloader.Download(buf, &awss3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	downloader := c.newDownloader()
+	buf := manager.NewWriteAtBuffer([]byte{})
+	size, err := downloader.Download(ctx, buf, &awss3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case "NotFound", "NoSuchKey":
-				l.Info("Skipping diff", "file", fileToDiff, "path", "s3://"+path.Join(bucket, key), "error", err)
-				return nil
-			default:
-				return err
-			}
+		if isNotFoundError(err) {
+			l.Info("Skipping diff", "file", fileToDiff, "path", "s3://"+path.Join(bucket, key), "error", err)
+			return nil
 		}
 		return err
 	}

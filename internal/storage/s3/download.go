@@ -7,22 +7,22 @@ import (
 	"os"
 	"path"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/sa6mwa/mkpod/internal/app/humanreadable"
 	"github.com/sa6mwa/mkpod/internal/logging"
 )
 
 func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {
 	l := logger.FromContext(ctx)
+	if err := c.ensureClient(ctx); err != nil {
+		return err
+	}
 
 	s3path := "s3://" + path.Join(bucket, key)
 	localPath := path.Join(c.atom.LocalStorageDirExpanded(), key)
 	l.Info("Downloading "+s3path, "bucket", bucket, "key", key, "location", s3path, "output", localPath)
 
-	downloader := s3manager.NewDownloader(c.session)
+	downloader := c.newDownloader()
 	dirPath := path.Dir(localPath)
 	if err := os.MkdirAll(dirPath, 0o755); err != nil {
 		return err
@@ -44,21 +44,16 @@ func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {
 			return err
 		}
 	} else {
-		size, err := c.GetObjectSize(bucket, key)
+		size, err := c.GetObjectSize(ctx, bucket, key)
 		if err != nil {
-			if awsErr, ok := err.(awserr.Error); ok {
-				switch awsErr.Code() {
-				case "NotFound", "NoSuchKey":
-					l.Info("Remote does not exist, will use local file only", "remote", s3path, "local", localPath)
-					if c.prompter != nil && c.prompter.Ask(ctx, "Upload %s to %s?", localPath, s3path) {
-						if err := uploadClient.UploadFile(ctx, bucket, key, localPath, &UploadOptions{StorageClass: c.atom.Config.Aws.Buckets.GetStorageClass(bucket)}); err != nil {
-							return err
-						}
+			if isNotFoundError(err) {
+				l.Info("Remote does not exist, will use local file only", "remote", s3path, "local", localPath)
+				if c.prompter != nil && c.prompter.Ask(ctx, "Upload %s to %s?", localPath, s3path) {
+					if err := uploadClient.UploadFile(ctx, bucket, key, localPath, &UploadOptions{StorageClass: c.atom.Config.Aws.Buckets.GetStorageClass(bucket)}); err != nil {
+						return err
 					}
-					return nil
-				default:
-					return err
 				}
+				return nil
 			}
 			return err
 		}
@@ -79,9 +74,9 @@ func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {
 		}()
 	}
 
-	n, err := downloader.Download(file, &awss3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	n, err := downloader.Download(ctx, file, &awss3.GetObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
 		return err
@@ -92,13 +87,19 @@ func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {
 	return nil
 }
 
-func (c *Client) GetObjectSize(bucket, key string) (int64, error) {
-	result, err := c.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+func (c *Client) GetObjectSize(ctx context.Context, bucket, key string) (int64, error) {
+	if err := c.ensureClient(ctx); err != nil {
+		return 0, err
+	}
+	result, err := c.s3.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
 		return 0, err
 	}
-	return aws.Int64Value(result.ContentLength), nil
+	if result.ContentLength == nil {
+		return 0, nil
+	}
+	return *result.ContentLength, nil
 }

@@ -5,10 +5,12 @@ import (
 	"errors"
 	"path"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
-	awss3 "github.com/aws/aws-sdk-go/service/s3"
+	awsv2 "github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	logger "github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/prompt"
@@ -47,23 +49,67 @@ type FileInfo struct {
 type Client struct {
 	prompter prompt.Prompter
 	atom     *model.Podcast
-	session  *session.Session
-	s3       *awss3.S3
+	cfg      awsv2.Config
+	cfgReady bool
+	s3       *awss3.Client
 }
 
 func New(atom *model.Podcast, prompter prompt.Prompter) *Client {
-	s := session.Must(session.NewSessionWithOptions(session.Options{
-		Profile: atom.Config.Aws.Profile,
-		Config: aws.Config{
-			Region: aws.String(atom.Config.Aws.Region),
-		},
-	}))
 	return &Client{
 		prompter: prompter,
 		atom:     atom,
-		session:  s,
-		s3:       awss3.New(s),
 	}
+}
+
+func (a *Client) ensureClient(ctx context.Context) error {
+	if a.s3 != nil {
+		return nil
+	}
+	if !a.cfgReady {
+		options := []func(*awsconfig.LoadOptions) error{}
+		if a.atom != nil {
+			if region := a.atom.Config.Aws.Region; region != "" {
+				options = append(options, awsconfig.WithRegion(region))
+			}
+			if profile := a.atom.Config.Aws.Profile; profile != "" {
+				options = append(options, awsconfig.WithSharedConfigProfile(profile))
+			}
+		}
+		cfg, err := awsconfig.LoadDefaultConfig(ctx, options...)
+		if err != nil {
+			return err
+		}
+		a.cfg = cfg
+		a.cfgReady = true
+	}
+	a.s3 = awss3.NewFromConfig(a.cfg)
+	return nil
+}
+
+func (a *Client) newUploader() *manager.Uploader {
+	return manager.NewUploader(a.s3)
+}
+
+func (a *Client) newDownloader() *manager.Downloader {
+	return manager.NewDownloader(a.s3)
+}
+
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var noSuchKey *s3types.NoSuchKey
+	if errors.As(err, &noSuchKey) {
+		return true
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "NotFound", "NoSuchKey":
+			return true
+		}
+	}
+	return false
 }
 
 func ValidStorageClasses() []string {
@@ -103,6 +149,9 @@ func (a *Client) DeleteRemoteFile(ctx context.Context, bucket, key string) error
 	if err := validateObjectArgs(bucket, key); err != nil {
 		return err
 	}
+	if err := a.ensureClient(ctx); err != nil {
+		return err
+	}
 
 	s3path := "s3://" + path.Join(bucket, key)
 	l.Info("About to delete remote file", "path", s3path)
@@ -121,9 +170,9 @@ func (a *Client) DeleteRemoteFile(ctx context.Context, bucket, key string) error
 		return nil
 	}
 
-	_, err = a.s3.DeleteObject(&awss3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	_, err = a.s3.DeleteObject(ctx, &awss3.DeleteObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
 		l.Error("Failed to delete remote file", "error", err, "path", s3path)
@@ -137,6 +186,9 @@ func (a *Client) DeleteRemoteFile(ctx context.Context, bucket, key string) error
 func (a *Client) ChangeStorageClass(ctx context.Context, bucket, key, newStorageClass string) error {
 	l := logger.FromContext(ctx)
 	if err := validateObjectArgs(bucket, key); err != nil {
+		return err
+	}
+	if err := a.ensureClient(ctx); err != nil {
 		return err
 	}
 	if newStorageClass == "" {
@@ -170,11 +222,13 @@ func (a *Client) ChangeStorageClass(ctx context.Context, bucket, key, newStorage
 		return nil
 	}
 
-	_, err = a.s3.CopyObject(&awss3.CopyObjectInput{
-		Bucket:       aws.String(bucket),
-		Key:          aws.String(key),
-		CopySource:   aws.String(path.Join(bucket, key)),
-		StorageClass: aws.String(newStorageClass),
+	storageClass := s3types.StorageClass(newStorageClass)
+	copySource := path.Join(bucket, key)
+	_, err = a.s3.CopyObject(ctx, &awss3.CopyObjectInput{
+		Bucket:       &bucket,
+		Key:          &key,
+		CopySource:   &copySource,
+		StorageClass: storageClass,
 	})
 	if err != nil {
 		l.Error("Failed to change storage class", "error", err, "path", s3path)
@@ -190,23 +244,21 @@ func (a *Client) FileExists(ctx context.Context, bucket, key string) (bool, erro
 	if err := validateObjectArgs(bucket, key); err != nil {
 		return false, err
 	}
+	if err := a.ensureClient(ctx); err != nil {
+		return false, err
+	}
 
 	s3path := "s3://" + path.Join(bucket, key)
-	_, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	_, err := a.s3.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case "NotFound", "NoSuchKey":
-				l.Debug("File does not exist", "path", s3path)
-				return false, nil
-			default:
-				l.Error("Error checking file existence", "error", err, "path", s3path)
-				return false, err
-			}
+		if isNotFoundError(err) {
+			l.Debug("File does not exist", "path", s3path)
+			return false, nil
 		}
+		l.Error("Error checking file existence", "error", err, "path", s3path)
 		return false, err
 	}
 
@@ -219,29 +271,27 @@ func (a *Client) GetStorageClass(ctx context.Context, bucket, key string) (strin
 	if err := validateObjectArgs(bucket, key); err != nil {
 		return "", err
 	}
+	if err := a.ensureClient(ctx); err != nil {
+		return "", err
+	}
 
 	s3path := "s3://" + path.Join(bucket, key)
-	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	result, err := a.s3.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case "NotFound", "NoSuchKey":
-				l.Debug("File does not exist", "path", s3path)
-				return "", ErrFileNotFound
-			default:
-				l.Error("Error getting storage class", "error", err, "path", s3path)
-				return "", err
-			}
+		if isNotFoundError(err) {
+			l.Debug("File does not exist", "path", s3path)
+			return "", ErrFileNotFound
 		}
+		l.Error("Error getting storage class", "error", err, "path", s3path)
 		return "", err
 	}
 
 	storageClass := StorageClassStandard
-	if result.StorageClass != nil {
-		storageClass = *result.StorageClass
+	if result.StorageClass != "" {
+		storageClass = string(result.StorageClass)
 	}
 	l.Debug("Got storage class", "path", s3path, "storageClass", storageClass)
 	return storageClass, nil
@@ -252,23 +302,21 @@ func (a *Client) GetFileInfo(ctx context.Context, bucket, key string) (*FileInfo
 	if err := validateObjectArgs(bucket, key); err != nil {
 		return nil, err
 	}
+	if err := a.ensureClient(ctx); err != nil {
+		return nil, err
+	}
 
 	s3path := "s3://" + path.Join(bucket, key)
-	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+	result, err := a.s3.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
 	})
 	if err != nil {
-		if awsErr, ok := err.(awserr.Error); ok {
-			switch awsErr.Code() {
-			case "NotFound", "NoSuchKey":
-				l.Debug("File does not exist", "path", s3path)
-				return &FileInfo{Exists: false}, nil
-			default:
-				l.Error("Error getting file info", "error", err, "path", s3path)
-				return nil, err
-			}
+		if isNotFoundError(err) {
+			l.Debug("File does not exist", "path", s3path)
+			return &FileInfo{Exists: false}, nil
 		}
+		l.Error("Error getting file info", "error", err, "path", s3path)
 		return nil, err
 	}
 
@@ -279,8 +327,8 @@ func (a *Client) GetFileInfo(ctx context.Context, bucket, key string) (*FileInfo
 	if result.ContentType != nil {
 		info.ContentType = *result.ContentType
 	}
-	if result.StorageClass != nil {
-		info.StorageClass = *result.StorageClass
+	if result.StorageClass != "" {
+		info.StorageClass = string(result.StorageClass)
 	}
 	if result.LastModified != nil {
 		info.LastModified = result.LastModified.Format("2006-01-02T15:04:05Z07:00")
