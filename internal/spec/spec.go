@@ -14,7 +14,10 @@ import (
 
 var DefaultSpecfile = "podspec.yaml"
 
-var ErrNilPodcast = errors.New("received nil pointer to podcast")
+var (
+	ErrNilPodcast           = errors.New("received nil pointer to podcast")
+	ErrUnknownRequiredField = errors.New("unknown required top-level field")
+)
 
 func New(filename string) *Store {
 	if filename == "" {
@@ -64,7 +67,11 @@ func Validate(atom *model.Podcast) error {
 	var missingFields []string
 
 	for _, field := range RequiredTopLevelFields {
-		if isMissingTopLevelField(atom, field) {
+		missing, err := isMissingTopLevelField(atom, field)
+		if err != nil {
+			return err
+		}
+		if missing {
 			missingFields = append(missingFields, field)
 		}
 	}
@@ -75,38 +82,38 @@ func Validate(atom *model.Podcast) error {
 	return nil
 }
 
-func isMissingTopLevelField(podcast *model.Podcast, field string) bool {
+func isMissingTopLevelField(podcast *model.Podcast, field string) (bool, error) {
 	switch field {
 	case "author":
-		return strings.TrimSpace(podcast.Author) == ""
+		return strings.TrimSpace(podcast.Author) == "", nil
 	case "config.baseURL":
-		return strings.TrimSpace(podcast.Config.BaseURL) == ""
+		return strings.TrimSpace(podcast.Config.BaseURL) == "", nil
 	case "config.image":
-		return strings.TrimSpace(podcast.Config.Image) == ""
+		return strings.TrimSpace(podcast.Config.Image) == "", nil
 	case "config.defaultPodImage":
-		return strings.TrimSpace(podcast.Config.DefaultPodImage) == ""
+		return strings.TrimSpace(podcast.Config.DefaultPodImage) == "", nil
 	case "atom":
-		return strings.TrimSpace(podcast.FeedFile) == ""
+		return strings.TrimSpace(podcast.FeedFile) == "", nil
 	case "title":
-		return strings.TrimSpace(podcast.Title) == ""
+		return strings.TrimSpace(podcast.Title) == "", nil
 	case "ttl":
-		return podcast.TTL == 0
+		return podcast.TTL == 0, nil
 	case "language":
-		return strings.TrimSpace(podcast.Language) == ""
+		return strings.TrimSpace(podcast.Language) == "", nil
 	case "copyright":
-		return strings.TrimSpace(podcast.Copyright) == ""
+		return strings.TrimSpace(podcast.Copyright) == "", nil
 	case "webMaster":
-		return strings.TrimSpace(podcast.WebMaster) == ""
+		return strings.TrimSpace(podcast.WebMaster) == "", nil
 	case "description":
-		return strings.TrimSpace(podcast.Description) == ""
+		return strings.TrimSpace(podcast.Description) == "", nil
 	case "subtitle":
-		return strings.TrimSpace(podcast.Subtitle) == ""
+		return strings.TrimSpace(podcast.Subtitle) == "", nil
 	case "ownerName":
-		return strings.TrimSpace(podcast.OwnerName) == ""
+		return strings.TrimSpace(podcast.OwnerName) == "", nil
 	case "ownerEmail":
-		return strings.TrimSpace(podcast.OwnerEmail) == ""
+		return strings.TrimSpace(podcast.OwnerEmail) == "", nil
 	default:
-		panic("unknown required top-level field: " + field)
+		return false, fmt.Errorf("%w: %s", ErrUnknownRequiredField, field)
 	}
 }
 
