@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
@@ -20,12 +22,16 @@ func (a *parseTestAsker) Ask(_ context.Context, _ string, _ ...any) bool {
 
 type fakeStorageClient struct {
 	existsResponses map[string]bool
+	existsErr       error
 	checkedKeys     []string
 	uploads         []*s3store.UploadRequest
 }
 
 func (f *fakeStorageClient) FileExists(_ context.Context, request *s3store.ObjectRequest) (bool, error) {
 	f.checkedKeys = append(f.checkedKeys, request.Key)
+	if f.existsErr != nil {
+		return false, f.existsErr
+	}
 	return f.existsResponses[request.Key], nil
 }
 
@@ -120,6 +126,36 @@ func TestCheckAndUploadPodcastImageUploadsMissingRemoteImage(t *testing.T) {
 	}
 	if upload.ContentType != "image/png" {
 		t.Fatalf("upload.ContentType = %q, want image/png", upload.ContentType)
+	}
+}
+
+func TestCheckAndUploadPodcastImageIncludesRemoteContextInErrors(t *testing.T) {
+	ctx := context.Background()
+	workdir := t.TempDir()
+	imageRelPath := filepath.Join("artwork", "podcast-cover.jpg")
+	imagePath := filepath.Join(workdir, imageRelPath)
+	mkdirAll(t, filepath.Dir(imagePath))
+	writeFile(t, imagePath, []byte("jpeg"))
+
+	atom := &model.Podcast{
+		Config: model.Config{
+			BaseURL:         "https://example.com/show",
+			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/podcast-cover.jpg",
+			LocalStorageDir: workdir,
+			Aws: model.AwsConfig{
+				Region:  "us-east-1",
+				Buckets: model.Buckets{Output: "bucket"},
+			},
+		},
+	}
+	storage := &fakeStorageClient{existsErr: errors.New("boom")}
+
+	err := checkAndUploadPodcastImage(ctx, atom, &parseTestAsker{answer: true}, storage)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "remote podcast image") || !strings.Contains(err.Error(), "bucket") || !strings.Contains(err.Error(), imageRelPath) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

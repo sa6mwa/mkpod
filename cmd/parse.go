@@ -88,7 +88,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
-			l.Error("Failed to load podcast spec", "error", err, "specfile", specFile)
+			l.Error("Failed to load podcast specification", "error", err, "specfile", specFile)
 			os.Exit(1)
 		}
 
@@ -210,7 +210,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 			l.Warn("Local image file does not exist", "path", fullLocalPath, "type", imageType)
 			return nil // Can't upload if local file doesn't exist
 		} else if err != nil {
-			return fmt.Errorf("failed to check local image file %s: %w", fullLocalPath, err)
+			return fmt.Errorf("failed to access local %s image %s: %w", imageType, fullLocalPath, err)
 		}
 
 		if uploaderAdapter == nil {
@@ -224,7 +224,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 			Key:   s3Key,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to check remote image %s: %w", s3Key, err)
+			return fmt.Errorf("failed to check remote %s image %s in bucket %s: %w", imageType, s3Key, atom.Config.Aws.Buckets.Output, err)
 		}
 		if exists {
 			l.Info("Image already exists in S3, skipping upload", "s3Key", s3Key, "type", imageType)

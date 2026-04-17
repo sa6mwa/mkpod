@@ -335,3 +335,18 @@ func cmdTest(_ string, args ...string) (string, error) {
 	output, err := command.CombinedOutput()
 	return string(output), err
 }
+
+func TestParseShowsInvalidYAMLError(t *testing.T) {
+	specPath := filepath.Join(t.TempDir(), "podspec.yaml")
+	if err := os.WriteFile(specPath, []byte("config: [\n"), 0o644); err != nil {
+		t.Fatalf("write invalid spec: %v", err)
+	}
+
+	output, err := cmdTest("", "parse", "--spec", specPath)
+	if err == nil {
+		t.Fatalf("mkpod parse unexpectedly succeeded\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "invalid YAML") {
+		t.Fatalf("expected invalid YAML error, got: %s", output)
+	}
+}

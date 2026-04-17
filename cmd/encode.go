@@ -97,7 +97,7 @@ Use --all --force to re-encode all episodes regardless.`,
 		config := spec.New(specFile)
 		atom, err := config.Load(ctx)
 		if err != nil {
-			l.Error("Failed to load podcast spec", "error", err, "specfile", specFile)
+			l.Error("Failed to load podcast specification", "error", err, "specfile", specFile)
 			os.Exit(1)
 		}
 
@@ -237,7 +237,7 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode
 	if _, err := os.Stat(localPath); os.IsNotExist(err) {
 		return false, nil // No local file, nothing to upload
 	} else if err != nil {
-		return false, fmt.Errorf("failed to check local file: %w", err)
+		return false, fmt.Errorf("failed to access local encoded file %s: %w", localPath, err)
 	}
 
 	// Check if remote file exists
@@ -248,7 +248,7 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode
 		}
 		exists, err := storageClient.FileExists(ctx, request)
 		if err != nil {
-			return false, fmt.Errorf("failed to check remote file: %w", err)
+			return false, fmt.Errorf("failed to check remote output %s in bucket %s: %w", episode.Output, atom.Config.Aws.Buckets.Output, err)
 		}
 
 		if !exists {

@@ -111,7 +111,7 @@ This file is the working plan for finishing the refactor.
 - [x] Make dry-run behavior consistent across commands.
 - [x] Ensure `force` means "do not prompt" everywhere.
 - [x] Review `encode --all` semantics and replace implicit magic with explicit language.
-- [ ] Improve error messages for missing tools, invalid config, missing local files, and S3 object mismatches.
+- [x] Improve error messages for missing tools, invalid config, missing local files, and S3 object mismatches.
 - [x] Add examples to help output for common workflows.
 - [ ] Decide whether preprocessing belongs as a long-term subcommand or should remain a thin utility wrapper.
 

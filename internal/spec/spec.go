@@ -33,11 +33,11 @@ type Store struct {
 func (s *Store) Load(ctx context.Context) (*model.Podcast, error) {
 	f, err := os.Open(s.specFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to open %s: %w", s.specFile, err)
 	}
 	var atom model.Podcast
 	if err := yaml.NewDecoder(f).Decode(&atom); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid YAML in %s: %w", s.specFile, err)
 	}
 	if err := Validate(&atom); err != nil {
 		return nil, fmt.Errorf("validation failed for %s: %w", s.specFile, err)
