@@ -94,7 +94,7 @@ This file is the working plan for finishing the refactor.
 - [x] Add `mkpod init <directory>` command.
 - [x] Make the target directory argument mandatory.
 - [x] Support `mkpod init .` and arbitrary paths like `mkpod init ~/podcast`.
-- [ ] Create a predictable starter structure, for example:
+- [x] Create a predictable starter structure, for example:
   - [x] target directory
   - [x] `podspec.yaml`
   - [x] `artwork/`
