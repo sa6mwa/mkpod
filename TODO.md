@@ -32,14 +32,14 @@ This file is the working plan for finishing the refactor.
 - [x] Remove `urfave/cli/v2` from `go.mod` once the legacy tree is gone.
 - [x] Replace `internal/app/ports` with fewer, behavior-oriented interfaces owned by the consuming package instead of a global "ports" package.
 - [x] Collapse adapter naming into plainer package names where possible.
-- [ ] Introduce a simpler package layout, roughly:
+- [x] Introduce a simpler package layout, roughly:
   - [x] `internal/spec` for YAML load/save/defaulting/validation
-  - [ ] `internal/podcast` for domain rules around episodes/feed generation
+  - [x] keep domain rules in `internal/spec` and `internal/rss` instead of adding `internal/podcast` without stronger separation pressure
   - [x] `internal/media` for shared tooling concerns around ffmpeg/ffprobe/lame execution
   - [x] `internal/prompt` for interactive/force/dry-run prompting
   - [x] `internal/logging` for context-backed logging helpers
   - [x] `internal/storage/s3` for S3 operations
-  - [ ] `internal/cli` for Cobra commands and command wiring
+  - [x] keep Cobra command wiring in `cmd/` instead of adding `internal/cli` without a clear payoff
 - [x] Avoid generic request/response structs when a concrete method signature is clearer.
 - [x] Move AWS-only constants and types out of generic abstractions.
 
@@ -123,7 +123,7 @@ This file is the working plan for finishing the refactor.
 - [x] Reduce duplication between uploader, downloader, and AWS handler session setup.
 - [x] Revisit AWS SDK choice:
   - [x] keep AWS SDK v1 for now and simplify around it
-  - [ ] migrate to v2 only as a separate, deliberate task if maintenance pressure justifies it
+  - [x] leave a v2 migration as a separate future task only if maintenance pressure justifies it
 - [x] Keep remote master deletion safety checks, but move them into a tested service with explicit policy.
 - [x] Add RSS/image existence checks without scattering S3 knowledge across command code.
 - [x] Decide whether storage class support is worth exposing in the main CLI today; if not, make it an internal detail.

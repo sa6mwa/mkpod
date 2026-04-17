@@ -8,8 +8,10 @@ keeps the boundaries that pay for themselves and removes the rest.
 ## Current shape
 
 - `cmd/`: Cobra commands and CLI orchestration.
+- `cmd/` intentionally remains the CLI boundary; there is no separate `internal/cli` layer because the command wiring is small enough to stay readable in place.
 - `internal/spec`: YAML load/save, top-level validation, defaults, and shared
   episode rules used by encode and RSS rendering.
+- Episode/feed domain rules intentionally stay split between `internal/spec` and `internal/rss`; introducing a separate `internal/podcast` package would add movement without clarifying the current responsibilities.
 - `internal/rss`: RSS template rendering and RSS-specific helpers.
 - `internal/media`: shared host-tool discovery and execution concerns.
 - `internal/storage/s3`: concrete S3 upload, download, diff, and object admin
