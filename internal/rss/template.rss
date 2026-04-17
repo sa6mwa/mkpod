@@ -52,6 +52,7 @@
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
+      <itunes:summary><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></itunes:summary>
       <description><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></description>
       <enclosure type="{{.Type}}" url="{{$.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
       <itunes:image href="{{$.Config.BaseURL}}/{{.Image}}"/>

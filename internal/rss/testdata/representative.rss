@@ -37,6 +37,8 @@
       <itunes:author>Guest Host</itunes:author>
       <itunes:explicit>no</itunes:explicit>
       <itunes:subtitle>Episode subtitle</itunes:subtitle>
+      <itunes:summary><![CDATA[<p>Episode description</p>
+]]></itunes:summary>
       <description><![CDATA[<p>Episode description</p>
 ]]></description>
       <enclosure type="audio/mpeg" url="https://example.com/podcast/episode1.mp3" length="12345"/>
