@@ -44,6 +44,15 @@ By default the workspace is generated under `e2e/workspace`.
 - `acceptance-aws`: end-to-end encode, RSS upload, and acceptance checks
 - `acceptance-fallbacks`: local-first fallback behavior for remote masters and images
 
+`make acceptance-aws` now validates more than object existence. It also checks
+the uploaded `podcast.rss` payload itself, including:
+
+- expected published item order
+- `itunes:summary` presence
+- enclosure type and URL
+- episode and podcast artwork references
+- expected encoded audio and artwork objects in the output bucket
+
 ## Notes
 
 - These tests intentionally stay outside the default local test loop.

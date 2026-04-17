@@ -174,7 +174,7 @@ This file is the working plan for finishing the refactor.
 - [x] Fill missing episode author from top-level author and fail when neither exists where required.
 - [x] Default explicitness correctly in RSS output.
 - [x] Validate required top-level fields before parse/write.
-- [ ] Complete full e2e integration coverage.
+- [x] Complete full e2e integration coverage.
 - [x] Remove leftover temporary ffmetadata files.
 - [x] Support natural-language date inputs like `now`, `today`, `yesterday`, `HH:MM`, and `HHMM` within the current `pubDate` parser.
 
