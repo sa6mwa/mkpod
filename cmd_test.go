@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -348,5 +349,67 @@ func TestParseShowsInvalidYAMLError(t *testing.T) {
 	}
 	if !strings.Contains(output, "invalid YAML") {
 		t.Fatalf("expected invalid YAML error, got: %s", output)
+	}
+}
+
+var (
+	compiledBinaryOnce sync.Once
+	compiledBinaryPath string
+	compiledBinaryErr  error
+)
+
+func compiledBinary(t *testing.T) string {
+	t.Helper()
+	compiledBinaryOnce.Do(func() {
+		binDir, err := os.MkdirTemp("", "mkpod-binary-*")
+		if err != nil {
+			compiledBinaryErr = err
+			return
+		}
+		compiledBinaryPath = filepath.Join(binDir, "mkpod-test")
+		cmd := exec.Command("go", "build", "-o", compiledBinaryPath, ".")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			compiledBinaryErr = &exec.ExitError{}
+			compiledBinaryErr = err
+			compiledBinaryPath = string(output)
+		}
+	})
+	if compiledBinaryErr != nil {
+		t.Fatalf("go build failed: %v\nOutput: %s", compiledBinaryErr, compiledBinaryPath)
+	}
+	return compiledBinaryPath
+}
+
+func binaryCmdTest(t *testing.T, args ...string) (string, error) {
+	t.Helper()
+	command := exec.Command(compiledBinary(t), args...)
+	output, err := command.CombinedOutput()
+	return string(output), err
+}
+
+func TestCompiledBinaryHelp(t *testing.T) {
+	output, err := binaryCmdTest(t, "--help")
+	if err != nil {
+		t.Fatalf("compiled mkpod --help failed: %v\nOutput: %s", err, output)
+	}
+	if !strings.Contains(output, "Available Commands:") {
+		t.Fatalf("expected help output, got: %s", output)
+	}
+}
+
+func TestCompiledBinaryInitThenParseDryRun(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "podcast")
+
+	if output, err := binaryCmdTest(t, "init", target); err != nil {
+		t.Fatalf("compiled mkpod init failed: %v\nOutput: %s", err, output)
+	}
+
+	output, err := binaryCmdTest(t, "parse", "--spec", filepath.Join(target, "podspec.yaml"), "--dry-run")
+	if err != nil {
+		t.Fatalf("compiled mkpod parse --dry-run failed: %v\nOutput: %s", err, output)
+	}
+	if !strings.Contains(output, "<rss") {
+		t.Fatalf("expected RSS output, got: %s", output)
 	}
 }
