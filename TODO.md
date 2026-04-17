@@ -4,16 +4,16 @@ This file is the working plan for finishing the refactor.
 
 ## Target Shape
 
-- [ ] Keep the codebase simple: domain types plus a small set of concrete services with narrow interfaces at the seams that actually vary.
-- [ ] Optimize for one supported backend now: local filesystem + external host tools (`ffmpeg`, `ffprobe`, `lame`) + AWS S3.
-- [ ] Remove architecture that exists only to satisfy "hexagonal purity" when there is only one implementation and no meaningful substitution pressure.
-- [ ] Preserve clean boundaries where they pay off:
-  - [ ] configuration/spec loading
-  - [ ] media tool execution
-  - [ ] RSS rendering
-  - [ ] remote storage operations
-  - [ ] interactive prompting
-- [ ] Make testing the primary quality gate: unit tests for rules, integration tests for command orchestration, e2e tests for S3 workflows.
+- [x] Keep the codebase simple: domain types plus a small set of concrete services with narrow interfaces at the seams that actually vary.
+- [x] Optimize for one supported backend now: local filesystem + external host tools (`ffmpeg`, `ffprobe`, `lame`) + AWS S3.
+- [x] Remove architecture that exists only to satisfy "hexagonal purity" when there is only one implementation and no meaningful substitution pressure.
+- [x] Preserve clean boundaries where they pay off:
+  - [x] configuration/spec loading
+  - [x] media tool execution
+  - [x] RSS rendering
+  - [x] remote storage operations
+  - [x] interactive prompting
+- [x] Make testing the primary quality gate: unit tests for rules, integration tests for command orchestration, e2e tests for S3 workflows.
 
 ## Current Repo Findings
 
@@ -45,7 +45,7 @@ This file is the working plan for finishing the refactor.
 
 ## Phase 2: Define Cleaner Interfaces
 
-- [ ] Replace `ForConfiguring` with a concrete spec store API, for example:
+- [x] Replace `ForConfiguring` with a concrete spec store API, for example:
   - [x] `Load(path string) (*podcast.Spec, error)`
   - [x] `Save(path string, spec *podcast.Spec) error`
 - [x] Replace `ForParsing` with a renderer that writes to `io.Writer` and a small helper for writing files.
@@ -135,7 +135,7 @@ This file is the working plan for finishing the refactor.
 - [x] Add unit tests for tool discovery and missing-binary failures.
 - [x] Add unit tests for `init` directory/template generation.
 - [x] Add unit tests for S3 safety logic using mocked storage responses.
-- [ ] Add integration tests for:
+- [x] Add integration tests for:
   - [x] `mkpod parse`
   - [x] `mkpod encode`
   - [x] `mkpod preprocess`
@@ -185,5 +185,5 @@ This file is the working plan for finishing the refactor.
 - [x] 3. Refactor media execution and switch AAC encoding.
 - [x] 4. Centralize spec validation/defaulting.
 - [x] 5. Implement `init`.
-- [ ] 6. Expand unit and integration coverage around the new seams.
+- [x] 6. Expand unit and integration coverage around the new seams.
 - [x] 7. Tighten AWS acceptance tests and refresh docs.
