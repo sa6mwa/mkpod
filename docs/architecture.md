@@ -30,7 +30,7 @@ keeps the boundaries that pay for themselves and removes the rest.
   behind generic abstractions.
 - Put validation and defaults into testable pure functions where possible.
 - Keep required top-level fields and top-level-derived episode defaults explicit in `internal/spec`.
-- AAC outputs use ffmpeg's built-in `aac` encoder with the configured `encoding.abr` target; storage-class handling remains an internal S3 concern rather than a CLI surface.
+- AAC outputs use ffmpeg's built-in `aac` encoder with the configured `encoding.abr` target; storage-class handling remains an internal S3 concern rather than a CLI surface. The current AWS integration deliberately stays on AWS SDK v1 for now because the S3 surface is already small and stable; a v2 migration would be a separate maintenance task rather than part of this refactor.
 
 ## Why this is simpler
 

@@ -121,9 +121,9 @@ This file is the working plan for finishing the refactor.
 
 - [x] Move all S3-specific logic into one package.
 - [x] Reduce duplication between uploader, downloader, and AWS handler session setup.
-- [ ] Revisit AWS SDK choice:
-  - [ ] either keep AWS SDK v1 for now and simplify around it
-  - [ ] or migrate to v2 as a separate, deliberate task
+- [x] Revisit AWS SDK choice:
+  - [x] keep AWS SDK v1 for now and simplify around it
+  - [ ] migrate to v2 only as a separate, deliberate task if maintenance pressure justifies it
 - [x] Keep remote master deletion safety checks, but move them into a tested service with explicit policy.
 - [x] Add RSS/image existence checks without scattering S3 knowledge across command code.
 - [x] Decide whether storage class support is worth exposing in the main CLI today; if not, make it an internal detail.
