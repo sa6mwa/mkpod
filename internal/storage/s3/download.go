@@ -51,12 +51,7 @@ func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {
 				case "NotFound", "NoSuchKey":
 					l.Info("Remote does not exist, will use local file only", "remote", s3path, "local", localPath)
 					if c.prompter != nil && c.prompter.Ask(ctx, "Upload %s to %s?", localPath, s3path) {
-						if err := uploadClient.UploadFile(ctx, &UploadRequest{
-							Store:        bucket,
-							Key:          key,
-							Filename:     localPath,
-							StorageClass: c.atom.Config.Aws.Buckets.GetStorageClass(bucket),
-						}); err != nil {
+						if err := uploadClient.UploadFile(ctx, bucket, key, localPath, &UploadOptions{StorageClass: c.atom.Config.Aws.Buckets.GetStorageClass(bucket)}); err != nil {
 							return err
 						}
 					}

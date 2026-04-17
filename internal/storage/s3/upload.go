@@ -19,10 +19,7 @@ import (
 	logger "github.com/sa6mwa/mkpod/internal/logging"
 )
 
-type UploadRequest struct {
-	Store        string
-	Key          string
-	Filename     string
+type UploadOptions struct {
 	ContentType  string
 	StorageClass string
 }
@@ -36,41 +33,40 @@ func (c *Client) getContentType(filename string) (string, error) {
 	return mimeType.String(), nil
 }
 
-func (c *Client) UploadFile(ctx context.Context, request *UploadRequest) error {
+func (c *Client) UploadFile(ctx context.Context, bucket, key, filename string, options *UploadOptions) error {
 	l := logger.FromContext(ctx)
-	if request == nil {
-		return ErrNilPointerRequest
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return err
 	}
-	if strings.TrimSpace(request.Filename) == "" {
+	if strings.TrimSpace(filename) == "" {
 		return ErrEmptyFilename
 	}
-	if strings.TrimSpace(request.Store) == "" {
-		return ErrEmptyStore
+	if options == nil {
+		options = &UploadOptions{}
 	}
 
-	if strings.TrimSpace(request.ContentType) == "" {
-		contentType, err := c.getContentType(request.Filename)
+	contentType := strings.TrimSpace(options.ContentType)
+	if contentType == "" {
+		detectedContentType, err := c.getContentType(filename)
 		if err != nil {
 			return err
 		}
-		request.ContentType = contentType
+		contentType = detectedContentType
 	}
 
-	if strings.TrimSpace(request.Key) == "" {
-		request.Key = request.Filename
-	}
-	if request.StorageClass == "" {
-		request.StorageClass = StorageClassStandard
+	storageClass := options.StorageClass
+	if storageClass == "" {
+		storageClass = StorageClassStandard
 	}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
-	fi, err := os.Stat(request.Filename)
+	s3path := "s3://" + path.Join(bucket, key)
+	fi, err := os.Stat(filename)
 	if err != nil {
 		return err
 	}
-	l.Info("Uploading to S3", "file", request.Filename, "to", s3path, "storageClass", request.StorageClass, "size", fi.Size(), "humanSize", humanreadable.IEC(fi.Size()))
+	l.Info("Uploading to S3", "file", filename, "to", s3path, "storageClass", storageClass, "size", fi.Size(), "humanSize", humanreadable.IEC(fi.Size()))
 
-	file, err := os.Open(request.Filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
@@ -78,11 +74,11 @@ func (c *Client) UploadFile(ctx context.Context, request *UploadRequest) error {
 
 	uploader := s3manager.NewUploader(c.session)
 	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket:       aws.String(request.Store),
-		Key:          aws.String(request.Key),
-		ContentType:  aws.String(request.ContentType),
+		Bucket:       aws.String(bucket),
+		Key:          aws.String(key),
+		ContentType:  aws.String(contentType),
 		Body:         file,
-		StorageClass: aws.String(request.StorageClass),
+		StorageClass: aws.String(storageClass),
 	})
 	if err != nil {
 		return err

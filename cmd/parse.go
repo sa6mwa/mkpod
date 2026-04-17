@@ -149,13 +149,8 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 			}
 
 			if askerAdapter.Ask(ctx, "Upload new %s?", atom.FeedFile) {
-				request := &s3store.UploadRequest{
-					Store:       atom.Config.Aws.Buckets.Output,
-					Key:         atom.FeedFile,
-					Filename:    feedPath,
-					ContentType: "text/xml",
-				}
-				if err := storageClient.UploadFile(ctx, request); err != nil {
+				options := &s3store.UploadOptions{ContentType: "text/xml"}
+				if err := storageClient.UploadFile(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, feedPath, options); err != nil {
 					l.Error("Failed to upload RSS", "error", err)
 					os.Exit(1)
 				}
@@ -175,7 +170,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 	Ask(context.Context, string, ...any) bool
 }, uploaderAdapter interface {
 	FileExists(context.Context, string, string) (bool, error)
-	UploadFile(context.Context, *s3store.UploadRequest) error
+	UploadFile(context.Context, string, string, string, *s3store.UploadOptions) error
 }) error {
 	l := logger.FromContext(ctx)
 
@@ -236,13 +231,8 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 				contentType = "image/png"
 			}
 
-			request := &s3store.UploadRequest{
-				Store:       atom.Config.Aws.Buckets.Output,
-				Key:         s3Key,
-				Filename:    fullLocalPath,
-				ContentType: contentType,
-			}
-			return uploaderAdapter.UploadFile(ctx, request)
+			options := &s3store.UploadOptions{ContentType: contentType}
+			return uploaderAdapter.UploadFile(ctx, atom.Config.Aws.Buckets.Output, s3Key, fullLocalPath, options)
 		}
 
 		return nil

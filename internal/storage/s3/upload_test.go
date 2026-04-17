@@ -19,18 +19,21 @@ func TestUploadRequestValidation(t *testing.T) {
 
 	ctx := context.Background()
 	tests := []struct {
-		name    string
-		request *UploadRequest
-		wantErr error
+		name     string
+		bucket   string
+		key      string
+		filename string
+		options  *UploadOptions
+		wantErr  error
 	}{
-		{name: "nil request", request: nil, wantErr: ErrNilPointerRequest},
-		{name: "empty store", request: &UploadRequest{Filename: "podcast.rss"}, wantErr: ErrEmptyStore},
-		{name: "empty filename", request: &UploadRequest{Store: "test-bucket"}, wantErr: ErrEmptyFilename},
+		{name: "empty store", bucket: "", key: "podcast.rss", filename: "podcast.rss", wantErr: ErrEmptyStore},
+		{name: "empty key", bucket: "test-bucket", key: "", filename: "podcast.rss", wantErr: ErrEmptyKey},
+		{name: "empty filename", bucket: "test-bucket", key: "podcast.rss", filename: "", wantErr: ErrEmptyFilename},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := client.UploadFile(ctx, tt.request)
+			err := client.UploadFile(ctx, tt.bucket, tt.key, tt.filename, tt.options)
 			if err != tt.wantErr {
 				t.Fatalf("UploadFile() error = %v, want %v", err, tt.wantErr)
 			}

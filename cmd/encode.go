@@ -148,12 +148,7 @@ Use --all --force to re-encode all episodes regardless.`,
 				if shouldUpload {
 					// Use full local path for upload
 					localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
-					request := &s3store.UploadRequest{
-						Store:    atom.Config.Aws.Buckets.Output,
-						Key:      episode.Output,
-						Filename: localPath,
-					}
-					return storageClient.UploadFile(ctx, request)
+					return storageClient.UploadFile(ctx, atom.Config.Aws.Buckets.Output, episode.Output, localPath, nil)
 				}
 			}
 			return nil
