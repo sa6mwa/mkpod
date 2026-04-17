@@ -12,9 +12,9 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media"
+	"github.com/sa6mwa/mkpod/internal/prompt"
 	"github.com/sa6mwa/mkpod/internal/spec"
 	"github.com/sa6mwa/mp3duration"
 )

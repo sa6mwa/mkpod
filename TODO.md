@@ -31,11 +31,13 @@ This file is the working plan for finishing the refactor.
 - [x] Delete the obsolete `cmd/mkpod/` tree after confirming nothing in the current build depends on it.
 - [x] Remove `urfave/cli/v2` from `go.mod` once the legacy tree is gone.
 - [x] Replace `internal/app/ports` with fewer, behavior-oriented interfaces owned by the consuming package instead of a global "ports" package.
-- [ ] Collapse adapter naming into plainer package names where possible.
+- [x] Collapse adapter naming into plainer package names where possible.
 - [ ] Introduce a simpler package layout, roughly:
   - [x] `internal/spec` for YAML load/save/defaulting/validation
   - [ ] `internal/podcast` for domain rules around episodes/feed generation
   - [x] `internal/media` for shared tooling concerns around ffmpeg/ffprobe/lame execution
+  - [x] `internal/prompt` for interactive/force/dry-run prompting
+  - [x] `internal/logging` for context-backed logging helpers
   - [x] `internal/storage/s3` for S3 operations
   - [ ] `internal/cli` for Cobra commands and command wiring
 - [ ] Avoid generic request/response structs when a concrete method signature is clearer.
@@ -53,7 +55,7 @@ This file is the working plan for finishing the refactor.
   - [x] `StatObject`
   - [x] `DeleteObject`
   - [x] `DiffTextObject`
-- [ ] Keep `Asker` or `Prompter` as a tiny interface because it genuinely varies between interactive, force, and dry-run behavior.
+- [x] Keep `Asker` or `Prompter` as a tiny interface because it genuinely varies between interactive, force, and dry-run behavior.
 - [ ] Move command-level orchestration out of storage/encoder adapters and into application services or Cobra command handlers.
 - [x] Replace sentinel UID control values (`-1`, `-2`) with explicit options structs.
 
@@ -179,7 +181,7 @@ This file is the working plan for finishing the refactor.
 ## Proposed Execution Order
 
 - [x] 1. Delete legacy CLI and dependency leftovers.
-- [ ] 2. Simplify package boundaries and replace the current global ports package.
+- [x] 2. Simplify package boundaries and replace the current global ports package.
 - [x] 3. Refactor media execution and switch AAC encoding.
 - [x] 4. Centralize spec validation/defaulting.
 - [x] 5. Implement `init`.

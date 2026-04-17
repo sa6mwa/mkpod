@@ -14,7 +14,7 @@ import (
 	"al.essio.dev/pkg/shellescape"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/spec"
 )
 

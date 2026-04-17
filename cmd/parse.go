@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
+	"github.com/sa6mwa/mkpod/internal/prompt"
 	"github.com/sa6mwa/mkpod/internal/rss"
 	"github.com/sa6mwa/mkpod/internal/spec"
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"

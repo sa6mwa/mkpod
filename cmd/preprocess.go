@@ -25,8 +25,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/preprocessor"
+	"github.com/sa6mwa/mkpod/internal/logging"
+	"github.com/sa6mwa/mkpod/internal/media/preprocess"
 	"github.com/spf13/cobra"
 )
 

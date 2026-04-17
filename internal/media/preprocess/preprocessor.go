@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media"
 )
 

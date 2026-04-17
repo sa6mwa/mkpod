@@ -160,7 +160,7 @@ func newInitialSpec(targetDir string) *model.Podcast {
 			},
 			LocalStorageDir: targetDir,
 		},
-		FeedFile:        "podcast.rss",
+		FeedFile:    "podcast.rss",
 		Title:       podcastName,
 		Link:        "https://example.com/" + podcastName,
 		TTL:         60,

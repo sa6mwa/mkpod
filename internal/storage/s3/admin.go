@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/asker"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
+	"github.com/sa6mwa/mkpod/internal/prompt"
 )
 
 var (

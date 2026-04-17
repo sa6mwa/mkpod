@@ -14,9 +14,9 @@ keeps the boundaries that pay for themselves and removes the rest.
 - `internal/media`: shared host-tool discovery and execution concerns.
 - `internal/storage/s3`: concrete S3 upload, download, diff, and object admin
   operations.
-- `internal/infra/adapters/encoder`, `preprocessor`, `asker`, `logger`:
+- `internal/media/encode`, `internal/media/preprocess`, `internal/prompt`, `internal/logging`:
   concrete services around media processing, prompting, and logging.
-  `preprocessor` is intentionally just a small optional ffmpeg utility, not a core application layer.
+  `preprocess` is intentionally just a small optional ffmpeg utility, not a core application layer.
 - `internal/app/model`: the existing domain/data structures loaded from
   `podspec.yaml`.
 

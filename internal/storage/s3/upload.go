@@ -16,7 +16,7 @@ import (
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
 	"github.com/sa6mwa/mkpod/internal/app/humanreadable"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 )
 
 type UploadRequest struct {

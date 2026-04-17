@@ -12,7 +12,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/sa6mwa/mkpod/internal/app/humanreadable"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 )
 
 func (c *Client) DownloadFile(ctx context.Context, bucket, key string) error {

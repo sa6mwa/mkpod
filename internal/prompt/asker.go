@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/sa6mwa/mkpod/internal/infra/adapters/logger"
+	"github.com/sa6mwa/mkpod/internal/logging"
 	"golang.org/x/term"
 )
 
