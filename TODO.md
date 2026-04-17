@@ -60,10 +60,10 @@ This file is the working plan for finishing the refactor.
 ## Phase 3: Media Pipeline Cleanup
 
 - [x] Replace `libfdk_aac` with ffmpeg’s native AAC encoder everywhere.
-- [ ] Decide and document default AAC settings for podcast use:
-  - [ ] audio codec: `aac`
-  - [ ] bitrate mode and target
-  - [ ] container defaults for `m4a` and `m4b`
+- [x] Decide and document default AAC settings for podcast use:
+  - [x] audio codec: `aac`
+  - [x] bitrate mode and target
+  - [x] container defaults for `m4a` and `m4b`
 - [x] Remove repo guidance that implies custom ffmpeg builds are required.
 - [x] Default to host-provided `ffmpeg`, `ffprobe`, and `lame` from `PATH`.
 - [x] Make explicit tool paths optional overrides in config, not required fields.
@@ -93,14 +93,14 @@ This file is the working plan for finishing the refactor.
 - [x] Make the target directory argument mandatory.
 - [x] Support `mkpod init .` and arbitrary paths like `mkpod init ~/podcast`.
 - [ ] Create a predictable starter structure, for example:
-  - [ ] target directory
+  - [x] target directory
   - [x] `podspec.yaml`
   - [x] `artwork/`
   - [x] `masters/`
   - [x] `output/` or document that outputs are written in-place under local storage
 - [x] Write a minimal but valid YAML template tailored to the current simplified config model.
-- [ ] Decide overwrite policy:
-  - [ ] fail if target exists and is non-empty
+- [x] Decide overwrite policy:
+  - [x] fail if target exists and is non-empty
   - [ ] optional `--force` later if needed
 - [x] Print next-step guidance after initialization.
 - [x] Add tests for empty dir init, nested dir creation, existing file conflicts, and path expansion.
@@ -124,7 +124,7 @@ This file is the working plan for finishing the refactor.
   - [ ] or migrate to v2 as a separate, deliberate task
 - [x] Keep remote master deletion safety checks, but move them into a tested service with explicit policy.
 - [x] Add RSS/image existence checks without scattering S3 knowledge across command code.
-- [ ] Decide whether storage class support is worth exposing in the main CLI today; if not, make it an internal detail.
+- [x] Decide whether storage class support is worth exposing in the main CLI today; if not, make it an internal detail.
 
 ## Phase 8: Testing Expansion
 
@@ -146,9 +146,9 @@ This file is the working plan for finishing the refactor.
 ## Phase 9: E2E Test Strategy
 
 - [x] Keep S3-backed e2e tests, but make them clearly optional and isolated from default local test runs.
-- [ ] Split e2e into:
-  - [ ] local integration tests that do not require AWS
-  - [ ] opt-in AWS acceptance tests
+- [x] Split e2e into:
+  - [x] local integration tests that do not require AWS
+  - [x] opt-in AWS acceptance tests
 - [ ] Replace brittle shell-grep assertions with clearer structured assertions where practical.
 - [x] Add a documented test fixture lifecycle for the AWS buckets.
 - [x] Make e2e target names reflect intent: `acceptance-aws`, `acceptance-remove-master`, etc.
@@ -173,7 +173,7 @@ This file is the working plan for finishing the refactor.
 - [x] Default explicitness correctly in RSS output.
 - [x] Validate required top-level fields before parse/write.
 - [ ] Complete full e2e integration coverage.
-- [ ] Remove leftover temporary ffmetadata files.
+- [x] Remove leftover temporary ffmetadata files.
 - [x] Support natural-language date inputs like `now`, `today`, `yesterday`, `HH:MM`, and `HHMM` within the current `pubDate` parser.
 
 ## Proposed Execution Order
@@ -181,7 +181,7 @@ This file is the working plan for finishing the refactor.
 - [x] 1. Delete legacy CLI and dependency leftovers.
 - [ ] 2. Simplify package boundaries and replace the current global ports package.
 - [x] 3. Refactor media execution and switch AAC encoding.
-- [ ] 4. Centralize spec validation/defaulting.
+- [x] 4. Centralize spec validation/defaulting.
 - [x] 5. Implement `init`.
 - [ ] 6. Expand unit and integration coverage around the new seams.
 - [x] 7. Tighten AWS acceptance tests and refresh docs.

@@ -32,6 +32,16 @@ will be an audio-only episode).
 For AAC-based outputs (`m4a`, `m4b`, and MP4 audio tracks), mkpod now uses
 ffmpeg's built-in `aac` encoder rather than `libfdk_aac`.
 
+For the current podcast-focused defaults, AAC outputs use ffmpeg's `aac`
+encoder at the configured `encoding.abr` target (default `128k`). `m4a`
+and `m4b` remain simple container choices selected by episode `format` or
+`encoding.preferredFormat`; there is no separate container-specific policy
+layer yet.
+
+S3 storage class handling is intentionally internal for now. mkpod keeps
+the behavior in the S3 layer, but does not expose storage-class controls
+as part of the main CLI workflow.
+
 `mkpod preprocess` is intentionally kept as a small convenience wrapper around a few ffmpeg filter presets. It is useful when you want it, but it is not part of the required `init -> encode -> parse` publishing path.
 
 ## Quick Start
