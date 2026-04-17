@@ -156,10 +156,15 @@ Use --all --force to re-encode all episodes regardless.`,
 
 		processedCount := 0
 
+		prepareEpisode := func(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
+			return prepareEpisodeAssetsForEncode(ctx, atom, episode, storageClient)
+		}
+
 		if all {
 			result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
-				All:           true,
-				ForceReencode: askNoQuestions,
+				All:            true,
+				ForceReencode:  askNoQuestions,
+				PrepareEpisode: prepareEpisode,
 			}, postEncodeFunc)
 			if err != nil {
 				l.Error("Failed to encode episodes", "error", err)
@@ -175,7 +180,8 @@ Use --all --force to re-encode all episodes regardless.`,
 					continue
 				}
 				result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
-					EpisodeUID: &uid,
+					EpisodeUID:     &uid,
+					PrepareEpisode: prepareEpisode,
 				}, postEncodeFunc)
 				if err != nil {
 					l.Error("Failed to encode episode", "uid", uid, "error", err)

@@ -23,9 +23,7 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -136,10 +134,10 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		if upload && !dryRun {
 			storageClient := s3store.New(atom, prompter)
 
-			// Check and upload podcast image if needed
+			// Ensure every referenced image can be published from local state or remote fallback.
 			if err := checkAndUploadPodcastImage(ctx, atom, prompter, storageClient); err != nil {
-				l.Warn("Failed to check/upload podcast image", "error", err)
-				// Don't exit on podcast image error - this is not critical
+				l.Error("Failed to sync required podcast images", "error", err)
+				os.Exit(1)
 			}
 
 			// Show diff first
@@ -165,101 +163,15 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 	},
 }
 
-// checkAndUploadPodcastImage checks if podcast images referenced in URLs exist in S3 and uploads missing ones
+// checkAndUploadPodcastImage keeps publishable images in sync with local-first semantics.
 func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerAdapter interface {
 	Ask(context.Context, string, ...any) bool
 }, uploaderAdapter interface {
-	FileExists(context.Context, string, string) (bool, error)
+	GetFileInfo(context.Context, string, string) (*s3store.FileInfo, error)
+	DownloadFile(context.Context, string, string) error
 	UploadFile(context.Context, string, string, string, *s3store.UploadOptions) error
 }) error {
-	l := logger.FromContext(ctx)
-
-	// Extract bucket domain from output bucket URL
-	bucketDomain := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", atom.Config.Aws.Buckets.Output, atom.Config.Aws.Region)
-
-	// Function to check and upload an image
-	checkAndUpload := func(imageURL, localImagePath, imageType string) error {
-		if imageURL == "" {
-			return nil // No image URL specified
-		}
-
-		// Check if the image URL points to our S3 bucket
-		if !strings.HasPrefix(imageURL, bucketDomain) {
-			l.Debug("Image URL does not reference our S3 bucket, skipping", "url", imageURL, "type", imageType)
-			return nil
-		}
-
-		// Extract the S3 key from the URL
-		s3Key := strings.TrimPrefix(imageURL, bucketDomain+"/")
-		if strings.TrimSpace(localImagePath) == "" {
-			localImagePath = s3Key
-		}
-
-		// Build the full path using localStorageDir from config
-		fullLocalPath := localImagePath
-		if atom.LocalStorageDirExpanded() != "" {
-			fullLocalPath = filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(localImagePath))
-		}
-
-		// Check if local image file exists
-		if _, err := os.Stat(fullLocalPath); os.IsNotExist(err) {
-			l.Warn("Local image file does not exist", "path", fullLocalPath, "type", imageType)
-			return nil // Can't upload if local file doesn't exist
-		} else if err != nil {
-			return fmt.Errorf("failed to access local %s image %s: %w", imageType, fullLocalPath, err)
-		}
-
-		if uploaderAdapter == nil {
-			// Dry run mode
-			l.Info("Would check/upload image", "s3Key", s3Key, "localPath", localImagePath, "type", imageType)
-			return nil
-		}
-
-		exists, err := uploaderAdapter.FileExists(ctx, atom.Config.Aws.Buckets.Output, s3Key)
-		if err != nil {
-			return fmt.Errorf("failed to check remote %s image %s in bucket %s: %w", imageType, s3Key, atom.Config.Aws.Buckets.Output, err)
-		}
-		if exists {
-			l.Info("Image already exists in S3, skipping upload", "s3Key", s3Key, "type", imageType)
-			return nil
-		}
-
-		if askerAdapter.Ask(ctx, "Upload %s image %s to S3?", imageType, localImagePath) {
-			// Determine content type based on file extension
-			contentType := "image/jpeg"
-			if strings.HasSuffix(strings.ToLower(localImagePath), ".png") {
-				contentType = "image/png"
-			}
-
-			options := &s3store.UploadOptions{ContentType: contentType}
-			return uploaderAdapter.UploadFile(ctx, atom.Config.Aws.Buckets.Output, s3Key, fullLocalPath, options)
-		}
-
-		return nil
-	}
-
-	// Check main podcast image
-	// Extract the local path from the image URL by removing the baseURL prefix
-	mainImageLocalPath := ""
-	baseURLPrefix := strings.TrimRight(atom.Config.BaseURL, "/") + "/"
-	if atom.Config.Image != "" && strings.HasPrefix(atom.Config.Image, baseURLPrefix) {
-		mainImageLocalPath = strings.TrimPrefix(atom.Config.Image, baseURLPrefix)
-	}
-	if err := checkAndUpload(atom.Config.Image, mainImageLocalPath, "podcast"); err != nil {
-		return fmt.Errorf("failed to check/upload main podcast image: %w", err)
-	}
-
-	// Check encoding cover image
-	coverImagePath := atom.Encoding.Coverfront
-	if coverImagePath != "" {
-		// Construct the URL from the base URL and cover image path
-		coverImageURL := joinBaseURLPath(atom.Config.BaseURL, coverImagePath)
-		if err := checkAndUpload(coverImageURL, coverImagePath, "cover"); err != nil {
-			return fmt.Errorf("failed to check/upload cover image: %w", err)
-		}
-	}
-
-	return nil
+	return syncReferencedImagesForPublish(ctx, atom, askerAdapter, uploaderAdapter)
 }
 
 func init() {

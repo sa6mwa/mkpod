@@ -23,7 +23,10 @@ func (a *parseTestAsker) Ask(_ context.Context, _ string, _ ...any) bool {
 type fakeStorageClient struct {
 	existsResponses map[string]bool
 	existsErr       error
+	infoResponses   map[string]*s3store.FileInfo
+	downloadErr     error
 	checkedKeys     []string
+	downloads       []string
 	uploads         []fakeUpload
 }
 
@@ -41,6 +44,24 @@ func (f *fakeStorageClient) FileExists(_ context.Context, bucket, key string) (b
 		return false, f.existsErr
 	}
 	return f.existsResponses[key], nil
+}
+
+func (f *fakeStorageClient) GetFileInfo(_ context.Context, bucket, key string) (*s3store.FileInfo, error) {
+	f.checkedKeys = append(f.checkedKeys, key)
+	if f.existsErr != nil {
+		return nil, f.existsErr
+	}
+	if f.infoResponses != nil {
+		if info, ok := f.infoResponses[key]; ok {
+			return info, nil
+		}
+	}
+	return &s3store.FileInfo{Exists: f.existsResponses[key]}, nil
+}
+
+func (f *fakeStorageClient) DownloadFile(_ context.Context, bucket, key string) error {
+	f.downloads = append(f.downloads, key)
+	return f.downloadErr
 }
 
 func (f *fakeStorageClient) UploadFile(_ context.Context, bucket, key, filename string, options *s3store.UploadOptions) error {
@@ -82,6 +103,9 @@ func TestCheckAndUploadPodcastImageSkipsExistingRemoteImage(t *testing.T) {
 	storage := &fakeStorageClient{
 		existsResponses: map[string]bool{
 			imageRelPath: true,
+		},
+		infoResponses: map[string]*s3store.FileInfo{
+			imageRelPath: {Exists: true, Size: int64(len("jpeg"))},
 		},
 	}
 

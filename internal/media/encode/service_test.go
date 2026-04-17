@@ -178,3 +178,59 @@ func TestEncodeReturnsEmptyResultForMissingEpisode(t *testing.T) {
 		t.Fatalf("EncodedOutputs = %v, want none", result.EncodedOutputs)
 	}
 }
+
+func TestEncodeAllRepairsExistingOutputMetadataWithoutReencode(t *testing.T) {
+	requireTools(t, "lame")
+
+	workdir := t.TempDir()
+	coverPath := filepath.Join(workdir, "artwork", "cover.jpg")
+	inputPath := filepath.Join(workdir, "masters", "episode.wav")
+	writeCoverJPEG(t, coverPath)
+	writeSilentWAV(t, inputPath, 44100, 1)
+
+	atom := testAtom(workdir)
+	episode := model.Episode{
+		UID:      1,
+		Title:    "Episode One",
+		Author:   "Host",
+		PubDate:  model.ItunesTime{},
+		Link:     "https://example.com/show/episodes/1",
+		Subtitle: "Subtitle",
+		Input:    filepath.ToSlash(filepath.Join("masters", "episode.wav")),
+		Image:    filepath.ToSlash(filepath.Join("artwork", "cover.jpg")),
+		Format:   "mp3",
+		Explicit: model.ItunesExplicit{S: "no"},
+	}
+	atom.Episodes = []model.Episode{episode}
+
+	if err := EncodeMP3(context.Background(), atom, &atom.Episodes[0]); err != nil {
+		t.Fatalf("EncodeMP3() error = %v", err)
+	}
+	atom.Episodes[0].Type = ""
+	atom.Episodes[0].Length = 0
+	atom.Episodes[0].Duration = model.ItunesDuration{}
+	if err := os.Remove(inputPath); err != nil {
+		t.Fatalf("Remove(%q): %v", inputPath, err)
+	}
+
+	service := New(stubPrompter{answer: false})
+	result, err := service.Encode(context.Background(), atom, EncodeOptions{All: true}, nil)
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+	if len(result.EncodedOutputs) != 0 {
+		t.Fatalf("EncodedOutputs = %v, want none", result.EncodedOutputs)
+	}
+	if atom.Episodes[0].Type != "audio/mpeg" {
+		t.Fatalf("Type = %q, want audio/mpeg", atom.Episodes[0].Type)
+	}
+	if atom.Episodes[0].Length <= 0 {
+		t.Fatalf("Length = %d, want > 0", atom.Episodes[0].Length)
+	}
+	if atom.Episodes[0].Duration.Duration <= 0 {
+		t.Fatalf("Duration = %s, want > 0", atom.Episodes[0].Duration.Duration)
+	}
+	if atom.Episodes[0].PubDate.IsZero() {
+		t.Fatal("PubDate should be set when repairing existing output metadata")
+	}
+}

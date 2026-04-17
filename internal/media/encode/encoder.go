@@ -28,9 +28,10 @@ var (
 type PostEncodeFunc func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error
 
 type EncodeOptions struct {
-	All           bool
-	EpisodeUID    *int64
-	ForceReencode bool
+	All            bool
+	EpisodeUID     *int64
+	ForceReencode  bool
+	PrepareEpisode PrepareEncodeFunc
 }
 
 type EncodeResult struct {
@@ -170,34 +171,42 @@ func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options Encod
 	}
 
 	for _, i := range indexes {
-		// Apply defaults to episode fields before encoding
-		if err := applyEpisodeDefaults(atom, &atom.Episodes[i]); err != nil {
+		episode := &atom.Episodes[i]
+		if err := applyEpisodeDefaults(atom, episode); err != nil {
 			return nil, err
 		}
-
-		inputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Input)
-		inputContentType, err := GetFileContentType(inputPath)
-		if err != nil {
-			return nil, err
-		}
+		_ = ensureEpisodePubDate(episode)
 
 		outputPath := ""
-		if strings.TrimSpace(atom.Episodes[i].Output) != "" {
-			outputPath = path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
+		if strings.TrimSpace(episode.Output) != "" {
+			outputPath = path.Join(atom.LocalStorageDirExpanded(), episode.Output)
 		}
+		if _, err := repairOutputMetadata(ctx, episode, outputPath); err != nil {
+			return nil, err
+		}
+
 		wasEncoded := false
 		if e.shouldEncode(ctx, options, outputPath) {
+			if options.PrepareEpisode != nil {
+				if err := options.PrepareEpisode(ctx, atom, episode); err != nil {
+					return nil, err
+				}
+			}
+			inputPath := path.Join(atom.LocalStorageDirExpanded(), episode.Input)
+			inputContentType, err := GetFileContentType(inputPath)
+			if err != nil {
+				return nil, err
+			}
 			wasEncoded = true
-			if err := e.encodeEpisode(ctx, atom, &atom.Episodes[i], inputContentType); err != nil {
+			if err := e.encodeEpisode(ctx, atom, episode, inputContentType); err != nil {
 				return nil, err
 			}
 
-			result.EncodedOutputs = append(result.EncodedOutputs, atom.Episodes[i].Output)
+			result.EncodedOutputs = append(result.EncodedOutputs, episode.Output)
 		}
 
-		// If postEncoding functions is given, call it...
 		if postEncoding != nil {
-			if err := postEncoding(atom, &atom.Episodes[i], wasEncoded); err != nil {
+			if err := postEncoding(atom, episode, wasEncoded); err != nil {
 				return nil, err
 			}
 		}
