@@ -10,6 +10,7 @@ BASE_URL ?= https://$(OUTPUT_BUCKET).s3.$(AWS_REGION).amazonaws.com
 FEED_FILE := $(WORKSPACE)/podcast.rss
 SPEC_FILE := $(WORKSPACE)/podspec.yaml
 OUTPUT_BUCKET_JSON := $(WORKSPACE)/output-bucket.json
+UPLOADED_RSS := $(WORKSPACE)/uploaded-podcast.rss
 
 .PHONY: all help build-mkpod rebuild bootstrap-workspace verify-buckets setup \
 	encode generate-rss upload-rss verify-outputs acceptance-aws \
@@ -57,10 +58,10 @@ upload-rss: setup
 
 verify-outputs:
 	@aws s3api list-objects-v2 --bucket $(OUTPUT_BUCKET) > $(OUTPUT_BUCKET_JSON)
-	@python3 -c 'import json,sys; from pathlib import Path; payload=json.loads(Path(sys.argv[1]).read_text()); keys=[obj["Key"] for obj in payload.get("Contents", [])]; ("podcast.rss" in keys) or (_ for _ in ()).throw(SystemExit("FAIL: podcast.rss missing from output bucket")); any(key.endswith(".m4a") for key in keys) or (_ for _ in ()).throw(SystemExit("FAIL: no .m4a objects found in output bucket"))' "$(OUTPUT_BUCKET_JSON)"
-	@rm -f $(OUTPUT_BUCKET_JSON)
-	@echo "Verified podcast.rss and encoded audio in $(OUTPUT_BUCKET)"
-
+	@aws s3 cp s3://$(OUTPUT_BUCKET)/podcast.rss $(UPLOADED_RSS) >/dev/null
+	@python3 -c 'import json,sys,xml.etree.ElementTree as ET; from pathlib import Path; objects=json.loads(Path(sys.argv[1]).read_text()); keys={obj[\'Key\'] for obj in objects.get(\'Contents\', [])}; (\'podcast.rss\' in keys) or (_ for _ in ()).throw(SystemExit(\'FAIL: podcast.rss missing from output bucket\')); any(key.endswith(\'.m4a\') for key in keys) or (_ for _ in ()).throw(SystemExit(\'FAIL: no .m4a objects found in output bucket\')); (\'artwork/episode-1.jpg\' in keys) or (_ for _ in ()).throw(SystemExit(\'FAIL: artwork/episode-1.jpg missing from output bucket\')); (\'artwork/podcast-cover.jpg\' in keys) or (_ for _ in ()).throw(SystemExit(\'FAIL: artwork/podcast-cover.jpg missing from output bucket\')); root=ET.fromstring(Path(sys.argv[2]).read_text()); channel=root.find(\'channel\'); channel is not None or (_ for _ in ()).throw(SystemExit(\'FAIL: uploaded RSS channel element missing\')); items=channel.findall(\'item\'); len(items) >= 2 or (_ for _ in ()).throw(SystemExit(f\'FAIL: expected at least 2 RSS items, found {len(items)}\')); titles=[items[0].findtext(\'title\', default=\'\'), items[1].findtext(\'title\', default=\'\')]; titles == [\'Acceptance Episode One\', \'Acceptance Episode Two\'] or (_ for _ in ()).throw(SystemExit(f\'FAIL: unexpected uploaded RSS item order {titles!r}\')); [((item.findtext(\'summary\', default=\'\').strip()) or (_ for _ in ()).throw(SystemExit(f\'FAIL: uploaded RSS item {idx} missing itunes:summary\')), (item.find(\'enclosure\') is not None) or (_ for _ in ()).throw(SystemExit(f\'FAIL: uploaded RSS item {idx} missing enclosure\')), (item.find(\'enclosure\').attrib.get(\'type\', \'\') == \'audio/mp4\') or (_ for _ in ()).throw(SystemExit(f"FAIL: uploaded RSS item {idx} enclosure type {item.find(\'enclosure\').attrib.get(\'type\', \'\')!r}, expected \'audio/mp4\'")), (item.find(\'enclosure\').attrib.get(\'url\', \'\').endswith(f\'episode-{idx}.m4a\')) or (_ for _ in ()).throw(SystemExit(f"FAIL: uploaded RSS item {idx} enclosure URL {item.find(\'enclosure\').attrib.get(\'url\', \'\')!r} did not reference episode-{idx}.m4a")), (item.find(\'image\') is not None) or (_ for _ in ()).throw(SystemExit(f\'FAIL: uploaded RSS item {idx} missing itunes:image\')), (item.find(\'image\').attrib.get(\'href\', \'\').endswith(\'artwork/episode-1.jpg\' if idx == 1 else \'artwork/podcast-cover.jpg\')) or (_ for _ in ()).throw(SystemExit(f"FAIL: uploaded RSS item {idx} image href {item.find(\'image\').attrib.get(\'href\', \'\')!r} did not reference {\'artwork/episode-1.jpg\' if idx == 1 else \'artwork/podcast-cover.jpg\'!r}"))) for idx,item in enumerate(items[:2], start=1)]' "$(OUTPUT_BUCKET_JSON)" "$(UPLOADED_RSS)"
+	@rm -f $(OUTPUT_BUCKET_JSON) $(UPLOADED_RSS)
+	@echo "Verified uploaded podcast.rss structure and published assets in $(OUTPUT_BUCKET)"
 acceptance-remove-master: setup
 	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" WORKSPACE="$(WORKSPACE)" SPEC_FILE="$(SPEC_FILE)" MKPOD_BIN="$(MKPOD_BIN)" ./acceptance-remove-master.sh
 
@@ -114,7 +115,7 @@ help:
 	@echo "  encode                   Encode all episodes into the workspace and upload as needed"
 	@echo "  generate-rss             Generate podcast.rss locally under the workspace"
 	@echo "  upload-rss               Generate and upload podcast.rss"
-	@echo "  verify-outputs           Assert that podcast.rss and encoded audio exist in S3"
+	@echo "  verify-outputs           Assert uploaded RSS structure, images, and encoded audio in S3"
 	@echo "  acceptance-remove-master Verify remote master deletion safety checks"
 	@echo "  acceptance-pubdate       Verify missing top-level pubDate gets filled"
 	@echo "  acceptance-validation    Verify top-level validation and episode filtering"
