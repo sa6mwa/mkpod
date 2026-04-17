@@ -42,6 +42,7 @@ By default the workspace is generated under `e2e/workspace`.
 - `acceptance-pubdate`: filling a missing top-level `pubDate`
 - `acceptance-remove-master`: safety checks around `--remove-remote-master`
 - `acceptance-aws`: end-to-end encode, RSS upload, and acceptance checks
+- `acceptance-fallbacks`: local-first fallback behavior for remote masters and images
 
 ## Notes
 

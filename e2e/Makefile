@@ -14,6 +14,7 @@ OUTPUT_BUCKET_JSON := $(WORKSPACE)/output-bucket.json
 .PHONY: all help build-mkpod rebuild bootstrap-workspace verify-buckets setup \
 	encode generate-rss upload-rss verify-outputs acceptance-aws \
 	acceptance-remove-master acceptance-pubdate acceptance-validation \
+	acceptance-fallbacks \
 	make-public make-private clean clean-local
 
 all: help
@@ -73,7 +74,10 @@ acceptance-pubdate: setup
 acceptance-validation: setup
 	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" AWS_REGION="$(AWS_REGION)" WORKSPACE="$(WORKSPACE)" MKPOD_BIN="$(MKPOD_BIN)" ./acceptance-validation.sh
 
-acceptance-aws: encode upload-rss verify-outputs acceptance-remove-master acceptance-pubdate acceptance-validation
+acceptance-fallbacks: setup
+	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" WORKSPACE="$(WORKSPACE)" SPEC_FILE="$(SPEC_FILE)" MKPOD_BIN="$(MKPOD_BIN)" ./acceptance-fallbacks.sh
+
+acceptance-aws: encode upload-rss verify-outputs acceptance-remove-master acceptance-pubdate acceptance-validation acceptance-fallbacks
 	@echo "Completed AWS acceptance workflow"
 
 make-public:
