@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -201,8 +202,8 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 
 		// Build the full path using localStorageDir from config
 		fullLocalPath := localImagePath
-		if atom.Config.LocalStorageDir != "" {
-			fullLocalPath = atom.Config.LocalStorageDir + "/" + localImagePath
+		if atom.LocalStorageDirExpanded() != "" {
+			fullLocalPath = filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(localImagePath))
 		}
 
 		// Check if local image file exists
@@ -253,8 +254,9 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 	// Check main podcast image
 	// Extract the local path from the image URL by removing the baseURL prefix
 	mainImageLocalPath := ""
-	if atom.Config.Image != "" && strings.HasPrefix(atom.Config.Image, atom.Config.BaseURL+"/") {
-		mainImageLocalPath = strings.TrimPrefix(atom.Config.Image, atom.Config.BaseURL+"/")
+	baseURLPrefix := strings.TrimRight(atom.Config.BaseURL, "/") + "/"
+	if atom.Config.Image != "" && strings.HasPrefix(atom.Config.Image, baseURLPrefix) {
+		mainImageLocalPath = strings.TrimPrefix(atom.Config.Image, baseURLPrefix)
 	}
 	if err := checkAndUpload(atom.Config.Image, mainImageLocalPath, "podcast"); err != nil {
 		return fmt.Errorf("failed to check/upload main podcast image: %w", err)
@@ -264,7 +266,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 	coverImagePath := atom.Encoding.Coverfront
 	if coverImagePath != "" {
 		// Construct the URL from the base URL and cover image path
-		coverImageURL := atom.Config.BaseURL + "/" + coverImagePath
+		coverImageURL := joinBaseURLPath(atom.Config.BaseURL, coverImagePath)
 		if err := checkAndUpload(coverImageURL, coverImagePath, "cover"); err != nil {
 			return fmt.Errorf("failed to check/upload cover image: %w", err)
 		}
@@ -290,4 +292,16 @@ func init() {
 	parseCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to \"output\" Amazon AWS S3 bucket defined in spec file")
 	parseCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
 	parseCmd.Flags().BoolP("dry-run", "n", false, "Behaves like the force option without modifying or producing anything. Will output RSS to stdout instead of file")
+}
+
+func joinBaseURLPath(baseURL, relPath string) string {
+	baseURL = strings.TrimRight(baseURL, "/")
+	relPath = strings.TrimLeft(relPath, "/")
+	if baseURL == "" {
+		return relPath
+	}
+	if relPath == "" {
+		return baseURL
+	}
+	return baseURL + "/" + relPath
 }

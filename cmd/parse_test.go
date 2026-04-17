@@ -172,3 +172,56 @@ func writeFile(t *testing.T, path string, content []byte) {
 		t.Fatalf("WriteFile(%q): %v", path, err)
 	}
 }
+
+func TestJoinBaseURLPath(t *testing.T) {
+	tests := []struct {
+		baseURL string
+		relPath string
+		want    string
+	}{
+		{baseURL: "https://example.com/show", relPath: "artwork/cover.jpg", want: "https://example.com/show/artwork/cover.jpg"},
+		{baseURL: "https://example.com/show/", relPath: "/artwork/cover.jpg", want: "https://example.com/show/artwork/cover.jpg"},
+		{baseURL: "", relPath: "artwork/cover.jpg", want: "artwork/cover.jpg"},
+	}
+
+	for _, tt := range tests {
+		if got := joinBaseURLPath(tt.baseURL, tt.relPath); got != tt.want {
+			t.Fatalf("joinBaseURLPath(%q, %q) = %q, want %q", tt.baseURL, tt.relPath, got, tt.want)
+		}
+	}
+}
+
+func TestCheckAndUploadPodcastImageUsesExpandedLocalStorageDir(t *testing.T) {
+	ctx := context.Background()
+	home := os.Getenv("HOME")
+	if home == "" {
+		t.Fatal("HOME is not set")
+	}
+	workdir := filepath.Join(home, "mkpod-parse-test-home")
+	t.Cleanup(func() { _ = os.RemoveAll(workdir) })
+	imageRelPath := filepath.Join("artwork", "podcast-cover.jpg")
+	imagePath := filepath.Join(workdir, imageRelPath)
+	mkdirAll(t, filepath.Dir(imagePath))
+	writeFile(t, imagePath, []byte("jpeg"))
+
+	atom := &model.Podcast{
+		Config: model.Config{
+			BaseURL:         "https://example.com/show/",
+			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/podcast-cover.jpg",
+			LocalStorageDir: "~/mkpod-parse-test-home",
+			Aws:             model.AwsConfig{Region: "us-east-1", Buckets: model.Buckets{Output: "bucket"}},
+		},
+	}
+	storage := &fakeStorageClient{existsResponses: map[string]bool{imageRelPath: false}}
+
+	err := checkAndUploadPodcastImage(ctx, atom, &parseTestAsker{answer: true}, storage)
+	if err != nil {
+		t.Fatalf("checkAndUploadPodcastImage() error = %v", err)
+	}
+	if len(storage.uploads) != 1 {
+		t.Fatalf("expected one upload, got %d", len(storage.uploads))
+	}
+	if storage.uploads[0].Filename != imagePath {
+		t.Fatalf("upload.Filename = %q, want %q", storage.uploads[0].Filename, imagePath)
+	}
+}

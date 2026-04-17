@@ -85,7 +85,7 @@ This file is the working plan for finishing the refactor.
 - [x] Centralize all defaulting logic instead of spreading it across spec, parser, and encoder.
 - [x] Decide whether `parse` should fail on invalid episodes or render only valid episodes with warnings; document and test the policy.
 - [x] Review path expansion helpers and remove `panic`-based behavior from tilde expansion.
-- [ ] Normalize path joining and base URL handling.
+- [x] Normalize path joining and base URL handling.
 
 ## Phase 5: Add `init` Command
 
