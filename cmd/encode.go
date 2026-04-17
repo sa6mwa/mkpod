@@ -107,46 +107,30 @@ Use --all --force to re-encode all episodes regardless.`,
 		storageClient := s3store.New(atom, askerAdapter)
 
 		postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
-			// First, handle remote master removal if requested
 			if removeRemoteMaster && episode.Input != "" {
-				// Safety check 1: Only remove remote master if local master exists
 				localMasterPath := path.Join(atom.LocalStorageDirExpanded(), episode.Input)
+				request := &s3store.ObjectRequest{Store: atom.Config.Aws.Buckets.Input, Key: episode.Input}
+
 				localStat, err := os.Stat(localMasterPath)
-				if os.IsNotExist(err) {
-					l.Warn("Skipping remote master removal: local master file does not exist", "localFile", localMasterPath, "remoteFile", episode.Input)
-				} else if err != nil {
+				if err != nil && !os.IsNotExist(err) {
 					l.Warn("Failed to check local master file", "error", err, "file", localMasterPath)
 				} else {
-					// Safety check 2: Compare file sizes (local must be at least 50% of remote size)
-					request := &s3store.ObjectRequest{
-						Store: atom.Config.Aws.Buckets.Input,
-						Key:   episode.Input,
-					}
 					remoteInfo, err := storageClient.GetFileInfo(ctx, request)
 					if err != nil {
 						l.Warn("Failed to get remote master file info", "error", err, "file", episode.Input)
-					} else if !remoteInfo.Exists {
-						l.Info("Remote master file does not exist, nothing to remove", "file", episode.Input)
 					} else {
-						localSize := localStat.Size()
-						remoteSize := remoteInfo.Size
-						minRequiredSize := remoteSize / 2 // 50% of remote size
-
-						if localSize < minRequiredSize {
-							l.Warn("Skipping remote master removal: local file is too small compared to remote",
-								"localFile", localMasterPath,
-								"localSize", localSize,
-								"remoteSize", remoteSize,
-								"minRequired", minRequiredSize)
-						} else {
-							// All safety checks passed, proceed with removal
-							l.Info("Safety checks passed for remote master removal",
-								"localFile", localMasterPath,
-								"localSize", localSize,
-								"remoteSize", remoteSize)
+						decision := s3store.EvaluateRemoteMasterRemoval(err == nil, fileSize(localStat), remoteInfo.Exists, remoteInfo.Size)
+						switch decision.Reason {
+						case s3store.RemovalLocalMissing:
+							l.Warn("Skipping remote master removal: local master file does not exist", "localFile", localMasterPath, "remoteFile", episode.Input)
+						case s3store.RemovalRemoteMissing:
+							l.Info("Remote master file does not exist, nothing to remove", "file", episode.Input)
+						case s3store.RemovalLocalTooSmall:
+							l.Warn("Skipping remote master removal: local file is too small compared to remote", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize, "minRequired", decision.MinRequiredSize)
+						case s3store.RemovalAllowed:
+							l.Info("Safety checks passed for remote master removal", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize)
 							if err := storageClient.DeleteRemoteFile(ctx, request); err != nil {
 								l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
-								// Don't fail the entire process for this - just log and continue
 							}
 						}
 					}
@@ -272,4 +256,11 @@ func init() {
 	encodeCmd.Flags().BoolP("all", "a", false, "Encode episodes whose local output file is missing")
 	encodeCmd.Flags().BoolP("force", "f", false, "Do not prompt. Combined with --all, re-encode every episode even if a local output already exists")
 	encodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file before uploading local master input file. Unless the force option is given, there is a yes/no prompt before proceeding")
+}
+
+func fileSize(fi os.FileInfo) int64 {
+	if fi == nil {
+		return 0
+	}
+	return fi.Size()
 }

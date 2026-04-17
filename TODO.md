@@ -122,7 +122,7 @@ This file is the working plan for finishing the refactor.
 - [ ] Revisit AWS SDK choice:
   - [ ] either keep AWS SDK v1 for now and simplify around it
   - [ ] or migrate to v2 as a separate, deliberate task
-- [ ] Keep remote master deletion safety checks, but move them into a tested service with explicit policy.
+- [x] Keep remote master deletion safety checks, but move them into a tested service with explicit policy.
 - [x] Add RSS/image existence checks without scattering S3 knowledge across command code.
 - [ ] Decide whether storage class support is worth exposing in the main CLI today; if not, make it an internal detail.
 
