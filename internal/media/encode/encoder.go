@@ -181,7 +181,10 @@ func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options Encod
 			return nil, err
 		}
 
-		outputPath := path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
+		outputPath := ""
+		if strings.TrimSpace(atom.Episodes[i].Output) != "" {
+			outputPath = path.Join(atom.LocalStorageDirExpanded(), atom.Episodes[i].Output)
+		}
 		wasEncoded := false
 		if e.shouldEncode(ctx, options, outputPath) {
 			wasEncoded = true
