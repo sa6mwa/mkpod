@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/xml"
 	"image"
 	"image/color"
 	"image/jpeg"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -595,6 +598,7 @@ func TestCompiledBinaryEncodePersistsMetadataForParse(t *testing.T) {
 		t.Fatalf("read podcast.rss: %v", err)
 	}
 	rssText := string(rssContent)
+	assertWellFormedRSSXMLBytes(t, rssContent)
 	for _, want := range []string{
 		"<title>Episode One</title>",
 		"url=\"https://example-podcast-bucket.s3.us-east-1.amazonaws.com/episode-one.mp3\"",
@@ -603,6 +607,19 @@ func TestCompiledBinaryEncodePersistsMetadataForParse(t *testing.T) {
 	} {
 		if !strings.Contains(rssText, want) {
 			t.Fatalf("expected RSS to contain %q, got: %s", want, rssText)
+		}
+	}
+}
+
+func assertWellFormedRSSXMLBytes(t *testing.T, content []byte) {
+	t.Helper()
+	decoder := xml.NewDecoder(bytes.NewReader(content))
+	for {
+		if _, err := decoder.Token(); err != nil {
+			if err == io.EOF {
+				return
+			}
+			t.Fatalf("invalid RSS XML: %v\n%s", err, string(content))
 		}
 	}
 }

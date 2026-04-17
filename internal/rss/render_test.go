@@ -3,6 +3,8 @@ package rss
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,6 +72,7 @@ func TestWriteRSSRendersValidEpisodesOnly(t *testing.T) {
 	}
 
 	output := buf.String()
+	assertWellFormedRSSXML(t, []byte(output))
 	if !strings.Contains(output, "<title>Example Show</title>") {
 		t.Fatalf("expected feed title in RSS output: %s", output)
 	}
@@ -145,5 +148,18 @@ func TestWriteRSSMatchesGoldenFile(t *testing.T) {
 	want := strings.TrimSpace(string(golden))
 	if got != want {
 		t.Fatalf("RSS output mismatch\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func assertWellFormedRSSXML(t *testing.T, content []byte) {
+	t.Helper()
+	decoder := xml.NewDecoder(bytes.NewReader(content))
+	for {
+		if _, err := decoder.Token(); err != nil {
+			if err == io.EOF {
+				return
+			}
+			t.Fatalf("invalid RSS XML: %v\n%s", err, string(content))
+		}
 	}
 }
