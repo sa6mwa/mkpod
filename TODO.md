@@ -50,7 +50,7 @@ This file is the working plan for finishing the refactor.
   - [x] `Save(path string, spec *podcast.Spec) error`
 - [x] Replace `ForParsing` with a renderer that writes to `io.Writer` and a small helper for writing files.
 - [x] Replace `ForEncoding` with a concrete encoding service that returns a result struct rather than mutating via callback-heavy flow where possible.
-- [ ] Replace `ForUploading`, `ForDownloading`, and `ForAdministeringRemoteFiles` with one S3 client interface used only where needed, for example:
+- [x] Replace `ForUploading`, `ForDownloading`, and `ForAdministeringRemoteFiles` with one S3 client interface used only where needed, for example:
   - [x] `UploadFile`
   - [x] `StatObject`
   - [x] `DeleteObject`

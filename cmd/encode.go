@@ -109,13 +109,14 @@ Use --all --force to re-encode all episodes regardless.`,
 		postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
 			if removeRemoteMaster && episode.Input != "" {
 				localMasterPath := path.Join(atom.LocalStorageDirExpanded(), episode.Input)
-				request := &s3store.ObjectRequest{Store: atom.Config.Aws.Buckets.Input, Key: episode.Input}
+				bucket := atom.Config.Aws.Buckets.Input
+				key := episode.Input
 
 				localStat, err := os.Stat(localMasterPath)
 				if err != nil && !os.IsNotExist(err) {
 					l.Warn("Failed to check local master file", "error", err, "file", localMasterPath)
 				} else {
-					remoteInfo, err := storageClient.GetFileInfo(ctx, request)
+					remoteInfo, err := storageClient.GetFileInfo(ctx, bucket, key)
 					if err != nil {
 						l.Warn("Failed to get remote master file info", "error", err, "file", episode.Input)
 					} else {
@@ -129,7 +130,7 @@ Use --all --force to re-encode all episodes regardless.`,
 							l.Warn("Skipping remote master removal: local file is too small compared to remote", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize, "minRequired", decision.MinRequiredSize)
 						case s3store.RemovalAllowed:
 							l.Info("Safety checks passed for remote master removal", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize)
-							if err := storageClient.DeleteRemoteFile(ctx, request); err != nil {
+							if err := storageClient.DeleteRemoteFile(ctx, bucket, key); err != nil {
 								l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
 							}
 						}
@@ -210,7 +211,7 @@ Use --all --force to re-encode all episodes regardless.`,
 func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode *model.Episode, askerAdapter interface {
 	Ask(context.Context, string, ...any) bool
 }, storageClient interface {
-	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)
+	FileExists(context.Context, string, string) (bool, error)
 }, wasEncoded bool) (bool, error) {
 	l := logger.FromContext(ctx)
 
@@ -226,13 +227,11 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode
 
 	// Check if remote file exists
 	if storageClient != nil {
-		request := &s3store.ObjectRequest{
-			Store: atom.Config.Aws.Buckets.Output,
-			Key:   episode.Output,
-		}
-		exists, err := storageClient.FileExists(ctx, request)
+		bucket := atom.Config.Aws.Buckets.Output
+		key := episode.Output
+		exists, err := storageClient.FileExists(ctx, bucket, key)
 		if err != nil {
-			return false, fmt.Errorf("failed to check remote output %s in bucket %s: %w", episode.Output, atom.Config.Aws.Buckets.Output, err)
+			return false, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
 		}
 
 		if !exists {

@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sa6mwa/mkpod/internal/app/model"
-	"github.com/sa6mwa/mkpod/internal/logging"
-	"github.com/sa6mwa/mkpod/internal/prompt"
+	logger "github.com/sa6mwa/mkpod/internal/logging"
+	asker "github.com/sa6mwa/mkpod/internal/prompt"
 )
 
 var (
@@ -34,13 +34,6 @@ const (
 	StorageClassGlacierIR          = "GLACIER_IR"
 	DefaultStorageClass            = StorageClassIntelligentTiering
 )
-
-type ObjectRequest struct {
-	Store           string
-	Key             string
-	NewStorageClass string
-	Region          string
-}
 
 type FileInfo struct {
 	Size         int64
@@ -100,23 +93,26 @@ func IsValidStorageClass(storageClass string) bool {
 	return false
 }
 
-func (a *Client) DeleteRemoteFile(ctx context.Context, request *ObjectRequest) error {
-	l := logger.FromContext(ctx)
-
-	if request == nil {
-		return ErrNilPointerRequest
-	}
-	if request.Store == "" {
+func validateObjectArgs(bucket, key string) error {
+	if bucket == "" {
 		return ErrEmptyStore
 	}
-	if request.Key == "" {
+	if key == "" {
 		return ErrEmptyKey
 	}
+	return nil
+}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
+func (a *Client) DeleteRemoteFile(ctx context.Context, bucket, key string) error {
+	l := logger.FromContext(ctx)
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return err
+	}
+
+	s3path := "s3://" + path.Join(bucket, key)
 	l.Info("About to delete remote file", "path", s3path)
 
-	exists, err := a.FileExists(ctx, request)
+	exists, err := a.FileExists(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
@@ -131,8 +127,8 @@ func (a *Client) DeleteRemoteFile(ctx context.Context, request *ObjectRequest) e
 	}
 
 	_, err = a.s3.DeleteObject(&awss3.DeleteObjectInput{
-		Bucket: aws.String(request.Store),
-		Key:    aws.String(request.Key),
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		l.Error("Failed to delete remote file", "error", err, "path", s3path)
@@ -143,27 +139,20 @@ func (a *Client) DeleteRemoteFile(ctx context.Context, request *ObjectRequest) e
 	return nil
 }
 
-func (a *Client) ChangeStorageClass(ctx context.Context, request *ObjectRequest) error {
+func (a *Client) ChangeStorageClass(ctx context.Context, bucket, key, newStorageClass string) error {
 	l := logger.FromContext(ctx)
-
-	if request == nil {
-		return ErrNilPointerRequest
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return err
 	}
-	if request.Store == "" {
-		return ErrEmptyStore
+	if newStorageClass == "" {
+		newStorageClass = DefaultStorageClass
 	}
-	if request.Key == "" {
-		return ErrEmptyKey
-	}
-	if request.NewStorageClass == "" {
-		request.NewStorageClass = DefaultStorageClass
-	}
-	if !IsValidStorageClass(request.NewStorageClass) {
+	if !IsValidStorageClass(newStorageClass) {
 		return ErrInvalidStorageClass
 	}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
-	exists, err := a.FileExists(ctx, request)
+	s3path := "s3://" + path.Join(bucket, key)
+	exists, err := a.FileExists(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
@@ -171,53 +160,46 @@ func (a *Client) ChangeStorageClass(ctx context.Context, request *ObjectRequest)
 		return ErrFileNotFound
 	}
 
-	currentClass, err := a.GetStorageClass(ctx, request)
+	currentClass, err := a.GetStorageClass(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
-	if currentClass == request.NewStorageClass {
+	if currentClass == newStorageClass {
 		l.Info("Storage class already matches, no change needed", "path", s3path, "storageClass", currentClass)
 		return nil
 	}
 
-	l.Info("Changing storage class", "path", s3path, "from", currentClass, "to", request.NewStorageClass)
-	if !a.prompter.Ask(ctx, "Change storage class of %s from %s to %s?", s3path, currentClass, request.NewStorageClass) {
+	l.Info("Changing storage class", "path", s3path, "from", currentClass, "to", newStorageClass)
+	if !a.prompter.Ask(ctx, "Change storage class of %s from %s to %s?", s3path, currentClass, newStorageClass) {
 		l.Info("Storage class change cancelled by user", "path", s3path)
 		return nil
 	}
 
 	_, err = a.s3.CopyObject(&awss3.CopyObjectInput{
-		Bucket:       aws.String(request.Store),
-		Key:          aws.String(request.Key),
-		CopySource:   aws.String(path.Join(request.Store, request.Key)),
-		StorageClass: aws.String(request.NewStorageClass),
+		Bucket:       aws.String(bucket),
+		Key:          aws.String(key),
+		CopySource:   aws.String(path.Join(bucket, key)),
+		StorageClass: aws.String(newStorageClass),
 	})
 	if err != nil {
 		l.Error("Failed to change storage class", "error", err, "path", s3path)
 		return err
 	}
 
-	l.Info("Successfully changed storage class", "path", s3path, "from", currentClass, "to", request.NewStorageClass)
+	l.Info("Successfully changed storage class", "path", s3path, "from", currentClass, "to", newStorageClass)
 	return nil
 }
 
-func (a *Client) FileExists(ctx context.Context, request *ObjectRequest) (bool, error) {
+func (a *Client) FileExists(ctx context.Context, bucket, key string) (bool, error) {
 	l := logger.FromContext(ctx)
-
-	if request == nil {
-		return false, ErrNilPointerRequest
-	}
-	if request.Store == "" {
-		return false, ErrEmptyStore
-	}
-	if request.Key == "" {
-		return false, ErrEmptyKey
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return false, err
 	}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
+	s3path := "s3://" + path.Join(bucket, key)
 	_, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(request.Store),
-		Key:    aws.String(request.Key),
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
@@ -237,23 +219,16 @@ func (a *Client) FileExists(ctx context.Context, request *ObjectRequest) (bool, 
 	return true, nil
 }
 
-func (a *Client) GetStorageClass(ctx context.Context, request *ObjectRequest) (string, error) {
+func (a *Client) GetStorageClass(ctx context.Context, bucket, key string) (string, error) {
 	l := logger.FromContext(ctx)
-
-	if request == nil {
-		return "", ErrNilPointerRequest
-	}
-	if request.Store == "" {
-		return "", ErrEmptyStore
-	}
-	if request.Key == "" {
-		return "", ErrEmptyKey
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return "", err
 	}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
+	s3path := "s3://" + path.Join(bucket, key)
 	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(request.Store),
-		Key:    aws.String(request.Key),
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
@@ -277,23 +252,16 @@ func (a *Client) GetStorageClass(ctx context.Context, request *ObjectRequest) (s
 	return storageClass, nil
 }
 
-func (a *Client) GetFileInfo(ctx context.Context, request *ObjectRequest) (*FileInfo, error) {
+func (a *Client) GetFileInfo(ctx context.Context, bucket, key string) (*FileInfo, error) {
 	l := logger.FromContext(ctx)
-
-	if request == nil {
-		return nil, ErrNilPointerRequest
-	}
-	if request.Store == "" {
-		return nil, ErrEmptyStore
-	}
-	if request.Key == "" {
-		return nil, ErrEmptyKey
+	if err := validateObjectArgs(bucket, key); err != nil {
+		return nil, err
 	}
 
-	s3path := "s3://" + path.Join(request.Store, request.Key)
+	s3path := "s3://" + path.Join(bucket, key)
 	result, err := a.s3.HeadObject(&awss3.HeadObjectInput{
-		Bucket: aws.String(request.Store),
-		Key:    aws.String(request.Key),
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
 	})
 	if err != nil {
 		if awsErr, ok := err.(awserr.Error); ok {
@@ -309,12 +277,7 @@ func (a *Client) GetFileInfo(ctx context.Context, request *ObjectRequest) (*File
 		return nil, err
 	}
 
-	info := &FileInfo{
-		Exists:       true,
-		Size:         0,
-		StorageClass: StorageClassStandard,
-		Region:       a.atom.Config.Aws.Region,
-	}
+	info := &FileInfo{Exists: true, Size: 0, StorageClass: StorageClassStandard, Region: a.atom.Config.Aws.Region}
 	if result.ContentLength != nil {
 		info.Size = *result.ContentLength
 	}

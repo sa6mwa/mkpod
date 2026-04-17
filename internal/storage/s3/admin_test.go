@@ -100,17 +100,17 @@ func TestAdminRequestValidation(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		request *ObjectRequest
+		bucket  string
+		key     string
 		wantErr error
 	}{
-		{name: "nil request", request: nil, wantErr: ErrNilPointerRequest},
-		{name: "empty store", request: &ObjectRequest{Store: "", Key: "test-key"}, wantErr: ErrEmptyStore},
-		{name: "empty key", request: &ObjectRequest{Store: "test-bucket", Key: ""}, wantErr: ErrEmptyKey},
+		{name: "empty store", bucket: "", key: "test-key", wantErr: ErrEmptyStore},
+		{name: "empty key", bucket: "test-bucket", key: "", wantErr: ErrEmptyKey},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := handler.FileExists(ctx, tt.request)
+			_, err := handler.FileExists(ctx, tt.bucket, tt.key)
 			if err != tt.wantErr {
 				t.Errorf("FileExists() error = %v, wantErr %v", err, tt.wantErr)
 			}

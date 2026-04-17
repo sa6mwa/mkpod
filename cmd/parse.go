@@ -174,7 +174,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerAdapter interface {
 	Ask(context.Context, string, ...any) bool
 }, uploaderAdapter interface {
-	FileExists(context.Context, *s3store.ObjectRequest) (bool, error)
+	FileExists(context.Context, string, string) (bool, error)
 	UploadFile(context.Context, *s3store.UploadRequest) error
 }) error {
 	l := logger.FromContext(ctx)
@@ -220,10 +220,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 			return nil
 		}
 
-		exists, err := uploaderAdapter.FileExists(ctx, &s3store.ObjectRequest{
-			Store: atom.Config.Aws.Buckets.Output,
-			Key:   s3Key,
-		})
+		exists, err := uploaderAdapter.FileExists(ctx, atom.Config.Aws.Buckets.Output, s3Key)
 		if err != nil {
 			return fmt.Errorf("failed to check remote %s image %s in bucket %s: %w", imageType, s3Key, atom.Config.Aws.Buckets.Output, err)
 		}

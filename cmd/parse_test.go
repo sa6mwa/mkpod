@@ -27,12 +27,12 @@ type fakeStorageClient struct {
 	uploads         []*s3store.UploadRequest
 }
 
-func (f *fakeStorageClient) FileExists(_ context.Context, request *s3store.ObjectRequest) (bool, error) {
-	f.checkedKeys = append(f.checkedKeys, request.Key)
+func (f *fakeStorageClient) FileExists(_ context.Context, bucket, key string) (bool, error) {
+	f.checkedKeys = append(f.checkedKeys, key)
 	if f.existsErr != nil {
 		return false, f.existsErr
 	}
-	return f.existsResponses[request.Key], nil
+	return f.existsResponses[key], nil
 }
 
 func (f *fakeStorageClient) UploadFile(_ context.Context, request *s3store.UploadRequest) error {
