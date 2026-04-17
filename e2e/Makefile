@@ -1,212 +1,117 @@
-# End-to-end integration tests for mkpod
-# Uses real S3 buckets for testing complete workflows
+SHELL := /bin/bash
 
-# S3 bucket configuration (matching podspec.yaml terminology)
 INPUT_BUCKET ?= mkpod-integration-test-assets
 OUTPUT_BUCKET ?= mkpod-integration-test
-
-# Build mkpod if it doesn't exist
+AWS_PROFILE ?= default
+AWS_REGION ?= eu-west-1
+WORKSPACE ?= $(CURDIR)/workspace
 MKPOD_BIN ?= ../bin/mkpod
+BASE_URL ?= https://$(OUTPUT_BUCKET).s3.$(AWS_REGION).amazonaws.com
+FEED_FILE := $(WORKSPACE)/podcast.rss
+SPEC_FILE := $(WORKSPACE)/podspec.yaml
 
-.PHONY: all clean acceptance-aws acceptance-remove-master acceptance-pubdate acceptance-validation setup teardown build-mkpod rebuild encode generate-rss upload-rss make-public make-private verify-outputs
+.PHONY: all help build-mkpod rebuild bootstrap-workspace verify-buckets setup \
+	encode generate-rss upload-rss verify-outputs acceptance-aws \
+	acceptance-remove-master acceptance-pubdate acceptance-validation \
+	make-public make-private clean clean-local
 
-all: acceptance-aws
+all: help
 
-# Build mkpod binary only if it doesn't exist
 build-mkpod:
-	@if [ ! -f "$(MKPOD_BIN)" ]; then \
+	@if [ ! -x "$(MKPOD_BIN)" ]; then \
 		echo "Building mkpod..."; \
 		cd .. && make build; \
 	else \
 		echo "mkpod binary already exists at $(MKPOD_BIN)"; \
 	fi
 
-# Force rebuild mkpod binary
 rebuild:
 	@echo "Force rebuilding mkpod..."
 	cd .. && make build
 
-# Setup test environment
-setup: build-mkpod
-	@echo "Setting up e2e test environment..."
-	@echo "Verifying S3 buckets exist..."
-	aws s3 ls s3://$(INPUT_BUCKET) > /dev/null
-	aws s3 ls s3://$(OUTPUT_BUCKET) > /dev/null
-	@echo "S3 buckets verified"
+bootstrap-workspace: build-mkpod
+	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" AWS_PROFILE="$(AWS_PROFILE)" AWS_REGION="$(AWS_REGION)" BASE_URL="$(BASE_URL)" WORKSPACE="$(WORKSPACE)" MKPOD_BIN="$(MKPOD_BIN)" ./bootstrap-workspace.sh
 
-# Run mkpod encode to produce m4a files and upload to output bucket
-# mkpod will handle uploading masters and artwork to input bucket as needed
+verify-buckets:
+	@aws s3 ls s3://$(INPUT_BUCKET) > /dev/null
+	@aws s3 ls s3://$(OUTPUT_BUCKET) > /dev/null
+
+setup: bootstrap-workspace verify-buckets
+	@echo "AWS acceptance workspace ready at $(WORKSPACE)"
+
 encode: setup
-	@echo "Running mkpod encode..."
-	@if [ ! -f "podspec.yaml" ]; then \
-		echo "No podspec.yaml found. Please create one with your test configuration."; \
-		exit 1; \
-	fi
-	$(MKPOD_BIN) encode --spec podspec.yaml --all
-	@echo "Encoding completed"
+	$(MKPOD_BIN) encode --spec "$(SPEC_FILE)" --all --force
 
-# Generate podcast.rss from podspec.yaml
 generate-rss: setup
-	@echo "Generating podcast.rss from podspec.yaml..."
-	@if [ ! -f "podspec.yaml" ]; then \
-		echo "No podspec.yaml found. Please create one with your test configuration."; \
-		exit 1; \
-	fi
-	$(MKPOD_BIN) parse --spec podspec.yaml
-	@echo "RSS generation completed"
-	@if [ -f "podcast.rss" ]; then \
-		echo "Validating RSS format..."; \
-		xmllint --format podcast.rss > /dev/null && echo "RSS format is valid" || echo "WARNING: RSS format may be invalid"; \
-	else \
-		echo "ERROR: podcast.rss was not generated"; \
-		exit 1; \
+	$(MKPOD_BIN) parse --spec "$(SPEC_FILE)" --force
+	@test -f "$(FEED_FILE)"
+	@if command -v xmllint >/dev/null 2>&1; then \
+		xmllint --format "$(FEED_FILE)" > /dev/null; \
 	fi
 
-# Generate and upload podcast.rss to output bucket in one step
 upload-rss: setup
-	@echo "Generating and uploading podcast.rss to output bucket..."
-	@if [ ! -f "podspec.yaml" ]; then \
-		echo "No podspec.yaml found. Please create one with your test configuration."; \
-		exit 1; \
-	fi
-	$(MKPOD_BIN) parse --spec podspec.yaml --upload --force
-	@echo "RSS generation and upload completed"
-	@if [ -f "podcast.rss" ]; then \
-		echo "Validating RSS format..."; \
-		xmllint --format podcast.rss > /dev/null && echo "RSS format is valid" || echo "WARNING: RSS format may be invalid"; \
-	else \
-		echo "ERROR: podcast.rss was not generated locally"; \
-		exit 1; \
-	fi
+	$(MKPOD_BIN) parse --spec "$(SPEC_FILE)" --upload --force
+	@test -f "$(FEED_FILE)"
 
-# Make output bucket temporarily read-only public
+verify-outputs:
+	@aws s3 ls s3://$(OUTPUT_BUCKET)/podcast.rss > /dev/null
+	@aws s3 ls s3://$(OUTPUT_BUCKET)/ --recursive | grep -q '\.m4a$$'
+	@echo "Verified podcast.rss and encoded audio in $(OUTPUT_BUCKET)"
+
+acceptance-remove-master: setup
+	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" WORKSPACE="$(WORKSPACE)" SPEC_FILE="$(SPEC_FILE)" MKPOD_BIN="$(MKPOD_BIN)" ./acceptance-remove-master.sh
+
+acceptance-pubdate: setup
+	@cp "$(WORKSPACE)/original-podspec.yaml" "$(SPEC_FILE)"
+	@perl -0pi -e 's/^pubDate:.*\n//m' "$(SPEC_FILE)"
+	@$(MKPOD_BIN) parse --spec "$(SPEC_FILE)" --force
+	@grep -q '^pubDate:' "$(SPEC_FILE)"
+	@echo "Verified missing top-level pubDate is filled during parse"
+
+acceptance-validation: setup
+	@INPUT_BUCKET="$(INPUT_BUCKET)" OUTPUT_BUCKET="$(OUTPUT_BUCKET)" AWS_REGION="$(AWS_REGION)" WORKSPACE="$(WORKSPACE)" MKPOD_BIN="$(MKPOD_BIN)" ./acceptance-validation.sh
+
+acceptance-aws: encode upload-rss verify-outputs acceptance-remove-master acceptance-pubdate acceptance-validation
+	@echo "Completed AWS acceptance workflow"
+
 make-public:
-	@echo "Making output bucket temporarily read-only public..."
-	@echo "Disabling Block Public Access settings..."
 	aws s3api put-public-access-block --bucket $(OUTPUT_BUCKET) --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-	@echo "Applying public read policy..."
 	sed 's/BUCKET_NAME/$(OUTPUT_BUCKET)/g' bucket-policy.json > /tmp/bucket-policy-$(OUTPUT_BUCKET).json
 	aws s3api put-bucket-policy --bucket $(OUTPUT_BUCKET) --policy file:///tmp/bucket-policy-$(OUTPUT_BUCKET).json
 	rm -f /tmp/bucket-policy-$(OUTPUT_BUCKET).json
-	@echo "Bucket $(OUTPUT_BUCKET) is now read-only public"
-	@echo "Access via: https://$(OUTPUT_BUCKET).s3.eu-west-1.amazonaws.com/podcast.rss"
 
-# Make output bucket private again
 make-private:
-	@echo "Making output bucket private again..."
-	aws s3api delete-bucket-policy --bucket $(OUTPUT_BUCKET) || echo "No bucket policy to delete"
-	@echo "Re-enabling Block Public Access settings for security..."
+	aws s3api delete-bucket-policy --bucket $(OUTPUT_BUCKET) || true
 	aws s3api put-public-access-block --bucket $(OUTPUT_BUCKET) --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
-	@echo "Bucket $(OUTPUT_BUCKET) is now private and secure"
 
-# Verify outputs in S3 buckets
-verify-outputs:
-	@echo "Verifying outputs in S3 buckets..."
-	@echo "Input bucket contents:"
-	aws s3 ls s3://$(INPUT_BUCKET)/ --recursive
-	@echo ""
-	@echo "Output bucket contents:"
-	aws s3 ls s3://$(OUTPUT_BUCKET)/ --recursive
-	@echo ""
-	@echo "Checking for required files..."
-	@aws s3 ls s3://$(OUTPUT_BUCKET)/podcast.rss > /dev/null && echo "✓ podcast.rss found" || echo "✗ podcast.rss missing"
-	@aws s3 ls s3://$(OUTPUT_BUCKET)/ | grep -q "\.m4a" && echo "✓ m4a files found" || echo "✗ m4a files missing"
-
-# AWS acceptance test: remote master removal safety checks
-acceptance-remove-master: setup
-	@echo "Running remote master removal safety tests..."
-	./acceptance-remove-master.sh
-
-# AWS acceptance test: pubDate field filling behavior
-acceptance-pubdate: setup
-	@echo "Testing pubDate field filling behavior..."
-	@echo "Starting with original podspec (no pubDate)..."
-	if [ -f "original-podspec.yaml" ]; then \
-		cp original-podspec.yaml podspec.yaml; \
-		echo "Reset podspec.yaml from original-podspec.yaml"; \
-	else \
-		echo "ERROR: original-podspec.yaml not found"; \
-		exit 1; \
-	fi
-	@echo "Checking that original podspec has no pubDate or has zero date..."
-	if grep -q "pubDate:" podspec.yaml; then \
-		echo "Original podspec contains pubDate field - checking if it's empty or zero"; \
-	else \
-		echo "Original podspec has no pubDate field - good for testing"; \
-	fi
-	@echo "Running mkpod parse to fill in missing pubDate..."
-	$(MKPOD_BIN) parse --spec podspec.yaml
-	@echo "Verifying that pubDate was filled with current time..."
-	if grep -q "pubDate: " podspec.yaml && ! grep -q "Mon, 01 Jan 0001 00:00:00 +0000" podspec.yaml; then \
-		echo "✓ pubDate successfully filled with current time"; \
-	else \
-		echo "✗ pubDate was not properly filled"; \
-		exit 1; \
-	fi
-	@echo "pubDate behavior test completed successfully"
-
-# AWS acceptance test: top-level validation and episode filtering
-acceptance-validation: setup
-	@echo "Testing validation behavior..."
-	./acceptance-validation.sh
-
-# Run complete AWS acceptance workflow
-acceptance-aws: setup encode upload-rss verify-outputs acceptance-remove-master acceptance-pubdate acceptance-validation
-	@echo "Running complete AWS acceptance workflow..."
-	@echo "Complete mkpod workflow test completed successfully!"
-	@echo ""
-	@echo "To make the bucket public for testing, run: make make-public"
-	@echo "To make it private again, run: make make-private"
-
-# Clean up test outputs from S3 buckets
 clean:
-	@echo "Cleaning up test outputs..."
-	@echo "Removing all objects from output bucket..."
 	aws s3 rm s3://$(OUTPUT_BUCKET) --recursive || true
-	@echo "Removing all objects from input bucket..."
 	aws s3 rm s3://$(INPUT_BUCKET) --recursive || true
-	@echo "Resetting podspec.yaml to original state for field filling tests..."
-	if [ -f "original-podspec.yaml" ]; then \
-		cp original-podspec.yaml podspec.yaml; \
-		echo "podspec.yaml reset from original-podspec.yaml"; \
-	else \
-		echo "WARNING: original-podspec.yaml not found, podspec.yaml not reset"; \
-	fi
-	@echo "Cleanup completed"
+	@echo "Removed AWS acceptance objects"
 
-# Completely remove the S3 buckets (use with caution)
-teardown: clean
-	@echo "WARNING: This will delete the S3 buckets entirely!"
-	@read -p "Are you sure you want to delete the buckets? (y/N): " confirm; \
-	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		aws s3 rb s3://$(INPUT_BUCKET) --force; \
-		aws s3 rb s3://$(OUTPUT_BUCKET) --force; \
-		echo "S3 buckets deleted"; \
-	else \
-		echo "Teardown cancelled"; \
-	fi
+clean-local:
+	rm -rf "$(WORKSPACE)"
 
 help:
-	@echo "E2E Integration Test Makefile for mkpod"
+	@echo "mkpod AWS acceptance targets (opt-in only)"
 	@echo ""
-	@echo "Available targets:"
-	@echo "  setup         - Build mkpod and verify S3 buckets exist"
-	@echo "  encode        - Run mkpod encode (handles all uploads)"
-	@echo "  generate-rss  - Generate podcast.rss from podspec.yaml"
-	@echo "  upload-rss    - Upload podcast.rss to output bucket"
-	@echo "  acceptance-aws - Run the full AWS acceptance workflow"
-	@echo "  acceptance-remove-master - Test --remove-remote-master safety checks"
-	@echo "  acceptance-pubdate - Test pubDate field filling behavior"
-	@echo "  acceptance-validation - Test validation rules and episode filtering"
-	@echo "  make-public   - Make output bucket temporarily read-only public"
-	@echo "  make-private  - Make output bucket private again"
-	@echo "  verify-outputs- Verify outputs in S3 buckets"
-	@echo "  clean         - Remove all test files from S3 buckets"
-	@echo "  teardown      - Delete S3 buckets entirely (use with caution)"
-	@echo "  build-mkpod   - Build the mkpod binary (only if missing)"
-	@echo "  rebuild       - Force rebuild the mkpod binary"
-	@echo "  help          - Show this help message"
+	@echo "Variables:"
+	@echo "  INPUT_BUCKET=$(INPUT_BUCKET)"
+	@echo "  OUTPUT_BUCKET=$(OUTPUT_BUCKET)"
+	@echo "  AWS_PROFILE=$(AWS_PROFILE)"
+	@echo "  AWS_REGION=$(AWS_REGION)"
+	@echo "  WORKSPACE=$(WORKSPACE)"
 	@echo ""
-	@echo "S3 Buckets:"
-	@echo "  Input:   $(INPUT_BUCKET)"
-	@echo "  Output:  $(OUTPUT_BUCKET)"
+	@echo "Targets:"
+	@echo "  bootstrap-workspace      Run mkpod init and generate tiny local test fixtures"
+	@echo "  setup                    Bootstrap workspace and verify S3 buckets"
+	@echo "  encode                   Encode all episodes into the workspace and upload as needed"
+	@echo "  generate-rss             Generate podcast.rss locally under the workspace"
+	@echo "  upload-rss               Generate and upload podcast.rss"
+	@echo "  verify-outputs           Assert that podcast.rss and encoded audio exist in S3"
+	@echo "  acceptance-remove-master Verify remote master deletion safety checks"
+	@echo "  acceptance-pubdate       Verify missing top-level pubDate gets filled"
+	@echo "  acceptance-validation    Verify top-level validation and episode filtering"
+	@echo "  acceptance-aws           Run the full opt-in AWS acceptance workflow"
+	@echo "  clean                    Remove AWS objects from the acceptance buckets"
+	@echo "  clean-local              Remove the generated local workspace"

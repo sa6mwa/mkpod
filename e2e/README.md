@@ -1,81 +1,50 @@
-# End-to-End Integration Tests
+# AWS Acceptance Tests
 
-This directory contains end-to-end integration tests for mkpod that use real S3 buckets to test the complete workflow.
+This directory contains opt-in AWS acceptance tests for `mkpod`. They are not part of `go test ./...` and they assume you have real S3 buckets you are willing to write to.
 
-## S3 Buckets
+## What changed
 
-- **mkpod-integration-test-assets** (input bucket): Contains artwork and master audio files
-- **mkpod-integration-test** (output bucket): Contains encoded files and podcast.rss output
+The old `e2e/` setup assumed a checked-in `pod/` fixture tree that no longer exists. The acceptance flow now bootstraps a fresh workspace by running `mkpod init`, then generates tiny local artwork and WAV masters with host `ffmpeg`.
 
-## Directory Structure
+That gives the AWS tests a reproducible starting point without requiring large checked-in media fixtures.
 
-```
-e2e/
-├── Makefile          # Main test runner with complete workflow
-├── README.md         # This file
-├── pod/              # Test pod assets (artwork, audio files)
-└── podspec.yaml      # Test podcast specification
-```
+## Requirements
 
-## Setup
+- `ffmpeg`
+- AWS CLI configured for the target profile
+- writable S3 buckets for `INPUT_BUCKET` and `OUTPUT_BUCKET`
+- a built `mkpod` binary, or let `make` build `../bin/mkpod`
 
-The setup is already complete with:
-1. The `pod/` directory containing test assets
-2. A `podspec.yaml` file configured for the S3 buckets
-
-## Usage
-
-### Run complete integration test workflow:
-```bash
-make test
-```
-This runs: setup → upload-pod → encode → upload-rss → verify-outputs
-
-### Individual workflow steps:
-```bash
-make upload-pod       # Upload pod assets to input bucket
-make encode           # Run mkpod encode (produces m4a files)
-make generate-rss     # Generate podcast.rss from podspec.yaml
-make upload-rss       # Upload podcast.rss to output bucket
-make verify-outputs   # Check bucket contents and required files
-```
-
-### Bucket access control:
-```bash
-make make-public      # Make output bucket temporarily read-only public
-make make-private     # Make output bucket private again
-```
-
-### Maintenance:
-```bash
-make clean           # Remove all test files from S3 buckets
-make build-mkpod     # Build mkpod binary
-make help            # Show all available targets
-```
-
-## Complete Test Flow
-
-1. **Setup**: Builds mkpod and verifies S3 buckets exist
-2. **Upload Pod Assets**: Syncs test assets (artwork, masters) to input bucket
-3. **Encode**: Runs mkpod encode to produce m4a files, uploads to output bucket
-4. **Generate RSS**: Creates podcast.rss from podspec.yaml with proper validation
-5. **Upload RSS**: Uploads podcast.rss to output bucket
-6. **Verification**: Checks that all required outputs exist in buckets
-
-## Public Access Testing
-
-After running the complete test, you can make the output bucket public to test RSS feed access:
+## Common commands
 
 ```bash
-make make-public
-# Test your RSS feed at: https://mkpod-integration-test.s3.eu-west-1.amazonaws.com/podcast.rss
-make make-private    # Make it private again when done
+cd e2e
+make help
+make bootstrap-workspace
+make acceptance-validation
+make acceptance-aws INPUT_BUCKET=my-input OUTPUT_BUCKET=my-output AWS_REGION=us-east-1
 ```
+
+## Workspace layout
+
+By default the workspace is generated under `e2e/workspace`.
+
+`make bootstrap-workspace` will:
+- run `mkpod init`
+- generate `artwork/podcast-cover.jpg`
+- generate `masters/episode-1.wav` and `masters/episode-2.wav`
+- write a bucket-specific `podspec.yaml`
+- save a copy as `original-podspec.yaml` for the pubDate acceptance check
+
+## Acceptance scope
+
+- `acceptance-validation`: top-level validation plus episode filtering during RSS rendering
+- `acceptance-pubdate`: filling a missing top-level `pubDate`
+- `acceptance-remove-master`: safety checks around `--remove-remote-master`
+- `acceptance-aws`: end-to-end encode, RSS upload, and acceptance checks
 
 ## Notes
 
-- The tests use real S3 buckets and will incur AWS costs
-- Always run `make clean` after testing to avoid unnecessary storage costs
-- The `teardown` target will delete the S3 buckets entirely - use with caution
-- Test files (.flac, .mp3, .m4a, .m4b, .wav, .jpeg) are ignored by git
-- RSS validation uses `xmllint` to ensure proper format
+- These tests intentionally stay outside the default local test loop.
+- `make clean` only removes remote AWS objects.
+- `make clean-local` removes the generated local workspace.

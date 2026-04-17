@@ -145,14 +145,14 @@ This file is the working plan for finishing the refactor.
 
 ## Phase 9: E2E Test Strategy
 
-- [ ] Keep S3-backed e2e tests, but make them clearly optional and isolated from default local test runs.
+- [x] Keep S3-backed e2e tests, but make them clearly optional and isolated from default local test runs.
 - [ ] Split e2e into:
   - [ ] local integration tests that do not require AWS
   - [ ] opt-in AWS acceptance tests
 - [ ] Replace brittle shell-grep assertions with clearer structured assertions where practical.
-- [ ] Add a documented test fixture lifecycle for the AWS buckets.
+- [x] Add a documented test fixture lifecycle for the AWS buckets.
 - [x] Make e2e target names reflect intent: `acceptance-aws`, `acceptance-remove-master`, etc.
-- [ ] Ensure e2e tests can bootstrap a fresh test workspace via `mkpod init`.
+- [x] Ensure e2e tests can bootstrap a fresh test workspace via `mkpod init`.
 
 ## Phase 10: Documentation
 
@@ -184,4 +184,4 @@ This file is the working plan for finishing the refactor.
 - [ ] 4. Centralize spec validation/defaulting.
 - [x] 5. Implement `init`.
 - [ ] 6. Expand unit and integration coverage around the new seams.
-- [ ] 7. Tighten AWS acceptance tests and refresh docs.
+- [x] 7. Tighten AWS acceptance tests and refresh docs.
