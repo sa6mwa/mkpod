@@ -1,4 +1,4 @@
-package encoder
+package encode
 
 import (
 	"path/filepath"

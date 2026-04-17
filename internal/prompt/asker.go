@@ -1,4 +1,4 @@
-package asker
+package prompt
 
 import (
 	"context"

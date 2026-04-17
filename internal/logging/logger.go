@@ -1,4 +1,4 @@
-// logger is an slog.Logger adapter to store an slog.Logger (using
+// Package logging stores an slog.Logger (using
 // logger.WithLogger) into a context.Context and later retrieve it
 // (using logger.FromContext). The default logger is
 // github.com/charmbracelet/log.
@@ -42,7 +42,7 @@ func FromContext(ctx context.Context) *slog.Logger {
 	return l
 }
 
-// DefaultLogger returns the default logger for this adapter package
+// DefaultLogger returns the default logger for this logging package
 // which utilizes github.com/charmbracelet/log.
 func DefaultLogger() *slog.Logger {
 	return slog.New(log.NewWithOptions(os.Stderr, log.Options{

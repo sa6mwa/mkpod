@@ -11,7 +11,7 @@ import (
 	awss3 "github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	logger "github.com/sa6mwa/mkpod/internal/logging"
-	asker "github.com/sa6mwa/mkpod/internal/prompt"
+	"github.com/sa6mwa/mkpod/internal/prompt"
 )
 
 var (
@@ -46,13 +46,13 @@ type FileInfo struct {
 }
 
 type Client struct {
-	prompter asker.Prompter
+	prompter prompt.Prompter
 	atom     *model.Podcast
 	session  *session.Session
 	s3       *awss3.S3
 }
 
-func New(atom *model.Podcast, prompter asker.Prompter) *Client {
+func New(atom *model.Podcast, prompter prompt.Prompter) *Client {
 	s := session.Must(session.NewSessionWithOptions(session.Options{
 		Profile: atom.Config.Aws.Profile,
 		Config: aws.Config{
@@ -67,7 +67,7 @@ func New(atom *model.Podcast, prompter asker.Prompter) *Client {
 	}
 }
 
-func NewAdminClient(atom *model.Podcast, prompter asker.Prompter) *Client {
+func NewAdminClient(atom *model.Podcast, prompter prompt.Prompter) *Client {
 	return New(atom, prompter)
 }
 

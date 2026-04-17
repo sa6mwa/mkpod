@@ -1,4 +1,4 @@
-package encoder
+package encode
 
 import (
 	"context"
@@ -48,10 +48,10 @@ const (
 )
 
 type Service struct {
-	prompter asker.Prompter
+	prompter prompt.Prompter
 }
 
-func New(prompter asker.Prompter) *Service {
+func New(prompter prompt.Prompter) *Service {
 	return &Service{
 		prompter: prompter,
 	}

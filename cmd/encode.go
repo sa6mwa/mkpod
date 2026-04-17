@@ -101,10 +101,10 @@ Use --all --force to re-encode all episodes regardless.`,
 			os.Exit(1)
 		}
 
-		// Create adapters
-		askerAdapter := asker.New(false, askNoQuestions)
-		encoderAdapter := encoder.New(askerAdapter)
-		storageClient := s3store.New(atom, askerAdapter)
+		// Create services
+		prompter := prompt.New(false, askNoQuestions)
+		encoderService := encode.New(prompter)
+		storageClient := s3store.New(atom, prompter)
 
 		postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
 			if removeRemoteMaster && episode.Input != "" {
@@ -140,7 +140,7 @@ Use --all --force to re-encode all episodes regardless.`,
 
 			// Check if local output file exists but is missing from output bucket
 			if episode.Output != "" {
-				shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, askerAdapter, storageClient, wasEncoded)
+				shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, prompter, storageClient, wasEncoded)
 				if err != nil {
 					return fmt.Errorf("failed to check for missing output file: %w", err)
 				}
@@ -157,7 +157,7 @@ Use --all --force to re-encode all episodes regardless.`,
 		processedCount := 0
 
 		if all {
-			result, err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+			result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
 				All:           true,
 				ForceReencode: askNoQuestions,
 			}, postEncodeFunc)
@@ -174,7 +174,7 @@ Use --all --force to re-encode all episodes regardless.`,
 					l.Error("Invalid episode UID", "uid", uidStr, "error", err)
 					continue
 				}
-				result, err := encoderAdapter.Encode(ctx, atom, encoder.EncodeOptions{
+				result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
 					EpisodeUID: &uid,
 				}, postEncodeFunc)
 				if err != nil {
@@ -192,7 +192,7 @@ Use --all --force to re-encode all episodes regardless.`,
 		}
 
 		// Save updated configuration if needed
-		if askerAdapter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile) {
+		if prompter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile) {
 			atom.LastBuildDate.Time = time.Now().UTC()
 			if err := config.Save(ctx, atom); err != nil {
 				l.Error("Unable to save configuration", "error", err, "specfile", specFile)

@@ -68,14 +68,14 @@ The default preset is sm7b. Available presets are: ` + availablePreprocessPreset
 			os.Exit(1)
 		}
 
-		preprocess := preprocessor.New(&preprocessor.Config{
+		processor := preprocess.New(&preprocess.Config{
 			Prefix: prefix,
 			Preset: preset,
 		})
 
 		ctx := context.Background()
 
-		if err := preprocess.Process(ctx, args); err != nil {
+		if err := processor.Process(ctx, args); err != nil {
 			l.Error("Failed to preprocess audio", "error", err)
 			os.Exit(1)
 		}
