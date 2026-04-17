@@ -37,6 +37,7 @@ type EncodeOptions struct {
 type EncodeResult struct {
 	SelectedIndexes []int
 	EncodedOutputs  []string
+	MetadataChanged bool
 }
 
 type encodeMode string
@@ -175,14 +176,18 @@ func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options Encod
 		if err := applyEpisodeDefaults(atom, episode); err != nil {
 			return nil, err
 		}
-		_ = ensureEpisodePubDate(episode)
+		if ensureEpisodePubDate(episode) {
+			result.MetadataChanged = true
+		}
 
 		outputPath := ""
 		if strings.TrimSpace(episode.Output) != "" {
 			outputPath = path.Join(atom.LocalStorageDirExpanded(), episode.Output)
 		}
-		if _, err := repairOutputMetadata(ctx, episode, outputPath); err != nil {
+		if changed, err := repairOutputMetadata(ctx, episode, outputPath); err != nil {
 			return nil, err
+		} else if changed {
+			result.MetadataChanged = true
 		}
 
 		wasEncoded := false
@@ -203,6 +208,7 @@ func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options Encod
 			}
 
 			result.EncodedOutputs = append(result.EncodedOutputs, episode.Output)
+			result.MetadataChanged = true
 		}
 
 		if postEncoding != nil {

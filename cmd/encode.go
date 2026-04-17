@@ -29,6 +29,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/term"
+
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media/encode"
@@ -155,6 +157,7 @@ Use --all --force to re-encode all episodes regardless.`,
 		}
 
 		processedCount := 0
+		metadataChanged := false
 
 		prepareEpisode := func(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
 			return prepareEpisodeAssetsForEncode(ctx, atom, episode, storageClient)
@@ -171,6 +174,7 @@ Use --all --force to re-encode all episodes regardless.`,
 				os.Exit(1)
 			}
 			processedCount = len(result.EncodedOutputs)
+			metadataChanged = metadataChanged || result.MetadataChanged
 		} else {
 			// Encode specific episodes by UID
 			for _, uidStr := range args {
@@ -188,6 +192,7 @@ Use --all --force to re-encode all episodes regardless.`,
 					os.Exit(1)
 				}
 				processedCount += len(result.EncodedOutputs)
+				metadataChanged = metadataChanged || result.MetadataChanged
 			}
 		}
 
@@ -197,8 +202,11 @@ Use --all --force to re-encode all episodes regardless.`,
 			l.Info("Processing complete", "processed", processedCount)
 		}
 
-		// Save updated configuration if needed
-		if prompter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile) {
+		shouldSave := metadataChanged
+		if shouldSave && !askNoQuestions && term.IsTerminal(int(os.Stdout.Fd())) {
+			shouldSave = prompter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile)
+		}
+		if shouldSave {
 			atom.LastBuildDate.Time = time.Now().UTC()
 			if err := config.Save(ctx, atom); err != nil {
 				l.Error("Unable to save configuration", "error", err, "specfile", specFile)
