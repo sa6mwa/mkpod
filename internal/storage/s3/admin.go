@@ -15,7 +15,6 @@ import (
 )
 
 var (
-	ErrNilPointerRequest   = errors.New("received nil pointer as request")
 	ErrEmptyStore          = errors.New("empty store/bucket name")
 	ErrEmptyKey            = errors.New("empty key/file name")
 	ErrEmptyFilename       = errors.New("empty or missing filename given")
@@ -65,10 +64,6 @@ func New(atom *model.Podcast, prompter prompt.Prompter) *Client {
 		session:  s,
 		s3:       awss3.New(s),
 	}
-}
-
-func NewAdminClient(atom *model.Podcast, prompter prompt.Prompter) *Client {
-	return New(atom, prompter)
 }
 
 func ValidStorageClasses() []string {

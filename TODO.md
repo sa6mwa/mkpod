@@ -40,8 +40,8 @@ This file is the working plan for finishing the refactor.
   - [x] `internal/logging` for context-backed logging helpers
   - [x] `internal/storage/s3` for S3 operations
   - [ ] `internal/cli` for Cobra commands and command wiring
-- [ ] Avoid generic request/response structs when a concrete method signature is clearer.
-- [ ] Move AWS-only constants and types out of generic abstractions.
+- [x] Avoid generic request/response structs when a concrete method signature is clearer.
+- [x] Move AWS-only constants and types out of generic abstractions.
 
 ## Phase 2: Define Cleaner Interfaces
 
@@ -119,7 +119,7 @@ This file is the working plan for finishing the refactor.
 
 ## Phase 7: Storage Cleanup
 
-- [ ] Move all S3-specific logic into one package.
+- [x] Move all S3-specific logic into one package.
 - [x] Reduce duplication between uploader, downloader, and AWS handler session setup.
 - [ ] Revisit AWS SDK choice:
   - [ ] either keep AWS SDK v1 for now and simplify around it

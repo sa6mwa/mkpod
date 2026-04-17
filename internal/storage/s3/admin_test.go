@@ -15,7 +15,7 @@ func (m *mockAsker) Ask(ctx context.Context, format string, a ...any) bool {
 	return m.response
 }
 
-func TestNewAdminClient(t *testing.T) {
+func TestNewClient(t *testing.T) {
 	atom := &model.Podcast{
 		Config: model.Config{
 			Aws: model.AwsConfig{
@@ -26,7 +26,7 @@ func TestNewAdminClient(t *testing.T) {
 	}
 	asker := &mockAsker{response: true}
 
-	handler := NewAdminClient(atom, asker)
+	handler := New(atom, asker)
 	if handler == nil {
 		t.Fatal("NewAdminClient() returned nil")
 	}
@@ -95,7 +95,7 @@ func TestAdminRequestValidation(t *testing.T) {
 		},
 	}
 	asker := &mockAsker{response: true}
-	handler := NewAdminClient(atom, asker)
+	handler := New(atom, asker)
 	ctx := context.Background()
 
 	tests := []struct {

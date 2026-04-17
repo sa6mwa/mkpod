@@ -7,7 +7,7 @@ import (
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
-func TestUploadRequestValidation(t *testing.T) {
+func TestUploadValidation(t *testing.T) {
 	client := New(&model.Podcast{
 		Config: model.Config{
 			Aws: model.AwsConfig{
