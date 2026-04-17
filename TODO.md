@@ -107,13 +107,13 @@ This file is the working plan for finishing the refactor.
 
 ## Phase 6: Command UX Improvements
 
-- [ ] Audit all help text so it matches current behavior and simplified architecture.
+- [x] Audit all help text so it matches current behavior and simplified architecture.
 - [x] Make dry-run behavior consistent across commands.
 - [x] Ensure `force` means "do not prompt" everywhere.
 - [x] Review `encode --all` semantics and replace implicit magic with explicit language.
 - [x] Improve error messages for missing tools, invalid config, missing local files, and S3 object mismatches.
 - [x] Add examples to help output for common workflows.
-- [ ] Decide whether preprocessing belongs as a long-term subcommand or should remain a thin utility wrapper.
+- [x] Decide whether preprocessing belongs as a long-term subcommand or should remain a thin utility wrapper.
 
 ## Phase 7: Storage Cleanup
 

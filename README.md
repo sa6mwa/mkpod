@@ -13,7 +13,7 @@ does not contain credentials).
 The main commands are:
 
 - `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
-- `mkpod preprocess` to run microphone/raw audio through ffmpeg filters
+- `mkpod preprocess` as an optional thin utility for raw audio cleanup before editing
 - `mkpod encode` to encode and upload episode media
 - `mkpod parse` to generate `podcast.rss` and optionally upload it
 
@@ -32,6 +32,8 @@ will be an audio-only episode).
 For AAC-based outputs (`m4a`, `m4b`, and MP4 audio tracks), mkpod now uses
 ffmpeg's built-in `aac` encoder rather than `libfdk_aac`.
 
+`mkpod preprocess` is intentionally kept as a small convenience wrapper around a few ffmpeg filter presets. It is useful when you want it, but it is not part of the required `init -> encode -> parse` publishing path.
+
 ## Quick Start
 
 ```console
@@ -47,7 +49,7 @@ $ mkpod init --help
 $ mkpod parse --help
 $ mkpod encode --help
 
-# Pre-process a raw microphone track
+# Optional raw-track cleanup before editing
 $ mkpod pre MIC1.WAV
 
 # Encode all episodes in podspec.yaml

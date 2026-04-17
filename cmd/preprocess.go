@@ -32,22 +32,22 @@ import (
 
 const defaultPreProcessingPrefix string = "preprocessed-"
 const defaultPreset string = "sm7b"
+const availablePreprocessPresets = "sm7b, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, lowcut"
 
 // preprocessCmd represents the preprocess command
 var preprocessCmd = &cobra.Command{
 	Use:     "preprocess [flags] audiofiles...",
 	Aliases: []string{"pre"},
-	Short:   "Pre-process an audio file (e.g a raw microphone track).",
-	Long: `mkpod preprocess is intended to be used before editing an episode to
-adjust EQ, compression, limiter and similar. The default preprocessing
-preset is sm7b (for audio recorded with the Shure SM7B). Available
-presets are: sm7b, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2,
-none. Limiter settings (except preset "none") will allow you to have
-background audio/music -10 dB. Minus 10.01 dB in fraction is
-0.3158639048423471 or 0.31586 which should produce a mix without
-clipping.`,
+	Short:   "Apply optional ffmpeg-based cleanup filters to raw audio files.",
+	Long: `mkpod preprocess is a thin utility wrapper around a small set of
+ffmpeg filter presets. It is intended for optional cleanup of raw voice
+recordings before editing, not as a required part of the spec-driven
+encode/parse workflow.
+
+The default preset is sm7b. Available presets are: ` + availablePreprocessPresets + `.`,
 	Example: `  mkpod preprocess masters/raw.wav
   mkpod preprocess --preset sm7b masters/intro.wav masters/interview.wav
+  mkpod preprocess --preset lowcut masters/room-tone.wav
   mkpod pre --prefix cleaned- masters/episode.wav`,
 	Run: func(cmd *cobra.Command, args []string) {
 		imsg := "Internal error"
@@ -85,16 +85,6 @@ clipping.`,
 func init() {
 	rootCmd.AddCommand(preprocessCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// preprocessCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// preprocessCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
-	preprocessCmd.Flags().String("prefix", defaultPreProcessingPrefix, "Prefix to add to the output filename")
-	preprocessCmd.Flags().StringP("preset", "p", defaultPreset, "Preset for EQ, compression, limiter and similar, available: sm7b, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, none.")
+	preprocessCmd.Flags().String("prefix", defaultPreProcessingPrefix, "Prefix to prepend to each generated output filename")
+	preprocessCmd.Flags().StringP("preset", "p", defaultPreset, "Preprocessing preset to apply. Available: "+availablePreprocessPresets)
 }

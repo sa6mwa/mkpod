@@ -12,19 +12,23 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "mkpod",
-	Short: "Generate and encode podcasts and publish to a cloud object store",
-	Long: `mkpod is designed to automate the process of preprocessing, encoding,
-generating metadata in Apple podcast RSS format (with chapter
-information), and publishing a podcast to an object store. AWS S3 is
-currently the only supported storage backend.`,
+	Short: "Prepare, encode, and publish a self-hosted podcast to AWS S3",
+	Long: `mkpod is a CLI for a spec-driven podcast workflow: initialize a
+workspace, encode episode media with host-provided tools, render RSS, and
+publish the results to AWS S3.
+
+The core workflow is:
+  1. mkpod init
+  2. mkpod encode
+  3. mkpod parse --upload
+
+mkpod preprocess remains available as an optional thin utility for raw
+microphone cleanup before editing; it is not required for the main publish
+pipeline.`,
 	Example: `  mkpod init ./podcast
   mkpod preprocess masters/raw.wav
   mkpod encode --spec ./podcast/podspec.yaml --all
   mkpod parse --spec ./podcast/podspec.yaml --upload`,
-
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -37,13 +41,4 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mkpod.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

@@ -24,7 +24,12 @@ func TestCLICommands(t *testing.T) {
 		{
 			name:     "preprocess help",
 			args:     []string{"preprocess", "--help"},
-			expected: "mkpod preprocess is intended to be used before editing",
+			expected: "mkpod preprocess is a thin utility wrapper",
+		},
+		{
+			name:     "preprocess help shows supported presets",
+			args:     []string{"preprocess", "--help"},
+			expected: "lowcut",
 		},
 		{
 			name:     "parse help",
@@ -88,7 +93,7 @@ func TestCommandAliases(t *testing.T) {
 		{
 			name:     "preprocess alias pre",
 			args:     []string{"pre", "--help"},
-			expected: "mkpod preprocess is intended to be used before editing",
+			expected: "mkpod preprocess is a thin utility wrapper",
 		},
 	}
 
