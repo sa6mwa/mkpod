@@ -56,7 +56,7 @@ This file is the working plan for finishing the refactor.
   - [x] `DeleteObject`
   - [x] `DiffTextObject`
 - [x] Keep `Asker` or `Prompter` as a tiny interface because it genuinely varies between interactive, force, and dry-run behavior.
-- [ ] Move command-level orchestration out of storage/encoder adapters and into application services or Cobra command handlers.
+- [x] Move command-level orchestration out of storage/encoder adapters and into application services or Cobra command handlers.
 - [x] Replace sentinel UID control values (`-1`, `-2`) with explicit options structs.
 
 ## Phase 3: Media Pipeline Cleanup

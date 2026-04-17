@@ -2,7 +2,7 @@ package model
 
 import "encoding/xml"
 
-// This struct is not used anywhere as of now. One use case could be to validate the rendered podcast.rss by the ForParsing port and RSS renderer.
+// This struct is currently used only by tests and tooling that need to validate rendered podcast.rss as XML.
 type Rss struct {
 	XMLName xml.Name `xml:"rss"`
 	Text    string   `xml:",chardata"`

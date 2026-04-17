@@ -1,58 +1,27 @@
 # mkpod context engineering
 
-This branch (hexagonal) is a refactoring of mkpod (cmd/mkpod/mkpod.go
-and other .go files under cmd/mkpod/) to the Ports and Adapters
-Pattern (hexagonal architecture). The cmd/mkpod/ is the old version
-and the top-level main.go holds the new refactored version using
-spf13/cobra (cobra-cli).
+This repository no longer follows the original broad ports-and-adapters experiment described in older planning notes. The current branch has been simplified to concrete services with narrow seams where variation actually matters.
 
-## Structure
+## Current structure
 
-* internal/app/ports/ has the ports (all prefixed with For indicating what the port interface is for)
-* internal/app/model holds the data-model and DTOs shared across packages
-* internal/adapters/ contains all adapters (concrete types implementing ports interfaces) in individual packages
-* scripts/ has scripts for building ffmpeg and a Blender addon to export markers
-* podspec.yaml is an example podspec
-* Makefile is how the CLI is built, tested, installed and packaged for release
-* TODO.org is an Emacs org mode TODO list
-* README.md describes the old usage unless updated to reflect the new usage
+* `cmd/` contains the Cobra CLI and command orchestration.
+* `internal/app/model` contains the podspec-backed data model and XML helper structs.
+* `internal/spec` handles podspec load/save, validation, defaults, and shared episode rules.
+* `internal/rss` renders RSS output.
+* `internal/media`, `internal/media/encode`, and `internal/media/preprocess` handle host media tooling and encoding/preprocessing flows.
+* `internal/storage/s3` contains the concrete AWS S3 integration.
+* `internal/prompt` and `internal/logging` contain prompting and logging helpers.
+* `e2e/` contains opt-in AWS acceptance coverage.
 
 ## Intent
 
-The main intent is to fully migrate the functionality of the old mkpod
-(cmd/mkpod/) to the new hexagonal architecture mkpod CLI under the
-top-level directory and be able to run `go install
-github.com/sa6mwa/mkpod@latest` to build and install it (the old
-version used github.com/sa6mwa/mkpod/cmd/mkpod as path to the main app
-which should be deprecated).
+The goal is to keep `mkpod` simple and correct for one supported backend: local files, host-provided `ffmpeg`/`ffprobe`/`lame`, and AWS S3. Abstractions should be introduced only when there is real substitution pressure or testability value.
 
-## Instructions
+## Working rules
 
-You are to consistently refactor the old mkpod (cmd/mkpod/) into the
-new ports and adapters pattern mkpod cobra-based CLI under the
-top-level directory. Features and functionality should be preserved,
-the new mkpod should support everything the old mkpod did. Both ports
-and adapters likely already exist for you to use, unless these need to
-be refactored themselves. All new constructors in the adapters should
-return the ports.For... interface (not a concrete type). The CLI app
-using the adapters should never access the adapter concrete type or
-any possible interface directly, it should only access the adapter
-through a port interface (adapter constructors are an exception for
-obvious reasons). Any data model required in an adapter should be
-defined in the ports package instead, but structs returned from
-adapters should genereally be avoided as these should probably be
-interfaces instead (same here, ports.For... interfaces) with getter
-methods to retrieve fields in non-exportable structs.
-
-Never add packages directly to go.mod, always add them to the code
-first, then let `go mod tidy` automatically retrieve the latest
-versions of these packages and patch go.mod for you.
-
-Always create unit tests for new code. Create mock adapters when
-necessary. Most of the current codebase lack unit tests, add when
-necessarry or when you modify existing codebase.
-
-Never build your own binary under the top-level directory, always
-build it as bin/mkpod (under the top-level directory of the repo).
-
-Always use bin/mkpod when running mkpod yourself.
+* Preserve podcast-publishing behavior first; refactors should not degrade the generated RSS or asset workflow.
+* Prefer concrete services over new global interface packages.
+* Keep command wiring visible in `cmd/` rather than hiding orchestration behind generic adapters.
+* Add tests for every behavior change. Prefer observable CLI, RSS, and S3 behavior over implementation-detail assertions.
+* Build the CLI as `bin/mkpod` under the repository root.
+* Use host tools from `PATH` unless the spec explicitly overrides them.
