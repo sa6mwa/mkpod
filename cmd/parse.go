@@ -93,21 +93,23 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 		}
 
 		if upload {
-			l.Info("About to generate RSS and upload to S3", "atom", atom.FeedFile, "bucket", atom.Config.Aws.Buckets.Output)
+			l.Info("About to generate RSS and upload to S3", "feed", atom.FeedFile, "bucket", atom.Config.Aws.Buckets.Output)
 		} else {
-			l.Info("About to generate RSS", "atom", atom.FeedFile)
+			l.Info("About to generate RSS", "feed", atom.FeedFile)
 		}
+
+		feedPath := atom.FeedFilePath()
 
 		// Create adapters
 		askerAdapter := asker.New(dryRun, askNoQuestions)
 		parserAdapter := rss.New()
 
 		// Ask if user wants to refresh lastBuildDate
-		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", atom.FeedFile, specFile) {
+		if askerAdapter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", feedPath, specFile) {
 			atom.LastBuildDate.Time = time.Now().UTC()
 
 			// Save updated configuration
-			if askerAdapter.Ask(ctx, "Fields in the atom have changed, re-write %s?", specFile) {
+			if askerAdapter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile) {
 				if err := config.Save(ctx, atom); err != nil {
 					l.Error("Unable to save configuration", "error", err, "specfile", specFile)
 					os.Exit(1)
@@ -123,10 +125,10 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 			}
 		} else {
 			if err := parserAdapter.WriteRSS(ctx, atom); err != nil {
-				l.Error("Failed to write RSS file", "error", err, "file", atom.FeedFile)
+				l.Error("Failed to write RSS file", "error", err, "file", feedPath)
 				os.Exit(1)
 			}
-			l.Info("Successfully generated RSS", "file", atom.FeedFile)
+			l.Info("Successfully generated RSS", "file", feedPath)
 		}
 
 		// Upload if requested
@@ -140,7 +142,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 			}
 
 			// Show diff first
-			if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, atom.FeedFile); err != nil {
+			if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, feedPath); err != nil {
 				l.Error("Failed to show diff", "error", err)
 				// Don't exit on diff error, continue with upload
 			}
@@ -149,7 +151,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 				request := &s3store.UploadRequest{
 					Store:       atom.Config.Aws.Buckets.Output,
 					Key:         atom.FeedFile,
-					Filename:    atom.FeedFile,
+					Filename:    feedPath,
 					ContentType: "text/xml",
 				}
 				if err := storageClient.UploadFile(ctx, request); err != nil {
@@ -158,7 +160,7 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 				}
 			}
 		} else if upload && dryRun {
-			l.Info("Dry run: would upload RSS", "file", atom.FeedFile, "bucket", atom.Config.Aws.Buckets.Output)
+			l.Info("Dry run: would upload RSS", "file", feedPath, "bucket", atom.Config.Aws.Buckets.Output)
 			// In dry run, also show what images would be checked/uploaded
 			if err := checkAndUploadPodcastImage(ctx, atom, askerAdapter, nil); err != nil {
 				l.Warn("Failed to check podcast image (dry run)", "error", err)
@@ -284,8 +286,8 @@ func init() {
 	// is called directly, e.g.:
 	// parseCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	parseCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Main configuration file for generating the RSS atom")
+	parseCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file (podspec.yaml)")
 	parseCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to \"output\" Amazon AWS S3 bucket defined in spec file")
-	parseCmd.Flags().BoolP("force", "f", false, "Force, do not ask if to proceed with an action, just do it")
+	parseCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
 	parseCmd.Flags().BoolP("dry-run", "n", false, "Behaves like the force option without modifying or producing anything. Will output RSS to stdout instead of file")
 }

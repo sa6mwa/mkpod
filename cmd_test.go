@@ -262,6 +262,74 @@ func TestParseSkipsInvalidEpisodesButSucceeds(t *testing.T) {
 	}
 }
 
+func TestParseWithoutForceLeavesSpecUnchangedInNonInteractiveRun(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "podcast")
+
+	if _, err := cmdTest("", "init", target); err != nil {
+		t.Fatalf("mkpod init failed: %v", err)
+	}
+
+	specPath := filepath.Join(target, "podspec.yaml")
+	before, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec before parse: %v", err)
+	}
+
+	if output, err := cmdTest("", "parse", "--spec", specPath); err != nil {
+		t.Fatalf("mkpod parse failed: %v\nOutput: %s", err, output)
+	}
+
+	after, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec after parse: %v", err)
+	}
+
+	if string(before) != string(after) {
+		t.Fatalf("parse without --force rewrote podspec.yaml")
+	}
+	if _, err := os.Stat(filepath.Join(target, "podcast.rss")); err != nil {
+		t.Fatalf("expected podcast.rss to be written: %v", err)
+	}
+}
+
+func TestParseForceRewritesSpecInNonInteractiveRun(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "podcast")
+
+	if _, err := cmdTest("", "init", target); err != nil {
+		t.Fatalf("mkpod init failed: %v", err)
+	}
+
+	specPath := filepath.Join(target, "podspec.yaml")
+	before, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec before force parse: %v", err)
+	}
+
+	stale := strings.Replace(string(before), "lastBuildDate:", `lastBuildDate: "Tue, 01 Jan 2002 00:00:00 +0000" # `, 1)
+	if stale == string(before) {
+		t.Fatal("expected init spec to contain lastBuildDate")
+	}
+	if err := os.WriteFile(specPath, []byte(stale), 0o644); err != nil {
+		t.Fatalf("write stale spec: %v", err)
+	}
+
+	if output, err := cmdTest("", "parse", "--spec", specPath, "--force"); err != nil {
+		t.Fatalf("mkpod parse --force failed: %v\nOutput: %s", err, output)
+	}
+
+	after, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec after force parse: %v", err)
+	}
+
+	if string(after) == stale {
+		t.Fatalf("parse --force did not rewrite podspec.yaml")
+	}
+	if !strings.Contains(string(after), "lastBuildDate:") {
+		t.Fatalf("rewritten spec missing lastBuildDate: %s", after)
+	}
+}
+
 func cmdTest(_ string, args ...string) (string, error) {
 	command := exec.Command("go", append([]string{"run", "."}, args...)...)
 	output, err := command.CombinedOutput()

@@ -109,7 +109,7 @@ This file is the working plan for finishing the refactor.
 
 - [ ] Audit all help text so it matches current behavior and simplified architecture.
 - [x] Make dry-run behavior consistent across commands.
-- [ ] Ensure `force` means "do not prompt" everywhere.
+- [x] Ensure `force` means "do not prompt" everywhere.
 - [x] Review `encode --all` semantics and replace implicit magic with explicit language.
 - [ ] Improve error messages for missing tools, invalid config, missing local files, and S3 object mismatches.
 - [x] Add examples to help output for common workflows.

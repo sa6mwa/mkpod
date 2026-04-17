@@ -63,6 +63,18 @@ func (p *Podcast) FFmpegPathExpanded() string {
 	return resolvetilde(p.Encoding.FFmpegPath)
 }
 
+func (p *Podcast) FeedFilePath() string {
+	feedFile := strings.TrimSpace(p.FeedFile)
+	if feedFile == "" {
+		return ""
+	}
+	feedFile = resolvetilde(feedFile)
+	if filepath.IsAbs(feedFile) || strings.TrimSpace(p.LocalStorageDirExpanded()) == "" {
+		return feedFile
+	}
+	return filepath.Join(p.LocalStorageDirExpanded(), feedFile)
+}
+
 // resolvetilde returns path where initial tilde (~) is replaced by
 // os.UserHomeDir().
 func resolvetilde(path string) string {

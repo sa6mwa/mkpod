@@ -212,7 +212,7 @@ Use --all --force to re-encode all episodes regardless.`,
 		}
 
 		// Save updated configuration if needed
-		if askerAdapter.Ask(ctx, "Fields in the atom have changed, re-write %s?", specFile) {
+		if askerAdapter.Ask(ctx, "Podcast metadata changed, rewrite %s?", specFile) {
 			atom.LastBuildDate.Time = time.Now().UTC()
 			if err := config.Save(ctx, atom); err != nil {
 				l.Error("Unable to save configuration", "error", err, "specfile", specFile)
@@ -268,7 +268,7 @@ func init() {
 	rootCmd.AddCommand(encodeCmd)
 
 	// Add flags matching the old mkpod encode command
-	encodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Main configuration file for generating the RSS atom")
+	encodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file (podspec.yaml)")
 	encodeCmd.Flags().BoolP("all", "a", false, "Encode episodes whose local output file is missing")
 	encodeCmd.Flags().BoolP("force", "f", false, "Do not prompt. Combined with --all, re-encode every episode even if a local output already exists")
 	encodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file before uploading local master input file. Unless the force option is given, there is a yes/no prompt before proceeding")

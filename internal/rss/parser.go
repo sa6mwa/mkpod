@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -38,7 +39,11 @@ func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Podcast) error {
 	if atom == nil {
 		return ErrNilPointerPodcast
 	}
-	f, err := os.Create(atom.FeedFile)
+	feedPath := atom.FeedFilePath()
+	if err := os.MkdirAll(filepath.Dir(feedPath), 0o755); err != nil {
+		return err
+	}
+	f, err := os.Create(feedPath)
 	if err != nil {
 		return err
 	}
