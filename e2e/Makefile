@@ -9,6 +9,7 @@ MKPOD_BIN ?= ../bin/mkpod
 BASE_URL ?= https://$(OUTPUT_BUCKET).s3.$(AWS_REGION).amazonaws.com
 FEED_FILE := $(WORKSPACE)/podcast.rss
 SPEC_FILE := $(WORKSPACE)/podspec.yaml
+OUTPUT_BUCKET_JSON := $(WORKSPACE)/output-bucket.json
 
 .PHONY: all help build-mkpod rebuild bootstrap-workspace verify-buckets setup \
 	encode generate-rss upload-rss verify-outputs acceptance-aws \
@@ -54,8 +55,9 @@ upload-rss: setup
 	@test -f "$(FEED_FILE)"
 
 verify-outputs:
-	@aws s3 ls s3://$(OUTPUT_BUCKET)/podcast.rss > /dev/null
-	@aws s3 ls s3://$(OUTPUT_BUCKET)/ --recursive | grep -q '\.m4a$$'
+	@aws s3api list-objects-v2 --bucket $(OUTPUT_BUCKET) > $(OUTPUT_BUCKET_JSON)
+	@python3 -c 'import json,sys; from pathlib import Path; payload=json.loads(Path(sys.argv[1]).read_text()); keys=[obj["Key"] for obj in payload.get("Contents", [])]; ("podcast.rss" in keys) or (_ for _ in ()).throw(SystemExit("FAIL: podcast.rss missing from output bucket")); any(key.endswith(".m4a") for key in keys) or (_ for _ in ()).throw(SystemExit("FAIL: no .m4a objects found in output bucket"))' "$(OUTPUT_BUCKET_JSON)"
+	@rm -f $(OUTPUT_BUCKET_JSON)
 	@echo "Verified podcast.rss and encoded audio in $(OUTPUT_BUCKET)"
 
 acceptance-remove-master: setup

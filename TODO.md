@@ -149,7 +149,7 @@ This file is the working plan for finishing the refactor.
 - [x] Split e2e into:
   - [x] local integration tests that do not require AWS
   - [x] opt-in AWS acceptance tests
-- [ ] Replace brittle shell-grep assertions with clearer structured assertions where practical.
+- [x] Replace brittle shell-grep assertions with clearer structured assertions where practical.
 - [x] Add a documented test fixture lifecycle for the AWS buckets.
 - [x] Make e2e target names reflect intent: `acceptance-aws`, `acceptance-remove-master`, etc.
 - [x] Ensure e2e tests can bootstrap a fresh test workspace via `mkpod init`.
