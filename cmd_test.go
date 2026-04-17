@@ -599,6 +599,22 @@ func TestCompiledBinaryEncodePersistsMetadataForParse(t *testing.T) {
 	}
 	rssText := string(rssContent)
 	assertWellFormedRSSXMLBytes(t, rssContent)
+	feed := parseCompiledBinaryRSS(t, rssContent)
+	if len(feed.Channel.Items) != 1 {
+		t.Fatalf("expected 1 RSS item, got %d", len(feed.Channel.Items))
+	}
+	if feed.Channel.Items[0].Summary == "" {
+		t.Fatalf("expected RSS item summary to be present")
+	}
+	if feed.Channel.Items[0].Enclosure.Type != "audio/mpeg" {
+		t.Fatalf("expected enclosure type audio/mpeg, got %q", feed.Channel.Items[0].Enclosure.Type)
+	}
+	if !strings.Contains(feed.Channel.Items[0].Enclosure.URL, "episode-one.mp3") {
+		t.Fatalf("expected enclosure URL to reference episode-one.mp3, got %q", feed.Channel.Items[0].Enclosure.URL)
+	}
+	if !strings.Contains(feed.Channel.Items[0].Image.Href, "artwork/episode-one.jpg") {
+		t.Fatalf("expected item image href to reference artwork/episode-one.jpg, got %q", feed.Channel.Items[0].Image.Href)
+	}
 	for _, want := range []string{
 		"<title>Episode One</title>",
 		"url=\"https://example-podcast-bucket.s3.us-east-1.amazonaws.com/episode-one.mp3\"",
@@ -622,4 +638,32 @@ func assertWellFormedRSSXMLBytes(t *testing.T, content []byte) {
 			t.Fatalf("invalid RSS XML: %v\n%s", err, string(content))
 		}
 	}
+}
+
+type compiledBinaryRSSFeed struct {
+	Channel struct {
+		Items []compiledBinaryRSSItem `xml:"item"`
+	} `xml:"channel"`
+}
+
+type compiledBinaryRSSItem struct {
+	Title       string `xml:"title"`
+	Summary     string `xml:"summary"`
+	Description string `xml:"description"`
+	Enclosure   struct {
+		Type string `xml:"type,attr"`
+		URL  string `xml:"url,attr"`
+	} `xml:"enclosure"`
+	Image struct {
+		Href string `xml:"href,attr"`
+	} `xml:"image"`
+}
+
+func parseCompiledBinaryRSS(t *testing.T, content []byte) compiledBinaryRSSFeed {
+	t.Helper()
+	var feed compiledBinaryRSSFeed
+	if err := xml.Unmarshal(content, &feed); err != nil {
+		t.Fatalf("unmarshal RSS XML: %v\n%s", err, string(content))
+	}
+	return feed
 }
