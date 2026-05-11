@@ -265,6 +265,38 @@ func TestPlanBlenderFailsWhenToolMissing(t *testing.T) {
 	}
 }
 
+func TestPlanPreprocessShowsOutputAndFilter(t *testing.T) {
+	tool, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skipf("sh unavailable: %v", err)
+	}
+
+	output, err := cmdTest("", "plan", "preprocess", "--ffmpeg", tool, "--prefix", "clean-", filepath.Join("masters", "raw.wav"))
+	if err != nil {
+		t.Fatalf("mkpod plan preprocess failed: %v\nOutput: %s", err, output)
+	}
+	for _, want := range []string{
+		"Workflow: preprocess",
+		"Preset: sm7b",
+		filepath.Join("masters", "raw.wav") + " -> " + filepath.Join("masters", "clean-raw.wav"),
+		"Filter:",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got: %s", want, output)
+		}
+	}
+}
+
+func TestPlanPreprocessFailsWithoutInputFiles(t *testing.T) {
+	output, err := cmdTest("", "plan", "preprocess")
+	if err == nil {
+		t.Fatalf("mkpod plan preprocess unexpectedly succeeded\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "empty slice, no media files to process") {
+		t.Fatalf("expected preprocess argument error, got: %s", output)
+	}
+}
+
 func TestCompiledBinaryPreprocessDefaultPreset(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skipf("ffmpeg unavailable: %v", err)

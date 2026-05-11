@@ -57,35 +57,74 @@ type Processor struct {
 	config Config
 }
 
-func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error {
-	l := logger.FromContext(ctx)
+type Plan struct {
+	Preset     string
+	Prefix     string
+	Filter     string
+	Operations []Operation
+}
+
+type Operation struct {
+	Input  string
+	Output string
+	Tool   string
+	Args   []string
+}
+
+func (p *Processor) Plan(mediaFilePaths []string) (*Plan, error) {
 	if len(mediaFilePaths) == 0 {
-		return ErrNoFilesToProcess
+		return nil, ErrNoFilesToProcess
 	}
 	if err := media.EnsureToolAvailable(p.config.Tool); err != nil {
-		return err
+		return nil, err
 	}
 
 	filter, err := filterForPreset(p.config.Preset)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var fcount int
-	var lastInput, lastOutput string
+	plan := &Plan{
+		Preset:     p.config.Preset,
+		Prefix:     p.config.Prefix,
+		Filter:     filter,
+		Operations: make([]Operation, 0, len(mediaFilePaths)),
+	}
 	for _, input := range mediaFilePaths {
 		output := outputPath(input, p.config.Prefix)
-		args := []string{"-y", "-i", input, "-vn", "-ac", "2", "-filter_complex", filter, output}
-		l.Info("Preprocessing", "file", input, "output", output, "tool", p.config.Tool, "args", args)
-		cmd := exec.CommandContext(ctx, p.config.Tool, args...)
+		plan.Operations = append(plan.Operations, Operation{
+			Input:  input,
+			Output: output,
+			Tool:   p.config.Tool,
+			Args:   buildArgs(input, output, filter),
+		})
+	}
+	return plan, nil
+}
+
+func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error {
+	plan, err := p.Plan(mediaFilePaths)
+	if err != nil {
+		return err
+	}
+	return ExecutePlan(ctx, plan)
+}
+
+func ExecutePlan(ctx context.Context, plan *Plan) error {
+	l := logger.FromContext(ctx)
+	var fcount int
+	var lastInput, lastOutput string
+	for _, operation := range plan.Operations {
+		l.Info("Preprocessing", "file", operation.Input, "output", operation.Output, "tool", operation.Tool, "args", operation.Args)
+		cmd := exec.CommandContext(ctx, operation.Tool, operation.Args...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("unable to pre-process %q using external tool (%s): %w", input, p.config.Tool, err)
+			return fmt.Errorf("unable to pre-process %q using external tool (%s): %w", operation.Input, operation.Tool, err)
 		}
-		lastInput = input
-		lastOutput = output
+		lastInput = operation.Input
+		lastOutput = operation.Output
 		fcount++
 	}
 	if fcount == 1 {
@@ -94,6 +133,10 @@ func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error 
 		l.Info(fmt.Sprintf("Processed %d files", fcount))
 	}
 	return nil
+}
+
+func buildArgs(input, output, filter string) []string {
+	return []string{"-y", "-i", input, "-vn", "-ac", "2", "-filter_complex", filter, output}
 }
 
 func outputPath(input, prefix string) string {

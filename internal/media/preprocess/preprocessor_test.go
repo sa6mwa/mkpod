@@ -67,6 +67,41 @@ func TestFilterForPresetRejectsUnknownPreset(t *testing.T) {
 	}
 }
 
+func TestPlanDescribesPreprocessOperations(t *testing.T) {
+	p := New(&Config{
+		Tool:   "sh",
+		Preset: "sm7b",
+		Prefix: "clean-",
+	})
+
+	plan, err := p.Plan([]string{filepath.Join("masters", "raw.wav")})
+	if err != nil {
+		t.Fatalf("Plan() error = %v", err)
+	}
+	if plan.Preset != "sm7b" {
+		t.Fatalf("Preset = %q, want sm7b", plan.Preset)
+	}
+	if len(plan.Operations) != 1 {
+		t.Fatalf("Operations length = %d, want 1", len(plan.Operations))
+	}
+	operation := plan.Operations[0]
+	if operation.Input != filepath.Join("masters", "raw.wav") {
+		t.Fatalf("Input = %q, want masters/raw.wav", operation.Input)
+	}
+	if operation.Output != filepath.Join("masters", "clean-raw.wav") {
+		t.Fatalf("Output = %q, want masters/clean-raw.wav", operation.Output)
+	}
+	if operation.Tool != "sh" {
+		t.Fatalf("Tool = %q, want sh", operation.Tool)
+	}
+	if len(operation.Args) == 0 {
+		t.Fatal("Args is empty")
+	}
+	if !strings.Contains(strings.Join(operation.Args, " "), "-filter_complex") {
+		t.Fatalf("Args = %v, want ffmpeg filter args", operation.Args)
+	}
+}
+
 func TestOutputPathPrefixesBaseNameInSameDirectory(t *testing.T) {
 	input := filepath.Join("masters", "raw.wav")
 	got := outputPath(input, "preprocessed-")
