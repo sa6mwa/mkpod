@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,37 @@ func TestBuildPlanDescribesMarkerExporterInstall(t *testing.T) {
 	}
 	if len(plan.Actions) == 0 {
 		t.Fatal("Actions is empty")
+	}
+}
+
+func TestCommonBlenderPathsAreGeneric(t *testing.T) {
+	for _, goos := range []string{"linux", "darwin", "windows"} {
+		for _, candidate := range commonBlenderPaths(goos) {
+			if strings.Contains(candidate, "/home/") || strings.Contains(candidate, `\Users\`) {
+				t.Fatalf("commonBlenderPaths(%q) includes user-specific path %q", goos, candidate)
+			}
+		}
+	}
+}
+
+func TestIsExecutable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("executable mode bits are not meaningful on windows")
+	}
+	tempDir := t.TempDir()
+	notExecutable := filepath.Join(tempDir, "not-executable")
+	if err := os.WriteFile(notExecutable, []byte(""), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", notExecutable, err)
+	}
+	if isExecutable(notExecutable) {
+		t.Fatalf("isExecutable(%q) = true, want false", notExecutable)
+	}
+	executable := filepath.Join(tempDir, "executable")
+	if err := os.WriteFile(executable, []byte(""), 0o755); err != nil {
+		t.Fatalf("WriteFile(%q): %v", executable, err)
+	}
+	if !isExecutable(executable) {
+		t.Fatalf("isExecutable(%q) = false, want true", executable)
 	}
 }
 

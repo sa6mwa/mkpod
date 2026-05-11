@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -62,7 +63,7 @@ func BuildPlan(options Options) (*Plan, error) {
 		repo = defaultRepo
 	}
 
-	blenderPath, err := exec.LookPath(tool)
+	blenderPath, err := findBlender(tool)
 	if err != nil {
 		return nil, fmt.Errorf("required tool not found: %s (install Blender or pass --blender)", tool)
 	}
@@ -79,6 +80,55 @@ func BuildPlan(options Options) (*Plan, error) {
 			"enable the extension after installation",
 		},
 	}, nil
+}
+
+func findBlender(tool string) (string, error) {
+	if blenderPath, err := exec.LookPath(tool); err == nil {
+		return blenderPath, nil
+	}
+	if filepath.IsAbs(tool) || strings.ContainsRune(tool, filepath.Separator) || tool != defaultBlenderTool {
+		return "", exec.ErrNotFound
+	}
+	for _, candidate := range commonBlenderPaths(runtime.GOOS) {
+		if isExecutable(candidate) {
+			return candidate, nil
+		}
+	}
+	return "", exec.ErrNotFound
+}
+
+func commonBlenderPaths(goos string) []string {
+	switch goos {
+	case "darwin":
+		return []string{
+			"/Applications/Blender.app/Contents/MacOS/Blender",
+		}
+	case "windows":
+		return []string{
+			`C:\Program Files\Blender Foundation\Blender\blender.exe`,
+			`C:\Program Files\Blender Foundation\Blender 4.2\blender.exe`,
+			`C:\Program Files\Blender Foundation\Blender 4.3\blender.exe`,
+			`C:\Program Files\Blender Foundation\Blender 4.4\blender.exe`,
+		}
+	default:
+		return []string{
+			"/usr/bin/blender",
+			"/usr/local/bin/blender",
+			"/snap/bin/blender",
+			"/var/lib/flatpak/exports/bin/org.blender.Blender",
+		}
+	}
+}
+
+func isExecutable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return true
+	}
+	return info.Mode()&0o111 != 0
 }
 
 func Apply(ctx context.Context, options Options, runner Runner) (*Plan, error) {
