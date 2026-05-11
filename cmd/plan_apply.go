@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/sa6mwa/mkpod/internal/blenderaddon"
 	"github.com/sa6mwa/mkpod/internal/logging"
+	"github.com/sa6mwa/mkpod/internal/media/encode"
 	"github.com/sa6mwa/mkpod/internal/media/preprocess"
+	"github.com/sa6mwa/mkpod/internal/spec"
 	"github.com/spf13/cobra"
 )
 
@@ -109,6 +114,42 @@ var applyPreprocessCmd = &cobra.Command{
 	},
 }
 
+var planEpisodeCmd = &cobra.Command{
+	Use:   "episode <uid>",
+	Short: "Preview episode encoding workflow",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("provide exactly one episode UID")
+		}
+		_, err := strconv.ParseInt(args[0], 10, 64)
+		return err
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		plan, err := buildEpisodePlan(context.Background(), cmd, args[0])
+		if err != nil {
+			l.Error("Unable to plan episode workflow", "error", err)
+			os.Exit(1)
+		}
+		printEpisodePlan(plan)
+	},
+}
+
+type episodeWorkflowPlan struct {
+	UID               int64
+	Title             string
+	Input             string
+	InputPath         string
+	InputContentType  string
+	Output            string
+	OutputPath        string
+	OutputExists      bool
+	EncodeMode        string
+	PreferredFormat   string
+	EpisodeFormat     string
+	MetadataWillWrite bool
+}
+
 func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, error) {
 	prefix, err := cmd.Flags().GetString("prefix")
 	if err != nil {
@@ -129,6 +170,63 @@ func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, e
 		Tool:   tool,
 	})
 	return processor.Plan(args)
+}
+
+func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string) (*episodeWorkflowPlan, error) {
+	specFile, err := cmd.Flags().GetString("spec")
+	if err != nil {
+		return nil, err
+	}
+	uid, err := strconv.ParseInt(uidString, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	atom, err := spec.New(specFile).Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	index := atom.ContainsEpisode(uid)
+	if index < 0 {
+		return nil, fmt.Errorf("episode UID %d does not exist in podcast specification", uid)
+	}
+
+	episode := atom.Episodes[index]
+	if err := spec.ApplyEpisodeDefaultsForEncoding(atom, &episode); err != nil {
+		return nil, err
+	}
+
+	inputPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(episode.Input))
+	inputContentType, err := encode.GetFileContentType(inputPath)
+	if err != nil {
+		return nil, err
+	}
+	encodingPlan, err := encode.PlanEpisode(atom, &episode, inputContentType)
+	if err != nil {
+		return nil, err
+	}
+
+	outputPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(encodingPlan.Output))
+	_, statErr := os.Stat(outputPath)
+	outputExists := statErr == nil
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return nil, fmt.Errorf("check output file %s: %w", outputPath, statErr)
+	}
+
+	return &episodeWorkflowPlan{
+		UID:               uid,
+		Title:             episode.Title,
+		Input:             episode.Input,
+		InputPath:         inputPath,
+		InputContentType:  inputContentType,
+		Output:            encodingPlan.Output,
+		OutputPath:        outputPath,
+		OutputExists:      outputExists,
+		EncodeMode:        encodingPlan.Mode,
+		PreferredFormat:   encodingPlan.Preferred,
+		EpisodeFormat:     encodingPlan.EpisodeFormat,
+		MetadataWillWrite: strings.TrimSpace(episode.Output) != encodingPlan.Output,
+	}, nil
 }
 
 func printBlenderPlan(plan *blenderaddon.Plan) {
@@ -155,6 +253,22 @@ func printPreprocessPlan(plan *preprocess.Plan) {
 	}
 }
 
+func printEpisodePlan(plan *episodeWorkflowPlan) {
+	fmt.Println("Workflow: episode")
+	fmt.Printf("Episode: %d\n", plan.UID)
+	fmt.Printf("Title: %s\n", plan.Title)
+	fmt.Printf("Input: %s\n", plan.Input)
+	fmt.Printf("Input path: %s\n", plan.InputPath)
+	fmt.Printf("Input content type: %s\n", plan.InputContentType)
+	fmt.Printf("Encode mode: %s\n", plan.EncodeMode)
+	fmt.Printf("Preferred format: %s\n", plan.PreferredFormat)
+	fmt.Printf("Episode format: %s\n", plan.EpisodeFormat)
+	fmt.Printf("Output: %s\n", plan.Output)
+	fmt.Printf("Output path: %s\n", plan.OutputPath)
+	fmt.Printf("Output exists: %t\n", plan.OutputExists)
+	fmt.Printf("Podspec metadata update: %t\n", plan.MetadataWillWrite)
+}
+
 func init() {
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
@@ -163,6 +277,7 @@ func init() {
 	applyCmd.AddCommand(applyBlenderCmd)
 	planCmd.AddCommand(planPreprocessCmd)
 	applyCmd.AddCommand(applyPreprocessCmd)
+	planCmd.AddCommand(planEpisodeCmd)
 
 	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
@@ -171,6 +286,8 @@ func init() {
 
 	addPreprocessWorkflowFlags(planPreprocessCmd)
 	addPreprocessWorkflowFlags(applyPreprocessCmd)
+
+	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 }
 
 func addPreprocessWorkflowFlags(cmd *cobra.Command) {
