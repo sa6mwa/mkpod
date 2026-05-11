@@ -211,8 +211,10 @@ Principles:
   podcast metadata.
 - [x] Make `apply` execute the same planned operations, while accepting that
   the outside world may have changed since the preview.
-- [ ] Prefer live plan rebuilding first; add `--out plan.json` and
-  `apply --from plan.json` later after the operation model stabilizes.
+- [x] Prefer live plan rebuilding first.
+- [x] Add `--out plan.json` for machine-readable plan artifacts.
+- [ ] Add `apply --from plan.json` after replay semantics are strict enough to
+  avoid surprising stale-plan execution.
 - [x] Remove or hide the old command surface once replacement workflows exist;
   backward CLI compatibility is not a goal for this refactor.
 
