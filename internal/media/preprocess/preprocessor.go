@@ -58,17 +58,17 @@ type Processor struct {
 }
 
 type Plan struct {
-	Preset     string
-	Prefix     string
-	Filter     string
-	Operations []Operation
+	Preset     string      `json:"preset"`
+	Prefix     string      `json:"prefix"`
+	Filter     string      `json:"filter"`
+	Operations []Operation `json:"operations"`
 }
 
 type Operation struct {
-	Input  string
-	Output string
-	Tool   string
-	Args   []string
+	Input  string   `json:"input"`
+	Output string   `json:"output"`
+	Tool   string   `json:"tool"`
+	Args   []string `json:"args"`
 }
 
 func (p *Processor) Plan(mediaFilePaths []string) (*Plan, error) {

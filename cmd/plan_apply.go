@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -51,6 +52,7 @@ var planBlenderCmd = &cobra.Command{
 		}
 
 		printBlenderPlan(plan)
+		writePlanIfRequested(cmd, "blender", plan)
 	},
 }
 
@@ -93,6 +95,7 @@ var planPreprocessCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printPreprocessPlan(plan)
+		writePlanIfRequested(cmd, "preprocess", plan)
 	},
 }
 
@@ -134,6 +137,7 @@ var planEpisodeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printEpisodePlan(plan)
+		writePlanIfRequested(cmd, "episode", plan)
 	},
 }
 
@@ -173,7 +177,13 @@ var planFeedCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printFeedPlan(plan)
+		writePlanIfRequested(cmd, "feed", plan)
 	},
+}
+
+type savedPlan struct {
+	Workflow string `json:"workflow"`
+	Plan     any    `json:"plan"`
 }
 
 var applyFeedCmd = &cobra.Command{
@@ -256,6 +266,24 @@ func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, e
 		Tool:   tool,
 	})
 	return processor.Plan(args)
+}
+
+func writePlanIfRequested(cmd *cobra.Command, workflow string, plan any) {
+	out, err := cmd.Flags().GetString("out")
+	if err != nil || strings.TrimSpace(out) == "" {
+		return
+	}
+	content, err := json.MarshalIndent(savedPlan{Workflow: workflow, Plan: plan}, "", "  ")
+	if err != nil {
+		logger.DefaultLogger().Error("Unable to marshal workflow plan", "error", err)
+		os.Exit(1)
+	}
+	content = append(content, '\n')
+	if err := os.WriteFile(out, content, 0o644); err != nil {
+		logger.DefaultLogger().Error("Unable to write workflow plan", "error", err, "file", out)
+		os.Exit(1)
+	}
+	fmt.Printf("Wrote plan: %s\n", out)
 }
 
 func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string) (*episodeWorkflowPlan, error) {
@@ -542,23 +570,31 @@ func init() {
 
 	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
+	addPlanOutputFlag(planBlenderCmd)
 	applyBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	applyBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
 
 	addPreprocessWorkflowFlags(planPreprocessCmd)
+	addPlanOutputFlag(planPreprocessCmd)
 	addPreprocessWorkflowFlags(applyPreprocessCmd)
 
 	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planEpisodeCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for planned remote objects")
+	addPlanOutputFlag(planEpisodeCmd)
 	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")
 	applyEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file after safety checks")
 
 	planFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planFeedCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for the planned remote feed")
+	addPlanOutputFlag(planFeedCmd)
 	applyFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyFeedCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to the configured output S3 bucket")
 	applyFeedCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
+}
+
+func addPlanOutputFlag(cmd *cobra.Command) {
+	cmd.Flags().String("out", "", "Write the generated workflow plan to a JSON file")
 }
 
 func addPreprocessWorkflowFlags(cmd *cobra.Command) {

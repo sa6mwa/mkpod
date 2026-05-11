@@ -297,6 +297,28 @@ func TestPlanPreprocessFailsWithoutInputFiles(t *testing.T) {
 	}
 }
 
+func TestPlanPreprocessWritesJSONPlan(t *testing.T) {
+	tool, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skipf("sh unavailable: %v", err)
+	}
+
+	planPath := filepath.Join(t.TempDir(), "plan.json")
+	output, err := cmdTest("", "plan", "preprocess", "--ffmpeg", tool, "--out", planPath, "raw.wav")
+	if err != nil {
+		t.Fatalf("mkpod plan preprocess failed: %v\nOutput: %s", err, output)
+	}
+	content, err := os.ReadFile(planPath)
+	if err != nil {
+		t.Fatalf("read plan: %v", err)
+	}
+	for _, want := range []string{`"workflow": "preprocess"`, `"preset": "sm7b"`, `"input": "raw.wav"`} {
+		if !strings.Contains(string(content), want) {
+			t.Fatalf("expected plan JSON to contain %q, got: %s", want, content)
+		}
+	}
+}
+
 func TestPlanEpisodeShowsEncodingDecision(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "podcast")
 	if _, err := cmdTest("", "init", target); err != nil {
