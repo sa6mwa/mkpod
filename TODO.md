@@ -202,10 +202,10 @@ mkpod apply <workflow> [selectors...]
 
 Principles:
 
-- [ ] Keep mkpod opinionated and automatic: `apply` should still run the
+- [x] Keep mkpod opinionated and automatic: `apply` should still run the
   podcast workflow end to end for the selected target.
 - [x] Make `plan` and `apply` share the same internal decision model.
-- [ ] Let `plan` perform read-only inspection, including remote S3 reads where
+- [x] Let `plan` perform read-only inspection, including remote S3 reads where
   needed to produce an accurate preview.
 - [x] Never let `plan` mutate local files, remote files, generated feeds, or
   podcast metadata.
@@ -213,7 +213,7 @@ Principles:
   the outside world may have changed since the preview.
 - [ ] Prefer live plan rebuilding first; add `--out plan.json` and
   `apply --from plan.json` later after the operation model stabilizes.
-- [ ] Remove or hide the old command surface once replacement workflows exist;
+- [x] Remove or hide the old command surface once replacement workflows exist;
   backward CLI compatibility is not a goal for this refactor.
 
 Initial workflow slices:
@@ -243,11 +243,19 @@ Initial workflow slices:
   - [x] Select and validate the episode.
   - [x] Resolve local asset paths.
   - [x] Detect media type and planned output format.
-  - [ ] Preview encode/skip/re-encode decisions.
+  - [x] Preview encode/skip/re-encode decisions.
   - [x] Preview metadata and podspec changes.
-  - [ ] Preview RSS rendering.
-  - [ ] Use read-only S3 checks to preview upload/overwrite/skip/remove
+  - [x] Preview RSS rendering.
+  - [x] Use read-only S3 checks to preview upload/overwrite/skip/remove
     decisions.
+- [x] `mkpod plan feed`
+  - [x] Load the podcast spec.
+  - [x] Preview feed path and local feed state.
+  - [x] Preview valid/skipped RSS episode counts.
+  - [x] Use optional read-only S3 checks for remote feed state.
+- [x] `mkpod apply feed`
+  - [x] Execute the existing parse/feed workflow.
+  - [x] Preserve upload prompts and image sync behavior.
 - [x] `mkpod apply episode <uid>`
   - [x] Execute the planned episode workflow with the same automatic behavior
     mkpod has today.

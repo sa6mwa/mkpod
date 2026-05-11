@@ -13,9 +13,10 @@ does not contain credentials).
 The main commands are:
 
 - `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
-- `mkpod preprocess` as an optional thin utility for raw audio cleanup before editing
-- `mkpod encode` to encode and upload episode media
-- `mkpod parse` to generate `podcast.rss` and optionally upload it
+- `mkpod plan preprocess` / `mkpod apply preprocess` for optional raw audio cleanup before editing
+- `mkpod plan blender` / `mkpod apply blender` to install the embedded Blender marker exporter
+- `mkpod plan episode` / `mkpod apply episode` to encode an edited master into an episode artifact
+- `mkpod plan feed` / `mkpod apply feed` to generate and optionally upload `podcast.rss`
 
 See [docs/architecture.md](docs/architecture.md) for the current simplified
 package and boundary layout.
@@ -42,7 +43,9 @@ S3 storage class handling is intentionally internal for now. mkpod keeps
 the behavior in the S3 layer, but does not expose storage-class controls
 as part of the main CLI workflow.
 
-`mkpod preprocess` is intentionally kept as a small convenience wrapper around a few ffmpeg filter presets. It is useful when you want it, but it is not part of the required `init -> encode -> parse` publishing path.
+mkpod uses a plan/apply workflow for the main operational commands. `plan`
+previews the files, tools, formats, and optional remote checks involved in a
+workflow. `apply` executes the same workflow.
 
 ## Quick Start
 
@@ -56,20 +59,24 @@ $ mkpod -h
 Generate and encode podcasts and publish to a cloud object store
 
 $ mkpod init --help
-$ mkpod parse --help
-$ mkpod encode --help
+$ mkpod plan --help
+$ mkpod apply --help
 
 # Optional raw-track cleanup before editing
-$ mkpod pre MIC1.WAV
+$ mkpod plan preprocess MIC1.WAV
+$ mkpod apply preprocess MIC1.WAV
 
-# Encode all episodes in podspec.yaml
-$ mkpod e -a
+# Install the Blender marker exporter
+$ mkpod plan blender
+$ mkpod apply blender
 
 # Encode a single episode selected by the uid field in podspec.yaml
-$ mkpod e 16
+$ mkpod plan episode 16
+$ mkpod apply episode 16
 
 # Parse and upload podcast.rss
-$ mkpod p -u
+$ mkpod plan feed --remote
+$ mkpod apply feed --upload
 
 # Commit changes to podspec.yaml
 $ git add podspec.yaml ; git commit -m 'Update pod' ; git push
