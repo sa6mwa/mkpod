@@ -175,6 +175,11 @@ type episodeWorkflowPlan struct {
 	PreferredFormat   string
 	EpisodeFormat     string
 	MetadataWillWrite bool
+	FeedFile          string
+	FeedPath          string
+	FeedExists        bool
+	RSSReady          bool
+	RSSMissingFields  []string
 }
 
 func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, error) {
@@ -244,6 +249,25 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	if outputExists {
 		encodeReason = "local output exists; apply episode would prompt before re-encoding"
 	}
+	plannedEpisode := episode
+	plannedEpisode.Output = encodingPlan.Output
+	if plannedEpisode.Type == "" {
+		plannedEpisode.Type = plannedContentType(encodingPlan.Output)
+	}
+	if plannedEpisode.Length == 0 {
+		plannedEpisode.Length = 1
+	}
+	if plannedEpisode.Duration.Duration == 0 {
+		plannedEpisode.Duration.Duration = 1
+	}
+	rssMissing := spec.MissingFieldsForRSS(atom, &plannedEpisode)
+
+	feedPath := atom.FeedFilePath()
+	_, feedStatErr := os.Stat(feedPath)
+	feedExists := feedStatErr == nil
+	if feedStatErr != nil && !os.IsNotExist(feedStatErr) {
+		return nil, fmt.Errorf("check feed file %s: %w", feedPath, feedStatErr)
+	}
 
 	return &episodeWorkflowPlan{
 		UID:               uid,
@@ -260,7 +284,27 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 		PreferredFormat:   encodingPlan.Preferred,
 		EpisodeFormat:     encodingPlan.EpisodeFormat,
 		MetadataWillWrite: strings.TrimSpace(episode.Output) != encodingPlan.Output,
+		FeedFile:          atom.FeedFile,
+		FeedPath:          feedPath,
+		FeedExists:        feedExists,
+		RSSReady:          len(rssMissing) == 0,
+		RSSMissingFields:  rssMissing,
 	}, nil
+}
+
+func plannedContentType(output string) string {
+	switch strings.ToLower(filepath.Ext(output)) {
+	case ".mp3":
+		return "audio/mpeg"
+	case ".m4a":
+		return "audio/mp4"
+	case ".m4b":
+		return "audio/mp4"
+	case ".mp4":
+		return "video/mp4"
+	default:
+		return ""
+	}
 }
 
 func printBlenderPlan(plan *blenderaddon.Plan) {
@@ -303,6 +347,13 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	fmt.Printf("Will encode: %t\n", plan.WillEncode)
 	fmt.Printf("Encode reason: %s\n", plan.EncodeReason)
 	fmt.Printf("Podspec metadata update: %t\n", plan.MetadataWillWrite)
+	fmt.Printf("Feed: %s\n", plan.FeedFile)
+	fmt.Printf("Feed path: %s\n", plan.FeedPath)
+	fmt.Printf("Feed exists: %t\n", plan.FeedExists)
+	fmt.Printf("RSS ready after apply: %t\n", plan.RSSReady)
+	if len(plan.RSSMissingFields) > 0 {
+		fmt.Printf("RSS missing fields after apply: %s\n", strings.Join(plan.RSSMissingFields, ", "))
+	}
 }
 
 func init() {
