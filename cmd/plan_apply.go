@@ -135,6 +135,31 @@ var planEpisodeCmd = &cobra.Command{
 	},
 }
 
+var applyEpisodeCmd = &cobra.Command{
+	Use:   "episode <uid>",
+	Short: "Execute episode encoding workflow",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("provide exactly one episode UID")
+		}
+		_, err := strconv.ParseInt(args[0], 10, 64)
+		return err
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		options, err := encodeWorkflowOptionsFromFlags(cmd)
+		if err != nil {
+			l.Error("Internal error", "error", err)
+			os.Exit(1)
+		}
+		options.All = false
+		if err := runEncodeWorkflow(logger.WithDefaultLogger(context.Background()), args, options); err != nil {
+			l.Error("Unable to apply episode workflow", "error", err)
+			os.Exit(1)
+		}
+	},
+}
+
 type episodeWorkflowPlan struct {
 	UID               int64
 	Title             string
@@ -278,6 +303,7 @@ func init() {
 	planCmd.AddCommand(planPreprocessCmd)
 	applyCmd.AddCommand(applyPreprocessCmd)
 	planCmd.AddCommand(planEpisodeCmd)
+	applyCmd.AddCommand(applyEpisodeCmd)
 
 	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
@@ -288,6 +314,9 @@ func init() {
 	addPreprocessWorkflowFlags(applyPreprocessCmd)
 
 	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
+	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
+	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")
+	applyEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file after safety checks")
 }
 
 func addPreprocessWorkflowFlags(cmd *cobra.Command) {
