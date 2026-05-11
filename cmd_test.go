@@ -59,6 +59,16 @@ func TestCLICommands(t *testing.T) {
 			expected: "Initialize a new mkpod workspace",
 		},
 		{
+			name:     "plan help",
+			args:     []string{"plan", "--help"},
+			expected: "Preview mkpod workflow operations",
+		},
+		{
+			name:     "apply help",
+			args:     []string{"apply", "--help"},
+			expected: "Execute mkpod workflow operations",
+		},
+		{
 			name:     "root help includes examples",
 			args:     []string{"--help"},
 			expected: "Examples:",
@@ -220,6 +230,57 @@ func TestPreprocessFailsWithoutInputFiles(t *testing.T) {
 	}
 	if !strings.Contains(output, "provide one or more audio files to preprocess") {
 		t.Fatalf("expected preprocess argument error, got: %s", output)
+	}
+}
+
+func TestPlanBlenderShowsMarkerExporterInstall(t *testing.T) {
+	tool, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skipf("sh unavailable: %v", err)
+	}
+
+	output, err := cmdTest("", "plan", "blender", "--blender", tool)
+	if err != nil {
+		t.Fatalf("mkpod plan blender failed: %v\nOutput: %s", err, output)
+	}
+	for _, want := range []string{
+		"Workflow: blender",
+		"Export Markers as YAML Chapters",
+		"Repository: user_default",
+		"install extension package with Blender's extension CLI",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got: %s", want, output)
+		}
+	}
+}
+
+func TestPlanBlenderFailsWhenToolMissing(t *testing.T) {
+	output, err := cmdTest("", "plan", "blender", "--blender", "mkpod-definitely-missing-blender")
+	if err == nil {
+		t.Fatalf("mkpod plan blender unexpectedly succeeded\nOutput: %s", output)
+	}
+	if !strings.Contains(output, "required tool not found") {
+		t.Fatalf("expected missing Blender error, got: %s", output)
+	}
+}
+
+func TestCompiledBinaryPreprocessDefaultPreset(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skipf("ffmpeg unavailable: %v", err)
+	}
+
+	target := filepath.Join(t.TempDir(), "podcast")
+	inputPath := filepath.Join(target, "masters", "raw.wav")
+	writeTestWAV(t, inputPath, 44100, 1)
+
+	if output, err := binaryCmdTest(t, "pre", inputPath); err != nil {
+		t.Fatalf("compiled mkpod pre failed: %v\nOutput: %s", err, output)
+	}
+
+	outputPath := filepath.Join(target, "masters", "preprocessed-raw.wav")
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("expected preprocessed output %s: %v", outputPath, err)
 	}
 }
 

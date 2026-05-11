@@ -187,3 +187,77 @@ This file is the working plan for finishing the refactor.
 - [x] 5. Implement `init`.
 - [x] 6. Expand unit and integration coverage around the new seams.
 - [x] 7. Tighten AWS acceptance tests and refresh docs.
+
+## Next Direction: Plan/Apply Workflow
+
+The next major direction is to make mkpod's automatic workflow previewable
+without turning it into a set of disconnected low-level utilities.
+
+Target CLI shape:
+
+```console
+mkpod plan <workflow> [selectors...]
+mkpod apply <workflow> [selectors...]
+```
+
+Principles:
+
+- [ ] Keep mkpod opinionated and automatic: `apply` should still run the
+  podcast workflow end to end for the selected target.
+- [ ] Make `plan` and `apply` share the same internal decision model.
+- [ ] Let `plan` perform read-only inspection, including remote S3 reads where
+  needed to produce an accurate preview.
+- [ ] Never let `plan` mutate local files, remote files, generated feeds, or
+  podcast metadata.
+- [ ] Make `apply` execute the same planned operations, while accepting that
+  the outside world may have changed since the preview.
+- [ ] Prefer live plan rebuilding first; add `--out plan.json` and
+  `apply --from plan.json` later after the operation model stabilizes.
+- [ ] Remove or hide the old command surface once replacement workflows exist;
+  backward CLI compatibility is not a goal for this refactor.
+
+Initial workflow slices:
+
+- [ ] `mkpod plan preprocess <audio-file...>`
+  - [ ] Resolve output paths.
+  - [ ] Resolve preset and exact ffmpeg filter chain.
+  - [ ] Check required tools.
+  - [ ] Report generated artifacts without running ffmpeg.
+- [ ] `mkpod apply preprocess <audio-file...>`
+  - [ ] Execute the planned ffmpeg preprocessing operations.
+  - [ ] Preserve `sm7b-original` as the backup preset.
+  - [ ] Keep `sm7b` as the default iterative preset.
+- [ ] Embed the Blender marker exporter currently stored at
+  `scripts/export_markers.py`.
+- [ ] `mkpod plan blender`
+  - [ ] Detect `blender` on `PATH` first.
+  - [ ] Optionally search common install paths only if needed.
+  - [ ] Preview the add-on installation/enabling operation.
+- [ ] `mkpod apply blender`
+  - [ ] Install and enable the embedded marker exporter in Blender.
+  - [ ] Prefer Blender's official extension CLI, for example
+    `blender --command extension install-file -r user_default -e <package>`.
+  - [ ] Report where Blender installed the add-on.
+- [ ] `mkpod plan episode <uid>`
+  - [ ] Load the podcast spec.
+  - [ ] Select and validate the episode.
+  - [ ] Resolve local and remote asset paths.
+  - [ ] Detect media type and planned output format.
+  - [ ] Preview encode/skip/re-encode decisions.
+  - [ ] Preview metadata and podspec changes.
+  - [ ] Preview RSS rendering.
+  - [ ] Use read-only S3 checks to preview upload/overwrite/skip/remove
+    decisions.
+- [ ] `mkpod apply episode <uid>`
+  - [ ] Execute the planned episode workflow with the same automatic behavior
+    mkpod has today.
+  - [ ] Preserve remote-master deletion safety checks.
+  - [ ] Preserve prompts where decisions remain interactive.
+
+Longer-term direction:
+
+- [ ] Support starting from a minimal local `podcast.yaml` while syncing needed
+  media, artwork, and feed state from the configured asset and podcast buckets.
+- [ ] Move toward operating entirely from buckets where practical.
+- [ ] Add a TUI editor for episode content and workflow review once the
+  operation plan model is stable.

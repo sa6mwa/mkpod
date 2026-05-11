@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media"
@@ -73,7 +74,7 @@ func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error 
 	var fcount int
 	var lastInput, lastOutput string
 	for _, input := range mediaFilePaths {
-		output := p.config.Prefix + input
+		output := outputPath(input, p.config.Prefix)
 		args := []string{"-y", "-i", input, "-vn", "-ac", "2", "-filter_complex", filter, output}
 		l.Info("Preprocessing", "file", input, "output", output, "tool", p.config.Tool, "args", args)
 		cmd := exec.CommandContext(ctx, p.config.Tool, args...)
@@ -93,6 +94,15 @@ func (p *Processor) Process(ctx context.Context, mediaFilePaths []string) error 
 		l.Info(fmt.Sprintf("Processed %d files", fcount))
 	}
 	return nil
+}
+
+func outputPath(input, prefix string) string {
+	dir := filepath.Dir(input)
+	output := prefix + filepath.Base(input)
+	if dir == "." {
+		return output
+	}
+	return filepath.Join(dir, output)
 }
 
 // SetPrefix is a setter for the instance's prefix value. Can be used to over

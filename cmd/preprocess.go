@@ -32,7 +32,7 @@ import (
 
 const defaultPreProcessingPrefix string = "preprocessed-"
 const defaultPreset string = "sm7b"
-const availablePreprocessPresets = "sm7b, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, lowcut"
+const availablePreprocessPresets = "sm7b, sm7b-original, qzj, aggressive, heavy, qzj-podmic, qzj-podmic2, lowcut"
 
 // preprocessCmd represents the preprocess command
 var preprocessCmd = &cobra.Command{
@@ -47,6 +47,7 @@ encode/parse workflow.
 The default preset is sm7b. Available presets are: ` + availablePreprocessPresets + `.`,
 	Example: `  mkpod preprocess masters/raw.wav
   mkpod preprocess --preset sm7b masters/intro.wav masters/interview.wav
+  mkpod preprocess --preset sm7b-original masters/dialog.wav
   mkpod preprocess --preset lowcut masters/room-tone.wav
   mkpod pre --prefix cleaned- masters/episode.wav`,
 	Run: func(cmd *cobra.Command, args []string) {

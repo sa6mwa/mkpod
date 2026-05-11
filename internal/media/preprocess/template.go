@@ -2,10 +2,18 @@ package preprocess
 
 import "fmt"
 
+const (
+	sm7bOriginalFilter = "pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,highpass=80,lowpass=18000,firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',compand=attacks=.1:decays=.3:points=-90/-900|-60/-60|-40/-15|-3/-3|0/-3|20/-3:soft-knee=2,alimiter=limit=0.7943282347242815:level=disabled"
+
+	sm7bFilter = "pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,highpass=80,lowpass=18000,adeclick=t=2.5:b=2,afftdn=nr=6:nf=-50:tn=1:gs=12,firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',compand=attacks=.01:decays=.3:points=-90/-900|-60/-60|-40/-15|-3/-3|0/-3|20/-3:soft-knee=2,alimiter=limit=0.7943282347242815:level=disabled"
+)
+
 func filterForPreset(preset string) (string, error) {
 	switch preset {
 	case "sm7b":
-		return "pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,highpass=80,lowpass=18000,firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-12|-3/-3|0/-3|20/-3:soft-knee=2,alimiter=limit=0.7943282347242815:level=disabled", nil
+		return sm7bFilter, nil
+	case "sm7b-original":
+		return sm7bOriginalFilter, nil
 	case "qzj":
 		return "pan=stereo|c0<.5*c0+.5*c1|c1<.5*c0+.5*c1,highpass=80,lowpass=18000,firequalizer=gain_entry='entry(100,0); entry(200,-6); entry(300,-6); entry(500,-6); entry(600,0); entry(1000,-2); entry(1200,0);entry(7000,0); entry(8000,2); entry(16000,6); entry(20000,0)',compand=attacks=.01:decays=.1:points=-90/-900|-57/-57|-27/-9|-3/-3|0/-3|20/-3:soft-knee=2,alimiter=limit=0.7943282347242815:level=disabled", nil
 	case "aggressive":
