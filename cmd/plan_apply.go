@@ -12,7 +12,9 @@ import (
 	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media/encode"
 	"github.com/sa6mwa/mkpod/internal/media/preprocess"
+	"github.com/sa6mwa/mkpod/internal/prompt"
 	"github.com/sa6mwa/mkpod/internal/spec"
+	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 	"github.com/spf13/cobra"
 )
 
@@ -180,6 +182,16 @@ type episodeWorkflowPlan struct {
 	FeedExists        bool
 	RSSReady          bool
 	RSSMissingFields  []string
+	RemotePreview     bool
+	RemoteOutput      remoteObjectPlan
+	RemoteFeed        remoteObjectPlan
+}
+
+type remoteObjectPlan struct {
+	Bucket string
+	Key    string
+	Exists string
+	Error  string
 }
 
 func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, error) {
@@ -206,6 +218,10 @@ func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, e
 
 func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string) (*episodeWorkflowPlan, error) {
 	specFile, err := cmd.Flags().GetString("spec")
+	if err != nil {
+		return nil, err
+	}
+	remotePreview, err := cmd.Flags().GetBool("remote")
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +285,7 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 		return nil, fmt.Errorf("check feed file %s: %w", feedPath, feedStatErr)
 	}
 
-	return &episodeWorkflowPlan{
+	plan := &episodeWorkflowPlan{
 		UID:               uid,
 		Title:             episode.Title,
 		Input:             episode.Input,
@@ -289,7 +305,42 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 		FeedExists:        feedExists,
 		RSSReady:          len(rssMissing) == 0,
 		RSSMissingFields:  rssMissing,
-	}, nil
+		RemotePreview:     remotePreview,
+		RemoteOutput: remoteObjectPlan{
+			Bucket: atom.Config.Aws.Buckets.Output,
+			Key:    encodingPlan.Output,
+			Exists: "skipped",
+		},
+		RemoteFeed: remoteObjectPlan{
+			Bucket: atom.Config.Aws.Buckets.Output,
+			Key:    atom.FeedFile,
+			Exists: "skipped",
+		},
+	}
+	if remotePreview {
+		storageClient := s3store.New(atom, prompt.New(true, false))
+		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteOutput)
+		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteFeed)
+	}
+	return plan, nil
+}
+
+type remoteExistenceChecker interface {
+	FileExists(context.Context, string, string) (bool, error)
+}
+
+func fillRemoteObjectPlan(ctx context.Context, storageClient remoteExistenceChecker, remotePlan *remoteObjectPlan) {
+	exists, err := storageClient.FileExists(ctx, remotePlan.Bucket, remotePlan.Key)
+	if err != nil {
+		remotePlan.Exists = "unknown"
+		remotePlan.Error = err.Error()
+		return
+	}
+	if exists {
+		remotePlan.Exists = "true"
+		return
+	}
+	remotePlan.Exists = "false"
 }
 
 func plannedContentType(output string) string {
@@ -354,6 +405,17 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	if len(plan.RSSMissingFields) > 0 {
 		fmt.Printf("RSS missing fields after apply: %s\n", strings.Join(plan.RSSMissingFields, ", "))
 	}
+	fmt.Printf("Remote preview: %t\n", plan.RemotePreview)
+	printRemoteObjectPlan("Remote output", plan.RemoteOutput)
+	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
+}
+
+func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
+	fmt.Printf("%s: s3://%s/%s\n", label, plan.Bucket, plan.Key)
+	fmt.Printf("%s exists: %s\n", label, plan.Exists)
+	if plan.Error != "" {
+		fmt.Printf("%s error: %s\n", label, plan.Error)
+	}
 }
 
 func init() {
@@ -376,6 +438,7 @@ func init() {
 	addPreprocessWorkflowFlags(applyPreprocessCmd)
 
 	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
+	planEpisodeCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for planned remote objects")
 	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")
 	applyEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file after safety checks")

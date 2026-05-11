@@ -338,6 +338,8 @@ func TestPlanEpisodeShowsEncodingDecision(t *testing.T) {
 		"Podspec metadata update: true",
 		"Feed: podcast.rss",
 		"RSS ready after apply: true",
+		"Remote preview: false",
+		"Remote output exists: skipped",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got: %s", want, output)
