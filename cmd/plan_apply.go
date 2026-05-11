@@ -169,6 +169,8 @@ type episodeWorkflowPlan struct {
 	Output            string
 	OutputPath        string
 	OutputExists      bool
+	WillEncode        bool
+	EncodeReason      string
 	EncodeMode        string
 	PreferredFormat   string
 	EpisodeFormat     string
@@ -237,6 +239,11 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	if statErr != nil && !os.IsNotExist(statErr) {
 		return nil, fmt.Errorf("check output file %s: %w", outputPath, statErr)
 	}
+	willEncode := !outputExists
+	encodeReason := "local output is missing"
+	if outputExists {
+		encodeReason = "local output exists; apply episode would prompt before re-encoding"
+	}
 
 	return &episodeWorkflowPlan{
 		UID:               uid,
@@ -247,6 +254,8 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 		Output:            encodingPlan.Output,
 		OutputPath:        outputPath,
 		OutputExists:      outputExists,
+		WillEncode:        willEncode,
+		EncodeReason:      encodeReason,
 		EncodeMode:        encodingPlan.Mode,
 		PreferredFormat:   encodingPlan.Preferred,
 		EpisodeFormat:     encodingPlan.EpisodeFormat,
@@ -291,6 +300,8 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	fmt.Printf("Output: %s\n", plan.Output)
 	fmt.Printf("Output path: %s\n", plan.OutputPath)
 	fmt.Printf("Output exists: %t\n", plan.OutputExists)
+	fmt.Printf("Will encode: %t\n", plan.WillEncode)
+	fmt.Printf("Encode reason: %s\n", plan.EncodeReason)
 	fmt.Printf("Podspec metadata update: %t\n", plan.MetadataWillWrite)
 }
 
