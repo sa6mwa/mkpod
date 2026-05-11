@@ -162,6 +162,37 @@ var applyEpisodeCmd = &cobra.Command{
 	},
 }
 
+var planFeedCmd = &cobra.Command{
+	Use:   "feed",
+	Short: "Preview RSS feed generation workflow",
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		plan, err := buildFeedPlan(context.Background(), cmd, args)
+		if err != nil {
+			l.Error("Unable to plan feed workflow", "error", err)
+			os.Exit(1)
+		}
+		printFeedPlan(plan)
+	},
+}
+
+var applyFeedCmd = &cobra.Command{
+	Use:   "feed",
+	Short: "Execute RSS feed generation workflow",
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		options, err := feedWorkflowOptionsFromFlags(cmd)
+		if err != nil {
+			l.Error("Internal error", "error", err)
+			os.Exit(1)
+		}
+		if err := runFeedWorkflow(logger.WithDefaultLogger(context.Background()), args, options); err != nil {
+			l.Error("Unable to apply feed workflow", "error", err)
+			os.Exit(1)
+		}
+	},
+}
+
 type episodeWorkflowPlan struct {
 	UID               int64
 	Title             string
@@ -185,6 +216,17 @@ type episodeWorkflowPlan struct {
 	RemotePreview     bool
 	RemoteOutput      remoteObjectPlan
 	RemoteFeed        remoteObjectPlan
+}
+
+type feedWorkflowPlan struct {
+	FeedFile        string
+	FeedPath        string
+	FeedExists      bool
+	OutputBucket    string
+	ValidEpisodes   int
+	SkippedEpisodes int
+	RemotePreview   bool
+	RemoteFeed      remoteObjectPlan
 }
 
 type remoteObjectPlan struct {
@@ -325,6 +367,61 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	return plan, nil
 }
 
+func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*feedWorkflowPlan, error) {
+	if len(args) > 0 {
+		return nil, fmt.Errorf("feed does not take positional arguments")
+	}
+	specFile, err := cmd.Flags().GetString("spec")
+	if err != nil {
+		return nil, err
+	}
+	remotePreview, err := cmd.Flags().GetBool("remote")
+	if err != nil {
+		return nil, err
+	}
+	atom, err := spec.New(specFile).Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	validEpisodes := 0
+	skippedEpisodes := 0
+	for i := range atom.Episodes {
+		if len(spec.MissingFieldsForRSS(atom, &atom.Episodes[i])) == 0 {
+			validEpisodes++
+		} else {
+			skippedEpisodes++
+		}
+	}
+
+	feedPath := atom.FeedFilePath()
+	_, statErr := os.Stat(feedPath)
+	feedExists := statErr == nil
+	if statErr != nil && !os.IsNotExist(statErr) {
+		return nil, fmt.Errorf("check feed file %s: %w", feedPath, statErr)
+	}
+
+	plan := &feedWorkflowPlan{
+		FeedFile:        atom.FeedFile,
+		FeedPath:        feedPath,
+		FeedExists:      feedExists,
+		OutputBucket:    atom.Config.Aws.Buckets.Output,
+		ValidEpisodes:   validEpisodes,
+		SkippedEpisodes: skippedEpisodes,
+		RemotePreview:   remotePreview,
+		RemoteFeed: remoteObjectPlan{
+			Bucket: atom.Config.Aws.Buckets.Output,
+			Key:    atom.FeedFile,
+			Exists: "skipped",
+		},
+	}
+	if remotePreview {
+		storageClient := s3store.New(atom, prompt.New(true, false))
+		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteFeed)
+	}
+	return plan, nil
+}
+
 type remoteExistenceChecker interface {
 	FileExists(context.Context, string, string) (bool, error)
 }
@@ -410,6 +507,18 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
 }
 
+func printFeedPlan(plan *feedWorkflowPlan) {
+	fmt.Println("Workflow: feed")
+	fmt.Printf("Feed: %s\n", plan.FeedFile)
+	fmt.Printf("Feed path: %s\n", plan.FeedPath)
+	fmt.Printf("Feed exists: %t\n", plan.FeedExists)
+	fmt.Printf("Output bucket: %s\n", plan.OutputBucket)
+	fmt.Printf("Valid episodes: %d\n", plan.ValidEpisodes)
+	fmt.Printf("Skipped episodes: %d\n", plan.SkippedEpisodes)
+	fmt.Printf("Remote preview: %t\n", plan.RemotePreview)
+	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
+}
+
 func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
 	fmt.Printf("%s: s3://%s/%s\n", label, plan.Bucket, plan.Key)
 	fmt.Printf("%s exists: %s\n", label, plan.Exists)
@@ -428,6 +537,8 @@ func init() {
 	applyCmd.AddCommand(applyPreprocessCmd)
 	planCmd.AddCommand(planEpisodeCmd)
 	applyCmd.AddCommand(applyEpisodeCmd)
+	planCmd.AddCommand(planFeedCmd)
+	applyCmd.AddCommand(applyFeedCmd)
 
 	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
@@ -442,6 +553,12 @@ func init() {
 	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")
 	applyEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file after safety checks")
+
+	planFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
+	planFeedCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for the planned remote feed")
+	applyFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
+	applyFeedCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to the configured output S3 bucket")
+	applyFeedCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
 }
 
 func addPreprocessWorkflowFlags(cmd *cobra.Command) {

@@ -390,6 +390,57 @@ func TestPlanEpisodeShowsExistingOutputWouldPrompt(t *testing.T) {
 	}
 }
 
+func TestPlanFeedShowsValidAndSkippedEpisodes(t *testing.T) {
+	target := filepath.Join(t.TempDir(), "podcast")
+	if _, err := cmdTest("", "init", target); err != nil {
+		t.Fatalf("mkpod init failed: %v", err)
+	}
+
+	specPath := filepath.Join(target, "podspec.yaml")
+	specContent, err := os.ReadFile(specPath)
+	if err != nil {
+		t.Fatalf("read spec: %v", err)
+	}
+	updated := strings.Replace(string(specContent), "episodes: []", `episodes:
+    - uid: 1
+      title: "Good Episode"
+      pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"
+      link: "https://example.com/podcast/episodes/1"
+      duration: "00:05:00"
+      subtitle: "Valid episode"
+      description: "Ready for RSS"
+      type: "audio/mpeg"
+      length: 12345
+      image: "artwork/podcast-cover.jpg"
+      output: "episode.mp3"
+    - uid: 2
+      title: "Draft Episode"
+      pubDate: "Fri, 25 Mar 2022 16:00:13 +0000"
+      link: "https://example.com/podcast/episodes/2"
+      subtitle: "Draft"
+      description: "Not ready"
+`, 1)
+	if err := os.WriteFile(specPath, []byte(updated), 0o644); err != nil {
+		t.Fatalf("write updated spec: %v", err)
+	}
+
+	output, err := cmdTest("", "plan", "feed", "--spec", specPath)
+	if err != nil {
+		t.Fatalf("mkpod plan feed failed: %v\nOutput: %s", err, output)
+	}
+	for _, want := range []string{
+		"Workflow: feed",
+		"Feed: podcast.rss",
+		"Valid episodes: 1",
+		"Skipped episodes: 1",
+		"Remote feed exists: skipped",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got: %s", want, output)
+		}
+	}
+}
+
 func TestCompiledBinaryPreprocessDefaultPreset(t *testing.T) {
 	if _, err := exec.LookPath("ffmpeg"); err != nil {
 		t.Skipf("ffmpeg unavailable: %v", err)
