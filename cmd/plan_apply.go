@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,6 +28,22 @@ var planCmd = &cobra.Command{
 var applyCmd = &cobra.Command{
 	Use:   "apply <workflow>",
 	Short: "Execute mkpod workflow operations",
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		from, err := cmd.Flags().GetString("from")
+		if err != nil {
+			l.Error("Internal error", "error", err)
+			os.Exit(1)
+		}
+		if strings.TrimSpace(from) == "" {
+			_ = cmd.Help()
+			os.Exit(1)
+		}
+		if err := applySavedPlan(context.Background(), from); err != nil {
+			l.Error("Unable to apply saved workflow plan", "error", err)
+			os.Exit(1)
+		}
+	},
 }
 
 var planBlenderCmd = &cobra.Command{
@@ -52,7 +69,7 @@ var planBlenderCmd = &cobra.Command{
 		}
 
 		printBlenderPlan(plan)
-		writePlanIfRequested(cmd, "blender", plan)
+		writePlan(cmd, "blender", plan, defaultPlanPath("blender", ""))
 	},
 }
 
@@ -95,7 +112,7 @@ var planPreprocessCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printPreprocessPlan(plan)
-		writePlanIfRequested(cmd, "preprocess", plan)
+		writePlan(cmd, "preprocess", plan, defaultPlanPath("preprocess", ""))
 	},
 }
 
@@ -137,7 +154,7 @@ var planEpisodeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printEpisodePlan(plan)
-		writePlanIfRequested(cmd, "episode", plan)
+		writePlan(cmd, "episode", plan, defaultPlanPath("episode", mustGetStringFlag(cmd, "spec")))
 	},
 }
 
@@ -177,13 +194,13 @@ var planFeedCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printFeedPlan(plan)
-		writePlanIfRequested(cmd, "feed", plan)
+		writePlan(cmd, "feed", plan, defaultPlanPath("feed", mustGetStringFlag(cmd, "spec")))
 	},
 }
 
 type savedPlan struct {
-	Workflow string `json:"workflow"`
-	Plan     any    `json:"plan"`
+	Workflow string          `json:"workflow"`
+	Plan     json.RawMessage `json:"plan"`
 }
 
 var applyFeedCmd = &cobra.Command{
@@ -268,12 +285,21 @@ func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, e
 	return processor.Plan(args)
 }
 
-func writePlanIfRequested(cmd *cobra.Command, workflow string, plan any) {
+func writePlan(cmd *cobra.Command, workflow string, plan any, defaultPath string) {
 	out, err := cmd.Flags().GetString("out")
-	if err != nil || strings.TrimSpace(out) == "" {
-		return
+	if err != nil {
+		logger.DefaultLogger().Error("Unable to read workflow plan output path", "error", err)
+		os.Exit(1)
 	}
-	content, err := json.MarshalIndent(savedPlan{Workflow: workflow, Plan: plan}, "", "  ")
+	if strings.TrimSpace(out) == "" {
+		out = defaultPath
+	}
+	planContent, err := json.Marshal(plan)
+	if err != nil {
+		logger.DefaultLogger().Error("Unable to marshal workflow plan", "error", err)
+		os.Exit(1)
+	}
+	content, err := json.MarshalIndent(savedPlan{Workflow: workflow, Plan: planContent}, "", "  ")
 	if err != nil {
 		logger.DefaultLogger().Error("Unable to marshal workflow plan", "error", err)
 		os.Exit(1)
@@ -284,6 +310,92 @@ func writePlanIfRequested(cmd *cobra.Command, workflow string, plan any) {
 		os.Exit(1)
 	}
 	fmt.Printf("Wrote plan: %s\n", out)
+}
+
+func defaultPlanPath(workflow, specFile string) string {
+	dir := "."
+	if strings.TrimSpace(specFile) != "" {
+		dir = filepath.Dir(specFile)
+	}
+	return filepath.Join(dir, workflow+".plan.json")
+}
+
+func mustGetStringFlag(cmd *cobra.Command, name string) string {
+	value, err := cmd.Flags().GetString(name)
+	if err != nil {
+		logger.DefaultLogger().Error("Unable to read flag", "flag", name, "error", err)
+		os.Exit(1)
+	}
+	return value
+}
+
+func loadSavedPlan(path string) (*savedPlan, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var saved savedPlan
+	if err := json.Unmarshal(content, &saved); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(saved.Workflow) == "" || len(saved.Plan) == 0 {
+		return nil, errors.New("invalid saved plan: workflow and plan are required")
+	}
+	return &saved, nil
+}
+
+func applySavedPlan(ctx context.Context, path string) error {
+	saved, err := loadSavedPlan(path)
+	if err != nil {
+		return err
+	}
+	switch saved.Workflow {
+	case "preprocess":
+		var plan preprocess.Plan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		if err := validateSavedPreprocessPlan(&plan); err != nil {
+			return err
+		}
+		return preprocess.ExecutePlan(ctx, &plan)
+	default:
+		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
+	}
+}
+
+func validateSavedPreprocessPlan(plan *preprocess.Plan) error {
+	if len(plan.Operations) == 0 {
+		return errors.New("stale or invalid preprocess plan: no operations")
+	}
+	expected, err := preprocess.New(&preprocess.Config{
+		Prefix: plan.Prefix,
+		Preset: plan.Preset,
+		Tool:   plan.Operations[0].Tool,
+	}).Plan(preprocessPlanInputs(plan))
+	if err != nil {
+		return err
+	}
+	expectedJSON, err := json.Marshal(expected)
+	if err != nil {
+		return err
+	}
+	actualJSON, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if string(expectedJSON) != string(actualJSON) {
+		return errors.New("saved preprocess plan is stale; rerun mkpod plan preprocess")
+	}
+	return nil
+}
+
+func preprocessPlanInputs(plan *preprocess.Plan) []string {
+	inputs := make([]string, 0, len(plan.Operations))
+	for _, operation := range plan.Operations {
+		inputs = append(inputs, operation.Input)
+	}
+	return inputs
 }
 
 func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string) (*episodeWorkflowPlan, error) {
@@ -558,6 +670,7 @@ func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
 func init() {
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
+	applyCmd.Flags().String("from", "", "Apply a saved workflow plan JSON file")
 
 	planCmd.AddCommand(planBlenderCmd)
 	applyCmd.AddCommand(applyBlenderCmd)
