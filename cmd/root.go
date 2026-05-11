@@ -21,7 +21,8 @@ The emerging workflow is:
   1. mkpod plan <workflow>
   2. mkpod apply <workflow>
 
-Legacy encode/parse commands remain available during the plan/apply migration.
+Legacy encode/parse/preprocess commands remain available during the
+plan/apply migration, but are hidden from the primary help surface.
 
 mkpod preprocess remains available as an optional thin utility for raw
 microphone cleanup before editing; it is not required for the main publish
@@ -31,7 +32,8 @@ pipeline.`,
   mkpod apply preprocess masters/raw.wav
   mkpod plan episode --spec ./podcast/podspec.yaml 16
   mkpod apply episode --spec ./podcast/podspec.yaml 16
-  mkpod parse --spec ./podcast/podspec.yaml --upload`,
+  mkpod plan feed --spec ./podcast/podspec.yaml
+  mkpod apply feed --spec ./podcast/podspec.yaml --upload`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

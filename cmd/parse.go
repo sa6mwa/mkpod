@@ -42,6 +42,7 @@ var parseCmd = &cobra.Command{
 	Use:     "parse",
 	Aliases: []string{"p"},
 	Short:   "Parse podspec.yaml into podcast RSS feed",
+	Hidden:  true,
 	Long: `Parse the podcast specification file (podspec.yaml) and generate
 the RSS feed (podcast.rss). This command reads the configuration,
 validates the podcast metadata, and generates the RSS XML file. Episodes

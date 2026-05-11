@@ -39,6 +39,7 @@ var preprocessCmd = &cobra.Command{
 	Use:     "preprocess [flags] audiofiles...",
 	Aliases: []string{"pre"},
 	Short:   "Apply optional ffmpeg-based cleanup filters to raw audio files.",
+	Hidden:  true,
 	Long: `mkpod preprocess is a thin utility wrapper around a small set of
 ffmpeg filter presets. It is intended for optional cleanup of raw voice
 recordings before editing, not as a required part of the spec-driven

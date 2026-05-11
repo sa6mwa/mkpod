@@ -45,6 +45,7 @@ var encodeCmd = &cobra.Command{
 	Aliases: []string{"e"},
 	Use:     "encode [episode-uids...] | --all",
 	Short:   "Encode and upload single or all episodes in podspec.yaml",
+	Hidden:  true,
 	Long: `Encode and upload episode media defined in the podcast specification.
 This command encodes local master files into the configured output
 formats (MP3, M4A, M4B, MP4) and can upload the resulting files to S3.
