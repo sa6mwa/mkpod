@@ -45,7 +45,15 @@ as part of the main CLI workflow.
 
 mkpod uses a plan/apply workflow for the main operational commands. `plan`
 previews the files, tools, formats, and optional remote checks involved in a
-workflow. `apply` executes the same workflow.
+workflow and writes a default `WORKFLOW.plan.json` artifact. Spec-based plans
+are written next to the selected spec file. `apply` executes the same workflow.
+For deterministic workflows such as preprocessing, mkpod can also apply a
+saved plan after checking that it is not stale:
+
+```console
+$ mkpod plan preprocess MIC1.WAV
+$ mkpod apply --from preprocess.plan.json
+```
 
 ## Quick Start
 
@@ -64,7 +72,7 @@ $ mkpod apply --help
 
 # Optional raw-track cleanup before editing
 $ mkpod plan preprocess MIC1.WAV
-$ mkpod apply preprocess MIC1.WAV
+$ mkpod apply --from preprocess.plan.json
 
 # Install the Blender marker exporter
 $ mkpod plan blender
