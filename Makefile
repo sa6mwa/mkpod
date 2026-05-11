@@ -9,14 +9,14 @@ GOARCH = amd64
 GO = CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go
 
 .PHONY: all
-all: clean build
+all: clean test vulncheck build
 
 .PHONY: clean
 clean:
 	rm -rf bin
 
 .PHONY: build
-build: test vulncheck bin/$(NAME) strip
+build: bin/$(NAME) strip
 
 .PHONY: vulncheck
 vulncheck:
