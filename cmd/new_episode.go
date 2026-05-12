@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
@@ -282,14 +283,18 @@ func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
 			huh.NewInput().Title("Author").Value(&inputs.Author),
 			localStorageFilePicker(atom, "Image", "Stored relative to localStorageDir", inputs.Image, &inputs.Image),
 			localStorageFilePicker(atom, "Input", "Edited master, stored relative to localStorageDir", inputs.Input, &inputs.Input),
-			huh.NewInput().Title("Format").Description("Optional: mp3, m4a, m4b, audio, video").Value(&inputs.Format),
-			huh.NewInput().Title("Encoding language").Description(encodingLanguageDescription(inputs)).Placeholder(inputs.InheritedEncodingLanguage).Value(&inputs.EncodingLanguage),
+			huh.NewInput().Title("Format").Description("Optional: mp3, m4a, m4b, audio, video").Value(&inputs.Format).Inline(true),
+			huh.NewInput().Title("Encoding language").Description(encodingLanguageDescription(inputs)).Placeholder(inputs.InheritedEncodingLanguage).Value(&inputs.EncodingLanguage).Inline(true),
 			huh.NewFilePicker().Title("Chapters file").CurrentDirectory(chaptersPickerDirectory(chapters)).Value(&inputs.Chapters).FileAllowed(true).DirAllowed(false),
 		),
 		huh.NewGroup(
-			huh.NewText().Title("Description").Value(&inputs.Description).Lines(12),
+			huh.NewText().Title("Description").Value(&inputs.Description).Lines(18),
 		),
-	).WithTheme(huh.ThemeCharm())
+	).WithTheme(huh.ThemeCharm()).WithProgramOptions(
+		tea.WithOutput(os.Stderr),
+		tea.WithReportFocus(),
+		tea.WithAltScreen(),
+	)
 	return form.Run()
 }
 
