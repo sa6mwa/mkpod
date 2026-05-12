@@ -640,6 +640,9 @@ func (m newEpisodeTUIModel) pickerStartDirectory(field int) string {
 		value = strings.TrimSpace(m.fields[field].Value())
 	}
 	if field == newEpisodeFieldChapters {
+		if value == "" {
+			return m.inputPickerDirectory()
+		}
 		return existingDirectoryForPicker(value, homeDirOrDot())
 	}
 	root := m.localStorageRoot()
@@ -657,6 +660,21 @@ func (m newEpisodeTUIModel) pickerStartDirectory(field int) string {
 		return root
 	}
 	return existingDirectoryForPicker(filepath.Join(root, clean), root)
+}
+
+func (m newEpisodeTUIModel) inputPickerDirectory() string {
+	input := strings.TrimSpace(m.fields[newEpisodeFieldInput].Value())
+	if input == "" {
+		return homeDirOrDot()
+	}
+	if filepath.IsAbs(input) {
+		return existingDirectoryForPicker(input, homeDirOrDot())
+	}
+	clean := filepath.Clean(filepath.FromSlash(input))
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return homeDirOrDot()
+	}
+	return existingDirectoryForPicker(filepath.Join(m.localStorageRoot(), clean), homeDirOrDot())
 }
 
 func countVisiblePickerEntries(dir string) int {

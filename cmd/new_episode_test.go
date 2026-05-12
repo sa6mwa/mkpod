@@ -357,6 +357,42 @@ func TestNewEpisodeTUIPickerRejectsParentRelativeStart(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIChaptersPickerStartsAtInputDirectory(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.fields[newEpisodeFieldInput].SetValue("masters/episode.wav")
+	tui.fields[newEpisodeFieldChapters].SetValue("")
+
+	got := tui.pickerStartDirectory(newEpisodeFieldChapters)
+	want := filepath.Join(atom.LocalStorageDirExpanded(), "masters")
+	if got != want {
+		t.Fatalf("chapters pickerStartDirectory() = %q, want input dir %q", got, want)
+	}
+}
+
+func TestNewEpisodeTUIChaptersPickerUsesExplicitChaptersDirectory(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	chaptersDir := filepath.Join(t.TempDir(), "chapters")
+	mkdirAll(t, chaptersDir)
+	writeFile(t, filepath.Join(chaptersDir, "episode.md"), []byte("- 00:00 intro\n"))
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.fields[newEpisodeFieldInput].SetValue("masters/episode.wav")
+	tui.fields[newEpisodeFieldChapters].SetValue(filepath.Join(chaptersDir, "episode.md"))
+
+	got := tui.pickerStartDirectory(newEpisodeFieldChapters)
+	if got != chaptersDir {
+		t.Fatalf("chapters pickerStartDirectory() = %q, want explicit chapters dir %q", got, chaptersDir)
+	}
+}
+
 func TestNewEpisodeTUICollectInputs(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
