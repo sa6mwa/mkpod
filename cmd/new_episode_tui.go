@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
+
+var errNewEpisodeFormCancelled = errors.New("new episode form cancelled")
 
 const (
 	newEpisodeFieldUID = iota
@@ -96,7 +99,7 @@ func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
 		return fmt.Errorf("new episode form returned unexpected model %T", finalModel)
 	}
 	if result.cancelled {
-		return fmt.Errorf("new episode form cancelled")
+		return errNewEpisodeFormCancelled
 	}
 	*inputs = result.collectInputs()
 	return nil

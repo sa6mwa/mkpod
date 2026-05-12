@@ -1,41 +1,38 @@
-// Package logging stores an slog.Logger (using
-// logger.WithLogger) into a context.Context and later retrieve it
-// (using logger.FromContext). The default logger is
-// github.com/charmbracelet/log.
+// Package logging stores a pslog.Logger in a context.Context and later
+// retrieves it. The default logger uses pkt.systems/pslog.
 package logger
 
 import (
 	"context"
-	"log/slog"
 	"os"
 	"time"
 
-	"github.com/charmbracelet/log"
+	"pkt.systems/pslog"
 )
 
 type contextKey struct{}
 
 var loggerKey = &contextKey{}
 
-// WithLogger returns a context with l as slog.Logger based off the
+// WithLogger returns a context with l as pslog.Logger based off the
 // ctx context. Retrieve the logger using FromContext.
-func WithLogger(ctx context.Context, l *slog.Logger) context.Context {
+func WithLogger(ctx context.Context, l pslog.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, l)
 }
 
 // WithDefaultLogger returns a context with DefaultLogger set as the
-// slog.Logger based off the ctx context. Retrieve the logger using
+// pslog.Logger based off the ctx context. Retrieve the logger using
 // FromContext.
 func WithDefaultLogger(ctx context.Context) context.Context {
 	return WithLogger(ctx, DefaultLogger())
 }
 
-// FromContext retrieves an slog.Logger saved by WithLogger from
+// FromContext retrieves a pslog.Logger saved by WithLogger from
 // ctx. If there is not such logger in the context,
 // logger.DefaultLogger() is returned ensuring this function will
-// always return a valid slog.Logger.
-func FromContext(ctx context.Context) *slog.Logger {
-	l, ok := ctx.Value(loggerKey).(*slog.Logger)
+// always return a valid pslog.Logger.
+func FromContext(ctx context.Context) pslog.Logger {
+	l, ok := ctx.Value(loggerKey).(pslog.Logger)
 	if !ok {
 		return DefaultLogger()
 	}
@@ -43,11 +40,13 @@ func FromContext(ctx context.Context) *slog.Logger {
 }
 
 // DefaultLogger returns the default logger for this logging package
-// which utilizes github.com/charmbracelet/log.
-func DefaultLogger() *slog.Logger {
-	return slog.New(log.NewWithOptions(os.Stderr, log.Options{
-		ReportTimestamp: true,
-		//TimeFormat:      time.RFC3339,
-		TimeFormat: time.Kitchen,
-	}))
+// which utilizes pkt.systems/pslog.
+func DefaultLogger() pslog.Logger {
+	return pslog.LoggerFromEnv(context.Background(),
+		pslog.WithEnvWriter(os.Stderr),
+		pslog.WithEnvOptions(pslog.Options{
+			Mode:       pslog.ModeConsole,
+			TimeFormat: time.Kitchen,
+		}),
+	)
 }

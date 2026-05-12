@@ -27,6 +27,9 @@ var newCmd = &cobra.Command{
 		l := logger.DefaultLogger()
 		plan, err := buildNewEpisodePlan(context.Background(), cmd, args)
 		if err != nil {
+			if errors.Is(err, errNewEpisodeFormCancelled) {
+				os.Exit(130)
+			}
 			l.Error("Unable to plan new episode", "error", err)
 			os.Exit(1)
 		}
@@ -42,6 +45,9 @@ var planNewCmd = &cobra.Command{
 		l := logger.DefaultLogger()
 		plan, err := buildNewEpisodePlan(context.Background(), cmd, args)
 		if err != nil {
+			if errors.Is(err, errNewEpisodeFormCancelled) {
+				os.Exit(130)
+			}
 			l.Error("Unable to plan new episode", "error", err)
 			os.Exit(1)
 		}
