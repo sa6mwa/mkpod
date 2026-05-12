@@ -66,6 +66,7 @@ type newEpisodeTUIModel struct {
 	focus     int
 	width     int
 	height    int
+	scroll    int
 	message   string
 	cancelled bool
 	submitted bool
@@ -120,12 +121,12 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		"episode title",
 		"short episode subtitle",
 		"https://example.com/episode",
-		"episode author",
-		"relative image path",
-		"relative edited master",
+		authorPlaceholder(inputs),
+		"enter to choose image file",
+		"enter to choose edited master",
 		"m4a",
 		inputs.InheritedEncodingLanguage,
-		"optional chapters.yaml",
+		"enter to choose optional chapters file",
 	}
 	for i := range fields {
 		field := textinput.New()
@@ -139,7 +140,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	desc := textarea.New()
 	desc.Prompt = ""
 	desc.ShowLineNumbers = false
-	desc.Placeholder = "episode description"
+	desc.Placeholder = "episode description markdown"
 	desc.SetValue(inputs.Description)
 
 	m := newEpisodeTUIModel{
@@ -237,6 +238,7 @@ func (m newEpisodeTUIModel) View() string {
 	}
 	lines := m.formLines()
 	lines = visualLines(lines)
+	lines = scrollLines(lines, m.scroll)
 	if m.picking {
 		if len(lines) > 0 {
 			lines[len(lines)-1] = ""
@@ -250,8 +252,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.titleStyle.Render("mkpod new episode:"),
-		m.subtitleStyle.Render("Prepare a saved plan. Nothing is written to podspec.yaml until apply."),
+		m.titleStyle.Render(m.formHeaderTitle()+":")+" "+m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
 		"",
@@ -262,6 +263,13 @@ func (m newEpisodeTUIModel) formLines() []string {
 	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
 	return lines
+}
+
+func (m newEpisodeTUIModel) formHeaderTitle() string {
+	if m.atom != nil && strings.TrimSpace(m.atom.Title) != "" {
+		return strings.TrimSpace(m.atom.Title)
+	}
+	return "New episode"
 }
 
 func (m *newEpisodeTUIModel) resize(width, height int) {
@@ -289,7 +297,7 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 
 	topHeight := lipgloss.Height(m.renderTopFields(bodyWidth))
 	const outerPaddingRows = 0
-	const headerRows = 3
+	const headerRows = 2
 	const descriptionChromeRows = 4
 	const helpRows = 1
 	fixedRows := outerPaddingRows + headerRows + topHeight + descriptionChromeRows + helpRows
@@ -301,6 +309,7 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 		descHeight = 3
 	}
 	m.desc.SetHeight(descHeight)
+	m.ensureFocusVisible()
 }
 
 func (m *newEpisodeTUIModel) focusNext() {
@@ -339,6 +348,7 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 	m.focus = next
 	if m.focus == newEpisodeFieldDescription {
 		m.desc.Focus()
+		m.ensureFocusVisible()
 		return
 	}
 	if m.focus >= 0 && m.focus < len(m.fields) {
@@ -347,6 +357,7 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 		m.fields[m.focus].TextStyle = m.blurredStyle
 		m.fields[m.focus].PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	}
+	m.ensureFocusVisible()
 }
 
 func (m newEpisodeTUIModel) renderTopFields(width int) string {
@@ -383,9 +394,13 @@ func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	if field == m.focus {
 		labelStyle = m.focusedStyle.Bold(true)
 	}
+	labelLine := labelStyle.Render(label)
+	if m.isFileField(field) {
+		labelLine += " " + m.helpStyle.Render("enter to choose")
+	}
 	value := m.fields[field].View()
 	value = lipgloss.NewStyle().Width(maxInt(8, width)).Render(value)
-	return labelStyle.Render(label) + "\n" + value
+	return labelLine + "\n" + value
 }
 
 func newEpisodeLabelWidth() int {
@@ -403,7 +418,7 @@ func (m newEpisodeTUIModel) renderDescription(width int) string {
 
 func (m newEpisodeTUIModel) helpText() string {
 	if m.picking {
-		return "enter select/open  arrows/j/k move  backspace/left parent  esc close picker"
+		return "arrows/j/k move  enter/l/right select/open  h/left parent  esc close picker"
 	}
 	if m.focus == newEpisodeFieldDescription {
 		return "ctrl+s save plan  esc cancel  ctrl+j/ctrl+k move fields  enter newline"
@@ -458,8 +473,40 @@ func visualLines(lines []string) []string {
 	return out
 }
 
+func scrollLines(lines []string, offset int) []string {
+	if offset <= 0 {
+		return lines
+	}
+	if offset >= len(lines) {
+		return []string{}
+	}
+	return lines[offset:]
+}
+
+func authorPlaceholder(inputs newEpisodeInputs) string {
+	if strings.TrimSpace(inputs.InheritedAuthor) != "" {
+		return inputs.InheritedAuthor
+	}
+	return "episode author"
+}
+
+func (m *newEpisodeTUIModel) ensureFocusVisible() {
+	row := m.fieldVisualRow(m.focus)
+	bottomMargin := 2
+	visibleBottom := m.scroll + m.height - bottomMargin
+	if row < m.scroll {
+		m.scroll = row
+	}
+	if row+2 > visibleBottom {
+		m.scroll = row + 2 - (m.height - bottomMargin)
+	}
+	if m.scroll < 0 {
+		m.scroll = 0
+	}
+}
+
 func (m newEpisodeTUIModel) pickerOverlayTop() int {
-	top := m.fieldVisualRow(m.pickField)
+	top := m.fieldVisualRow(m.pickField) - m.scroll
 	height := m.pickerHeight()
 	maxTop := m.height - height - 1
 	if maxTop < 2 {
@@ -475,7 +522,7 @@ func (m newEpisodeTUIModel) pickerOverlayTop() int {
 }
 
 func (m newEpisodeTUIModel) fieldVisualRow(field int) int {
-	const topFieldsStart = 3
+	const topFieldsStart = 2
 	switch field {
 	case newEpisodeFieldUID, newEpisodeFieldAuthor:
 		return topFieldsStart

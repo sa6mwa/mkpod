@@ -158,7 +158,7 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
 	tui.resize(100, 50)
 	view := tui.View()
-	if !strings.Contains(view, "mkpod new episode") {
+	if !strings.Contains(view, "Test Podcast: Prepare a plan for a new episode") {
 		t.Fatalf("View() missing title: %q", view)
 	}
 	if tui.desc.Height() < 16 {
@@ -178,6 +178,24 @@ func TestNewEpisodeTUIViewFitsTerminalHeight(t *testing.T) {
 	viewHeight := strings.Count(tui.View(), "\n") + 1
 	if viewHeight > 32 {
 		t.Fatalf("View() height = %d, want <= 32", viewHeight)
+	}
+}
+
+func TestNewEpisodeTUIScrollsFocusedFieldIntoSmallTerminal(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 14)
+	tui.focusField(newEpisodeFieldDescription)
+	view := tui.View()
+	if !strings.Contains(view, "Description") {
+		t.Fatalf("View() missing focused description after scroll: %q", view)
+	}
+	if strings.Contains(view, "UID") && !strings.Contains(view, "Description") {
+		t.Fatalf("View() did not scroll down to focused field: %q", view)
 	}
 }
 
@@ -241,6 +259,43 @@ func TestNewEpisodeTUITabDoesNotOpenFilePicker(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIShowsMarkdownAndFilePickerHints(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	view := tui.View()
+	for _, want := range []string{
+		"episode description markdown",
+		"Image enter to choose",
+		"Input enter to choose",
+		"Chapters File enter to choose",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("View() missing %q: %q", want, view)
+		}
+	}
+}
+
+func TestNewEpisodeTUIUsesInheritedAuthorPlaceholder(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	atom.Episodes[0].Author = ""
+	defaults := defaultNewEpisodeInputs(atom, specFile)
+	tui := newNewEpisodeTUIModel(atom, defaults)
+	if got := tui.fields[newEpisodeFieldAuthor].Value(); got != "" {
+		t.Fatalf("author value = %q, want empty explicit override", got)
+	}
+	if got := tui.fields[newEpisodeFieldAuthor].Placeholder; got != "Host" {
+		t.Fatalf("author placeholder = %q, want inherited podcast author", got)
+	}
+}
+
 func TestNewEpisodeTUIEnterOpensFilePickerScreen(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
@@ -290,8 +345,8 @@ func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
 		t.Fatalf("picker rendered below description, want visual overlay before it: picker=%d description=%d view=%q", picker, description, view)
 	}
 	lines := strings.Split(view, "\n")
-	if !strings.Contains(lines[18], "Input") {
-		t.Fatalf("picker did not align to input row: line 18 = %q view=%q", lines[18], view)
+	if !strings.Contains(lines[17], "Input") {
+		t.Fatalf("picker did not align to input row: line 17 = %q view=%q", lines[17], view)
 	}
 }
 

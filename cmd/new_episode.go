@@ -70,6 +70,7 @@ type newEpisodeInputs struct {
 	Format                    string
 	EncodingLanguage          string
 	InheritedEncodingLanguage string
+	InheritedAuthor           string
 	Chapters                  string
 }
 
@@ -196,7 +197,7 @@ func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInp
 	defaults := newEpisodeInputs{SpecFile: specFile}
 	if len(atom.Episodes) == 0 {
 		defaults.UID = "1"
-		defaults.Author = atom.Author
+		defaults.InheritedAuthor = atom.Author
 		defaults.Image = atom.Config.DefaultPodImage
 		defaults.InheritedEncodingLanguage = atom.Encoding.Language
 		return defaults
@@ -208,7 +209,11 @@ func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInp
 		}
 	}
 	defaults.UID = strconv.FormatInt(previous.UID+1, 10)
-	defaults.Author = spec.EffectiveEpisodeAuthor(atom, &previous)
+	if strings.TrimSpace(previous.Author) != "" {
+		defaults.Author = previous.Author
+	} else {
+		defaults.InheritedAuthor = atom.Author
+	}
 	defaults.Image = spec.EffectiveEpisodeImage(atom, &previous)
 	defaults.Format = previous.Format
 	defaults.InheritedEncodingLanguage = atom.Encoding.Language
