@@ -176,10 +176,14 @@ func TestNewEpisodeTUITitleBarSpansBodyWidth(t *testing.T) {
 	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
 	tui.resize(80, 32)
 
-	titleLine := strings.Split(tui.View(), "\n")[0]
-	got, want := ansi.StringWidth(titleLine), 80
+	titleLine := tui.formLines()[0]
+	got, want := ansi.StringWidth(titleLine), 78
 	if got != want {
 		t.Fatalf("title line width = %d, want %d", got, want)
+	}
+	screenLine := strings.Split(tui.View(), "\n")[0]
+	if got, want := ansi.StringWidth(screenLine), 80; got != want {
+		t.Fatalf("screen title line width = %d, want %d", got, want)
 	}
 }
 

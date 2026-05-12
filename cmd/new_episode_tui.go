@@ -252,7 +252,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.renderTitleBar(bodyWidth),
+		m.renderTitleBar(m.contentWidth()),
 		m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
@@ -568,9 +568,9 @@ func (m newEpisodeTUIModel) fieldVisualRow(field int) int {
 }
 
 func (m newEpisodeTUIModel) renderScreen(lines []string) string {
-	width := maxInt(1, m.width)
+	contentWidth := m.contentWidth()
 	height := maxInt(1, m.height)
-	style := lipgloss.NewStyle().Width(width)
+	style := lipgloss.NewStyle().Width(contentWidth)
 	content := strings.Join(lines, "\n")
 	plainLines := strings.Split(content, "\n")
 	if len(plainLines) > height {
@@ -580,17 +580,21 @@ func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 		plainLines = append(plainLines, "")
 	}
 	for i, line := range plainLines {
-		line = ansi.Truncate(line, width, "")
-		if pad := width - ansi.StringWidth(line); pad > 0 {
+		line = ansi.Truncate(line, contentWidth, "")
+		if pad := contentWidth - ansi.StringWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		plainLines[i] = style.Render(line)
+		plainLines[i] = " " + style.Render(line) + " "
 	}
 	return strings.Join(plainLines, "\n")
 }
 
 func (m newEpisodeTUIModel) bodyWidth() int {
-	return clampInt(m.width-4, 64, 118)
+	return clampInt(m.contentWidth()-2, 64, 118)
+}
+
+func (m newEpisodeTUIModel) contentWidth() int {
+	return maxInt(1, m.width-2)
 }
 
 func (m newEpisodeTUIModel) isFileField(field int) bool {
