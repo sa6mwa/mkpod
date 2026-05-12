@@ -15,6 +15,30 @@ Scope:
   behavior, because those differences matter for rebuilding `new` / `apply`
   correctly.
 
+## Idempotency Caveat
+
+All workflow commands should be idempotent.
+
+The original flow was nearly idempotent because most side effects were guarded
+by local file existence checks, remote existence checks, metadata comparison,
+and prompts. Re-running `encode` or `parse --upload` usually converged toward
+the same state rather than blindly duplicating work.
+
+The new workflow should make that property explicit instead of incidental:
+
+- re-running a command should safely resume from the current local/remote state,
+- already-applied metadata should be recognized as applied, not treated as an
+  error,
+- existing local files should be inspected and reused when valid,
+- existing remote objects should be compared before upload or overwrite,
+- destructive operations should remain explicit and safety-checked,
+- repeated RSS/feed generation should not cause unnecessary metadata churn,
+- prompts should describe the exact side effect that remains to be performed.
+
+This is stricter than preserving the old behavior. The old behavior is the
+compatibility baseline; the redesigned flow should make idempotency a first
+class invariant.
+
 ## Original User Workflow
 
 The original workflow was not plan-based. The user maintained `podspec.yaml`
@@ -398,6 +422,9 @@ to compose the workflow.
 9. Prompt defaults are interactive yes, non-terminal no, force yes, dry-run no.
 10. `podspec.yaml` is the durable metadata source after encode fills output,
     type, length, duration, and pubDate.
+11. Commands should be idempotent: re-running a completed or partially completed
+    command should converge, resume, or no-op safely instead of failing on work
+    already performed.
 
 ## Open Questions For The New Workflow
 
@@ -418,4 +445,3 @@ These are not solved here; they are the points to decide before redesigning
    with generated metadata?
 7. What is the exact production boundary for `publish`: RSS only, RSS plus
    images, or all remote artifacts?
-
