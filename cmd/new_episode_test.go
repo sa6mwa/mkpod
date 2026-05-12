@@ -148,6 +148,79 @@ func TestNewEpisodePlanFromInputsRejectsParentRelativePaths(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(100, 50)
+	view := tui.View()
+	if !strings.Contains(view, "mkpod new episode") {
+		t.Fatalf("View() missing title: %q", view)
+	}
+	if tui.desc.Height() < 20 {
+		t.Fatalf("description height = %d, want terminal-adapted height", tui.desc.Height())
+	}
+}
+
+func TestNewEpisodeTUICompletesLocalStoragePath(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+
+	completed, matches, err := tui.completePath("artwork/co", false)
+	if err != nil {
+		t.Fatalf("completePath() error = %v", err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("matches = %v, want no ambiguity", matches)
+	}
+	if completed != "artwork/cover.jpg" {
+		t.Fatalf("completed = %q, want artwork/cover.jpg", completed)
+	}
+}
+
+func TestNewEpisodeTUIRejectsParentRelativeCompletion(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+
+	if _, _, err := tui.completePath("../", false); err == nil {
+		t.Fatal("completePath() error = nil, want parent-relative path rejection")
+	}
+}
+
+func TestNewEpisodeTUICollectInputs(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.fields[newEpisodeFieldTitle].SetValue("Collected Title")
+	tui.fields[newEpisodeFieldInput].SetValue("masters/collected.flac")
+	tui.desc.SetValue("Collected description")
+
+	inputs := tui.collectInputs()
+	if inputs.Title != "Collected Title" {
+		t.Fatalf("Title = %q, want collected title", inputs.Title)
+	}
+	if inputs.Input != "masters/collected.flac" {
+		t.Fatalf("Input = %q, want collected input", inputs.Input)
+	}
+	if inputs.Description != "Collected description" {
+		t.Fatalf("Description = %q, want collected description", inputs.Description)
+	}
+}
+
 func TestValidateNonInteractiveNewEpisodeFlagsRequiresContentFields(t *testing.T) {
 	err := validateNonInteractiveNewEpisodeFlags(newEpisodeInputs{Title: "Title"})
 	if err == nil {

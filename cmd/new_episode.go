@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/logging"
@@ -266,85 +264,6 @@ func mergeNewEpisodeInputs(defaults *newEpisodeInputs, overrides newEpisodeInput
 	}
 }
 
-func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
-	chapters := inputs.Chapters
-	if strings.TrimSpace(chapters) == "" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			chapters = home
-		}
-	}
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().Title("UID").Value(&inputs.UID),
-			huh.NewInput().Title("Title").Value(&inputs.Title),
-			huh.NewInput().Title("Link").Value(&inputs.Link),
-			huh.NewInput().Title("Subtitle").Value(&inputs.Subtitle),
-			huh.NewInput().Title("Author").Value(&inputs.Author),
-			localStorageFilePicker(atom, "Image", "Stored relative to localStorageDir", inputs.Image, &inputs.Image),
-			localStorageFilePicker(atom, "Input", "Edited master, stored relative to localStorageDir", inputs.Input, &inputs.Input),
-			huh.NewInput().Title("Format").Description("Optional: mp3, m4a, m4b, audio, video").Value(&inputs.Format).Inline(true),
-			huh.NewInput().Title("Encoding language").Description(encodingLanguageDescription(inputs)).Placeholder(inputs.InheritedEncodingLanguage).Value(&inputs.EncodingLanguage).Inline(true),
-			huh.NewFilePicker().Title("Chapters file").CurrentDirectory(chaptersPickerDirectory(chapters)).Value(&inputs.Chapters).FileAllowed(true).DirAllowed(false),
-			huh.NewText().Title("Description").Value(&inputs.Description).Lines(newEpisodeDescriptionLines()),
-		),
-	).WithTheme(huh.ThemeCharm()).WithProgramOptions(
-		tea.WithOutput(os.Stderr),
-		tea.WithReportFocus(),
-		tea.WithAltScreen(),
-	)
-	return form.Run()
-}
-
-func newEpisodeDescriptionLines() int {
-	_, height, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || height <= 0 {
-		_, height, err = term.GetSize(int(os.Stderr.Fd()))
-	}
-	if err != nil || height <= 0 {
-		return 18
-	}
-	const reservedFormRows = 32
-	lines := height - reservedFormRows
-	if lines < 8 {
-		return 8
-	}
-	return lines
-}
-
-func localStorageFilePicker(atom *model.Podcast, title, description, current string, value *string) *huh.FilePicker {
-	return huh.NewFilePicker().
-		Title(title).
-		Description(description).
-		CurrentDirectory(localStoragePickerDirectory(atom, current)).
-		Value(value).
-		FileAllowed(true).
-		DirAllowed(false)
-}
-
-func localStoragePickerDirectory(atom *model.Podcast, current string) string {
-	root := "."
-	if atom != nil && strings.TrimSpace(atom.LocalStorageDirExpanded()) != "" {
-		root = atom.LocalStorageDirExpanded()
-	}
-	current = strings.TrimSpace(current)
-	if current == "" {
-		return root
-	}
-	if filepath.IsAbs(current) {
-		rel, err := localStorageRelativePath(atom, current, "path", false)
-		if err != nil {
-			return root
-		}
-		current = rel
-	}
-	dir := filepath.Dir(filepath.FromSlash(current))
-	if dir == "." {
-		return root
-	}
-	return filepath.Join(root, dir)
-}
-
 func encodingLanguageDescription(inputs *newEpisodeInputs) string {
 	if strings.TrimSpace(inputs.EncodingLanguage) != "" {
 		return "Explicit on this episode; clear to inherit podcast encoding language"
@@ -353,29 +272,6 @@ func encodingLanguageDescription(inputs *newEpisodeInputs) string {
 		return "Inherited from encoding.language unless explicitly set here"
 	}
 	return "Optional per-episode override"
-}
-
-func chaptersPickerDirectory(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return home
-		}
-		return "."
-	}
-	info, err := os.Stat(path)
-	if err == nil && info.IsDir() {
-		return path
-	}
-	dir := filepath.Dir(path)
-	if dir == "." {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return home
-		}
-	}
-	return dir
 }
 
 func localStorageRelativePath(atom *model.Podcast, value, field string, required bool) (string, error) {
