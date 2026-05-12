@@ -3,6 +3,7 @@
 \#*\#
 /mkpod
 /bin
+*.plan.json
 e2e/podcast.rss
 
 # Audio files
