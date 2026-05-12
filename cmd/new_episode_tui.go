@@ -151,7 +151,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		focus:            newEpisodeFieldTitle,
 		width:            100,
 		height:           32,
-		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("215")).Padding(0, 1),
+		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("16")).Background(lipgloss.Color("215")),
 		subtitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		labelStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
 		focusedStyle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
@@ -252,7 +252,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.renderTitleBar(m.contentWidth()),
+		m.renderTitleBar(),
 		m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
@@ -266,8 +266,8 @@ func (m newEpisodeTUIModel) formLines() []string {
 	return lines
 }
 
-func (m newEpisodeTUIModel) renderTitleBar(width int) string {
-	return m.titleStyle.Width(width).Render(m.formHeaderTitle())
+func (m newEpisodeTUIModel) renderTitleBar() string {
+	return m.titleStyle.Width(m.width).Render(" " + m.formHeaderTitle())
 }
 
 func (m newEpisodeTUIModel) formHeaderTitle() string {
@@ -580,8 +580,23 @@ func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 		plainLines = append(plainLines, "")
 	}
 	for i, line := range plainLines {
-		line = ansi.Truncate(line, contentWidth, "")
-		if pad := contentWidth - ansi.StringWidth(line); pad > 0 {
+		if i == 0 {
+			plainLines[i] = ansi.Truncate(line, m.width, "")
+			if pad := m.width - ansi.StringWidth(plainLines[i]); pad > 0 {
+				plainLines[i] += strings.Repeat(" ", pad)
+			}
+			continue
+		}
+		if i == height-1 {
+			line = ansi.Truncate(line, contentWidth, "")
+			if pad := contentWidth - ansi.StringWidth(line); pad > 0 {
+				line += strings.Repeat(" ", pad)
+			}
+			plainLines[i] = " " + line + " "
+			continue
+		}
+		line = ansi.Truncate(line, contentWidth-2, "")
+		if pad := contentWidth - 2 - ansi.StringWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
 		plainLines[i] = " " + style.Render(line) + " "

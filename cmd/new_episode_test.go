@@ -177,7 +177,7 @@ func TestNewEpisodeTUITitleBarSpansBodyWidth(t *testing.T) {
 	tui.resize(80, 32)
 
 	titleLine := tui.formLines()[0]
-	got, want := ansi.StringWidth(titleLine), 78
+	got, want := ansi.StringWidth(titleLine), 80
 	if got != want {
 		t.Fatalf("title line width = %d, want %d", got, want)
 	}
