@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sa6mwa/mkpod/internal/app/model"
@@ -18,8 +18,8 @@ import (
 const (
 	newEpisodeFieldUID = iota
 	newEpisodeFieldTitle
-	newEpisodeFieldLink
 	newEpisodeFieldSubtitle
+	newEpisodeFieldLink
 	newEpisodeFieldAuthor
 	newEpisodeFieldImage
 	newEpisodeFieldInput
@@ -33,8 +33,8 @@ const (
 var newEpisodeFieldLabels = []string{
 	"UID",
 	"Title",
-	"Link",
 	"Subtitle",
+	"Link",
 	"Author",
 	"Image",
 	"Input",
@@ -56,8 +56,9 @@ type newEpisodeTUIModel struct {
 	cancelled bool
 	submitted bool
 	picking   bool
-	picker    filepicker.Model
 	pickField int
+	picker    *huh.FilePicker
+	pickValue string
 
 	titleStyle       lipgloss.Style
 	subtitleStyle    lipgloss.Style
@@ -67,7 +68,6 @@ type newEpisodeTUIModel struct {
 	helpStyle        lipgloss.Style
 	errorStyle       lipgloss.Style
 	descriptionStyle lipgloss.Style
-	pickerStyle      lipgloss.Style
 }
 
 func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
@@ -92,8 +92,8 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	values := []string{
 		inputs.UID,
 		inputs.Title,
-		inputs.Link,
 		inputs.Subtitle,
+		inputs.Link,
 		inputs.Author,
 		inputs.Image,
 		inputs.Input,
@@ -104,8 +104,8 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	placeholders := []string{
 		"next numeric id",
 		"episode title",
-		"https://example.com/episode",
 		"short episode subtitle",
+		"https://example.com/episode",
 		"episode author",
 		"relative image path",
 		"relative edited master",
@@ -115,7 +115,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	}
 	for i := range fields {
 		field := textinput.New()
-		field.Prompt = ""
+		field.Prompt = "  "
 		field.SetValue(values[i])
 		field.Placeholder = placeholders[i]
 		field.CharLimit = 0
@@ -123,7 +123,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	}
 
 	desc := textarea.New()
-	desc.Prompt = ""
+	desc.Prompt = "  "
 	desc.ShowLineNumbers = false
 	desc.Placeholder = "episode description"
 	desc.SetValue(inputs.Description)
@@ -136,15 +136,14 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		focus:            newEpisodeFieldTitle,
 		width:            100,
 		height:           32,
-		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63")),
+		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")).Padding(0, 1, 0, 0),
 		subtitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		labelStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")),
-		focusedStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("15")),
-		blurredStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("250")),
+		focusedStyle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")),
+		blurredStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
 		helpStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
 		descriptionStyle: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
-		pickerStyle:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
 	}
 	m.focusField(m.focus)
 	m.resize(100, 32)
@@ -160,6 +159,10 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.resize(msg.Width, msg.Height)
+		if m.picking && m.picker != nil {
+			m.picker = m.picker.WithWidth(m.pickerWidth()).(*huh.FilePicker)
+			m.picker = m.picker.Height(m.pickerHeight())
+		}
 	case tea.KeyMsg:
 		m.message = ""
 		if m.picking {
@@ -215,14 +218,21 @@ func (m newEpisodeTUIModel) View() string {
 	if m.width <= 0 {
 		return ""
 	}
+	lines := m.formLines()
 	if m.picking {
-		return m.renderPickerScreen()
+		if len(lines) > 0 {
+			lines[len(lines)-1] = ""
+		}
+		lines = m.overlayPicker(lines)
 	}
-	bodyWidth := clampInt(m.width-4, 60, 120)
+	return m.renderScreen(lines)
+}
 
+func (m newEpisodeTUIModel) formLines() []string {
+	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.titleStyle.Render("mkpod new episode"),
+		m.boundary("mkpod new episode", false),
 		m.subtitleStyle.Render("Prepare a saved plan. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
@@ -233,7 +243,7 @@ func (m newEpisodeTUIModel) View() string {
 		lines = append(lines, m.errorStyle.Render(m.message))
 	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
-	return m.renderScreen(lines)
+	return lines
 }
 
 func (m *newEpisodeTUIModel) resize(width, height int) {
@@ -243,14 +253,13 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 	if height > 0 {
 		m.height = height
 	}
-	bodyWidth := clampInt(m.width-4, 60, 120)
-	labelWidth := newEpisodeLabelWidth()
-	inputWidth := maxInt(8, ((bodyWidth-6)/2)-labelWidth)
+	bodyWidth := m.bodyWidth()
+	inputWidth := maxInt(12, (bodyWidth-8)/2)
 	for i := range m.fields {
 		m.fields[i].Width = inputWidth
 	}
-	fullWidth := maxInt(20, bodyWidth-4)
-	fullInputWidth := maxInt(8, fullWidth-labelWidth)
+	fullWidth := maxInt(20, bodyWidth)
+	fullInputWidth := maxInt(12, fullWidth-4)
 	m.fields[newEpisodeFieldTitle].Width = fullInputWidth
 	m.fields[newEpisodeFieldLink].Width = fullInputWidth
 	m.fields[newEpisodeFieldSubtitle].Width = fullInputWidth
@@ -295,6 +304,8 @@ func (m *newEpisodeTUIModel) focusPrev() {
 func (m *newEpisodeTUIModel) focusField(next int) {
 	for i := range m.fields {
 		m.fields[i].Blur()
+		m.fields[i].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		m.fields[i].TextStyle = m.blurredStyle
 	}
 	m.desc.Blur()
 	m.focus = next
@@ -304,60 +315,61 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 	}
 	if m.focus >= 0 && m.focus < len(m.fields) {
 		m.fields[m.focus].Focus()
+		m.fields[m.focus].PromptStyle = m.focusedStyle
+		m.fields[m.focus].TextStyle = m.blurredStyle
 	}
 }
 
 func (m newEpisodeTUIModel) renderTopFields(width int) string {
 	full := lipgloss.NewStyle().Width(width)
-	leftWidth := (width - 6) / 2
-	rightWidth := width - leftWidth - 6
+	leftWidth := (width - 8) / 2
+	rightWidth := width - leftWidth - 8
 	left := lipgloss.NewStyle().Width(leftWidth)
 	right := lipgloss.NewStyle().Width(rightWidth)
 
 	rows := []string{
-		left.Render(m.renderInput(newEpisodeFieldUID, leftWidth)),
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			left.Render(m.renderInput(newEpisodeFieldUID, leftWidth)),
+			"        ",
+			right.Render(m.renderInput(newEpisodeFieldAuthor, rightWidth)),
+		),
 		full.Render(m.renderInput(newEpisodeFieldTitle, width)),
-		full.Render(m.renderInput(newEpisodeFieldLink, width)),
 		full.Render(m.renderInput(newEpisodeFieldSubtitle, width)),
-		full.Render(m.renderInput(newEpisodeFieldAuthor, width)),
+		full.Render(m.renderInput(newEpisodeFieldLink, width)),
 		full.Render(m.renderInput(newEpisodeFieldImage, width)),
 		full.Render(m.renderInput(newEpisodeFieldInput, width)),
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			left.Render(m.renderInput(newEpisodeFieldFormat, leftWidth)),
-			"      ",
+			"        ",
 			right.Render(m.renderInput(newEpisodeFieldEncodingLanguage, rightWidth)),
 		),
 		full.Render(m.renderInput(newEpisodeFieldChapters, width)),
 	}
-	return strings.Join(rows, "\n")
+	return strings.Join(rows, "\n\n")
 }
 
 func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	label := newEpisodeFieldLabels[field]
+	labelStyle := m.labelStyle
 	if field == m.focus {
-		label = ">" + label
+		labelStyle = m.focusedStyle.Bold(true)
 	}
-	labelWidth := newEpisodeLabelWidth()
-	labelLine := m.labelStyle.Width(labelWidth).MaxWidth(labelWidth).Render(label)
 	value := m.fields[field].View()
-	if field == m.focus {
-		value = m.focusedStyle.Render(value)
-	} else {
-		value = m.blurredStyle.Render(value)
-	}
-	return labelLine + value
+	value = lipgloss.NewStyle().Width(maxInt(8, width)).Render(value)
+	return labelStyle.Render(label) + "\n" + value
 }
 
 func newEpisodeLabelWidth() int {
-	return 20
+	return 18
 }
 
 func (m newEpisodeTUIModel) renderDescription(width int) string {
 	label := "Description"
+	labelStyle := m.labelStyle
 	if m.focus == newEpisodeFieldDescription {
-		label = ">Description"
+		labelStyle = m.focusedStyle.Bold(true)
 	}
-	return m.labelStyle.Render(label) + "\n" + m.descriptionStyle.Width(width-2).Render(m.desc.View())
+	return labelStyle.Render(label) + "\n" + m.descriptionStyle.Width(width-2).Render(m.desc.View())
 }
 
 func (m newEpisodeTUIModel) helpText() string {
@@ -373,29 +385,52 @@ func (m newEpisodeTUIModel) helpText() string {
 	return "enter/ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
 }
 
-func (m newEpisodeTUIModel) renderPickerScreen() string {
-	bodyWidth := clampInt(m.width-4, 60, 120)
-	title := "Choose " + strings.ToLower(newEpisodeFieldLabels[m.pickField])
-	if !m.pickerAllowsOutsideLocalStorage() {
-		title += " from localStorageDir"
+func (m newEpisodeTUIModel) overlayPicker(lines []string) []string {
+	body := ""
+	if m.picker != nil {
+		body = m.picker.View()
 	}
-	body := strings.TrimRight(m.picker.View(), "\n")
-	lines := []string{
-		m.titleStyle.Render("mkpod new episode"),
-		m.subtitleStyle.Render(title),
-		"",
-		m.helpStyle.Render("Current directory: " + filepath.ToSlash(m.picker.CurrentDirectory)),
-		"",
-		m.pickerStyle.Width(bodyWidth - 2).Render(body),
-		m.helpStyle.Render(m.helpText()),
+	overlay := []string{
+		m.overlayBox(clampInt(m.width-4, 60, 120), body),
 	}
-	return m.renderScreen(lines)
+	top := 3
+	if m.height > 28 {
+		top = 4
+	}
+	return overlayLines(lines, overlay, top)
+}
+
+func (m newEpisodeTUIModel) overlayBox(width int, body string) string {
+	return lipgloss.PlaceHorizontal(
+		width,
+		lipgloss.Center,
+		lipgloss.NewStyle().Width(m.pickerWidth()).Render(body),
+	)
+}
+
+func overlayLines(base []string, overlay []string, top int) []string {
+	out := append([]string(nil), base...)
+	if top < 0 {
+		top = 0
+	}
+	for len(out) < top {
+		out = append(out, "")
+	}
+	for i, line := range overlay {
+		idx := top + i
+		if idx < len(out) {
+			out[idx] = line
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 	width := maxInt(1, m.width)
 	height := maxInt(1, m.height)
-	style := lipgloss.NewStyle().Width(width).Background(lipgloss.Color("0"))
+	style := lipgloss.NewStyle().Width(width)
 	content := strings.Join(lines, "\n")
 	plainLines := strings.Split(content, "\n")
 	if len(plainLines) > height {
@@ -414,22 +449,50 @@ func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 	return strings.Join(plainLines, "\n")
 }
 
+func (m newEpisodeTUIModel) bodyWidth() int {
+	return clampInt(m.width-4, 64, 118)
+}
+
+func (m newEpisodeTUIModel) boundary(text string, isError bool) string {
+	style := m.titleStyle
+	color := lipgloss.Color("99")
+	if isError {
+		style = m.errorStyle.Bold(true).Padding(0, 1, 0, 0)
+		color = lipgloss.Color("203")
+	}
+	return lipgloss.PlaceHorizontal(
+		m.bodyWidth(),
+		lipgloss.Left,
+		style.Render(text),
+		lipgloss.WithWhitespaceChars("/"),
+		lipgloss.WithWhitespaceForeground(color),
+	)
+}
+
 func (m newEpisodeTUIModel) isFileField(field int) bool {
 	return field == newEpisodeFieldImage || field == newEpisodeFieldInput || field == newEpisodeFieldChapters
 }
 
 func (m *newEpisodeTUIModel) startFilePicker(field int) tea.Cmd {
-	picker := filepicker.New()
-	picker.ShowPermissions = false
-	picker.ShowSize = false
-	picker.FileAllowed = true
-	picker.DirAllowed = false
-	picker.CurrentDirectory = m.pickerStartDirectory(field)
-	picker.SetHeight(m.pickerHeight())
-	m.picker = picker
 	m.picking = true
 	m.pickField = field
-	return m.picker.Init()
+	m.pickValue = ""
+	picker := huh.NewFilePicker().
+		Title(newEpisodeFieldLabels[field]).
+		CurrentDirectory(m.pickerStartDirectory(field)).
+		Value(&m.pickValue).
+		FileAllowed(true).
+		DirAllowed(false).
+		Picking(true).
+		Height(m.pickerHeight())
+	if !m.pickerAllowsOutsideLocalStorage() {
+		picker = picker.Description("from localStorageDir")
+	}
+	picker = picker.WithWidth(m.pickerWidth()).(*huh.FilePicker)
+	picker = picker.WithTheme(huh.ThemeCharm()).(*huh.FilePicker)
+	picker = picker.WithKeyMap(huh.NewDefaultKeyMap()).(*huh.FilePicker)
+	m.picker = picker
+	return m.picker.Focus()
 }
 
 func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -437,16 +500,18 @@ func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		m.picking = false
 		return m, nil
 	}
-	var cmd tea.Cmd
-	m.picker, cmd = m.picker.Update(msg)
-	if !m.pickerAllowsOutsideLocalStorage() && !pathInsideRoot(m.localStorageRoot(), m.picker.CurrentDirectory) {
-		m.picker.CurrentDirectory = m.localStorageRoot()
-		cmd = m.picker.Init()
+	if m.picker == nil {
+		m.picking = false
+		return m, nil
 	}
-	if selected, path := m.picker.DidSelectFile(msg); selected {
-		value := path
+	next, cmd := m.picker.Update(msg)
+	if picker, ok := next.(*huh.FilePicker); ok {
+		m.picker = picker
+	}
+	if strings.TrimSpace(m.pickValue) != "" {
+		value := m.pickValue
 		if !m.pickerAllowsOutsideLocalStorage() {
-			rel, err := localStorageRelativePath(m.atom, path, strings.ToLower(newEpisodeFieldLabels[m.pickField]), true)
+			rel, err := localStorageRelativePath(m.atom, value, strings.ToLower(newEpisodeFieldLabels[m.pickField]), true)
 			if err != nil {
 				m.message = err.Error()
 				return m, cmd
@@ -466,13 +531,17 @@ func (m newEpisodeTUIModel) pickerAllowsOutsideLocalStorage() bool {
 
 func (m newEpisodeTUIModel) pickerHeight() int {
 	height := m.height - 8
-	if height < 8 {
-		return 8
+	if height < 10 {
+		return 10
 	}
 	if height > 24 {
 		return 24
 	}
 	return height
+}
+
+func (m newEpisodeTUIModel) pickerWidth() int {
+	return maxInt(44, m.bodyWidth()-8)
 }
 
 func (m newEpisodeTUIModel) pickerStartDirectory(field int) string {

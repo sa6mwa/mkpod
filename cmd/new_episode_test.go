@@ -161,7 +161,7 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	if !strings.Contains(view, "mkpod new episode") {
 		t.Fatalf("View() missing title: %q", view)
 	}
-	if tui.desc.Height() < 20 {
+	if tui.desc.Height() < 16 {
 		t.Fatalf("description height = %d, want terminal-adapted height", tui.desc.Height())
 	}
 }
@@ -178,6 +178,26 @@ func TestNewEpisodeTUIViewFitsTerminalHeight(t *testing.T) {
 	viewHeight := strings.Count(tui.View(), "\n") + 1
 	if viewHeight > 32 {
 		t.Fatalf("View() height = %d, want <= 32", viewHeight)
+	}
+}
+
+func TestNewEpisodeTUIFieldOrderAndNoArrowFocus(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(100, 40)
+	view := tui.View()
+	if strings.Contains(view, ">Title") || strings.Contains(view, ">Input") {
+		t.Fatalf("View() contains arrow focus marker: %q", view)
+	}
+	title := strings.Index(view, "Title")
+	subtitle := strings.Index(view, "Subtitle")
+	link := strings.Index(view, "Link")
+	if !(title >= 0 && subtitle > title && link > subtitle) {
+		t.Fatalf("field order title=%d subtitle=%d link=%d in view %q", title, subtitle, link, view)
 	}
 }
 
@@ -216,11 +236,14 @@ func TestNewEpisodeTUIEnterOpensFilePickerScreen(t *testing.T) {
 		t.Fatal("enter did not open file picker")
 	}
 	view := updated.View()
-	if !strings.Contains(view, "Choose image from localStorageDir") {
-		t.Fatalf("picker view missing title: %q", view)
-	}
 	if viewHeight := strings.Count(view, "\n") + 1; viewHeight != 32 {
 		t.Fatalf("picker view height = %d, want 32", viewHeight)
+	}
+	if updated.picker == nil {
+		t.Fatal("picker is nil")
+	}
+	if !strings.Contains(view, "No files found.") && !strings.Contains(view, "Image") {
+		t.Fatalf("picker view missing huh file picker content: %q", view)
 	}
 }
 
