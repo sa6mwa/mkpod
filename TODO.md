@@ -260,9 +260,13 @@ Initial workflow slices:
   - [x] Preview feed path and local feed state.
   - [x] Preview valid/skipped RSS episode counts.
   - [x] Use optional read-only S3 checks for remote feed state.
+  - [x] Preview upload image sync and RSS upload decisions through the same
+    helpers as apply.
 - [x] `mkpod apply feed`
   - [x] Execute the existing parse/feed workflow.
   - [x] Preserve upload prompts and image sync behavior.
+  - [x] Execute image sync and RSS upload through shared workflow decision
+    helpers.
 - [x] `mkpod apply episode <uid>`
   - [x] Execute the planned episode workflow with the same automatic behavior
     mkpod has today.

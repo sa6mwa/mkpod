@@ -11,7 +11,7 @@ import (
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 )
 
-type episodeWorkflowOperation struct {
+type workflowOperation struct {
 	Kind           string `json:"kind"`
 	Label          string `json:"label,omitempty"`
 	Bucket         string `json:"bucket,omitempty"`
@@ -35,10 +35,10 @@ type remoteMasterInfoClient interface {
 	GetFileInfo(context.Context, string, string) (*s3store.FileInfo, error)
 }
 
-func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client assetInfoClient, buckets []string, key, label string) (episodeWorkflowOperation, error) {
+func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client assetInfoClient, buckets []string, key, label string) (workflowOperation, error) {
 	key = normalizeStorageKey(atom, key)
 	if key == "" {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:   "skip-asset",
 			Label:  label,
 			Reason: "asset key is empty or not managed by mkpod storage",
@@ -46,7 +46,7 @@ func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client asset
 	}
 	localPath := localAssetPath(atom, key)
 	if info, err := os.Stat(localPath); err == nil {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:        "skip-asset",
 			Label:       label,
 			Key:         key,
@@ -56,10 +56,10 @@ func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client asset
 			LocalSize:   info.Size(),
 		}, nil
 	} else if !os.IsNotExist(err) {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to access local %s %s: %w", label, localPath, err)
+		return workflowOperation{}, fmt.Errorf("failed to access local %s %s: %w", label, localPath, err)
 	}
 	if client == nil {
-		return episodeWorkflowOperation{}, fmt.Errorf("missing local %s %s and no remote storage client is configured", label, localPath)
+		return workflowOperation{}, fmt.Errorf("missing local %s %s and no remote storage client is configured", label, localPath)
 	}
 
 	for _, bucket := range buckets {
@@ -69,10 +69,10 @@ func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client asset
 		}
 		info, err := client.GetFileInfo(ctx, bucket, key)
 		if err != nil {
-			return episodeWorkflowOperation{}, fmt.Errorf("failed to check remote %s %s in bucket %s: %w", label, key, bucket, err)
+			return workflowOperation{}, fmt.Errorf("failed to check remote %s %s in bucket %s: %w", label, key, bucket, err)
 		}
 		if info != nil && info.Exists {
-			return episodeWorkflowOperation{
+			return workflowOperation{
 				Kind:         "download-asset",
 				Label:        label,
 				Bucket:       bucket,
@@ -85,17 +85,17 @@ func decideLocalAssetSync(ctx context.Context, atom *model.Podcast, client asset
 		}
 	}
 
-	return episodeWorkflowOperation{}, fmt.Errorf("missing %s %s locally and in configured S3 buckets", label, key)
+	return workflowOperation{}, fmt.Errorf("missing %s %s locally and in configured S3 buckets", label, key)
 }
 
-func decideOutputUpload(ctx context.Context, atom *model.Podcast, episode *model.Episode, client outputExistenceClient, wasEncoded bool) (episodeWorkflowOperation, error) {
+func decideOutputUpload(ctx context.Context, atom *model.Podcast, episode *model.Episode, client outputExistenceClient, wasEncoded bool) (workflowOperation, error) {
 	bucket := atom.Config.Aws.Buckets.Output
 	key := episode.Output
 	localPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(key))
 
 	info, err := os.Stat(localPath)
 	if os.IsNotExist(err) {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:      "skip-output-upload",
 			Bucket:    bucket,
 			Key:       key,
@@ -104,10 +104,10 @@ func decideOutputUpload(ctx context.Context, atom *model.Podcast, episode *model
 		}, nil
 	}
 	if err != nil {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to access local encoded file %s: %w", localPath, err)
+		return workflowOperation{}, fmt.Errorf("failed to access local encoded file %s: %w", localPath, err)
 	}
 	if client == nil {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:        "skip-output-upload",
 			Bucket:      bucket,
 			Key:         key,
@@ -120,13 +120,13 @@ func decideOutputUpload(ctx context.Context, atom *model.Podcast, episode *model
 
 	exists, err := client.FileExists(ctx, bucket, key)
 	if err != nil {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
+		return workflowOperation{}, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
 	}
 	remoteExists := "false"
 	if exists {
 		remoteExists = "true"
 	}
-	operation := episodeWorkflowOperation{
+	operation := workflowOperation{
 		Kind:         "skip-output-upload",
 		Bucket:       bucket,
 		Key:          key,
@@ -151,7 +151,7 @@ func decideOutputUpload(ctx context.Context, atom *model.Podcast, episode *model
 	return operation, nil
 }
 
-func decidePlannedOutputUpload(ctx context.Context, atom *model.Podcast, episode *model.Episode, client outputExistenceClient, localOutputExists, willEncode bool) (episodeWorkflowOperation, error) {
+func decidePlannedOutputUpload(ctx context.Context, atom *model.Podcast, episode *model.Episode, client outputExistenceClient, localOutputExists, willEncode bool) (workflowOperation, error) {
 	if !willEncode {
 		return decideOutputUpload(ctx, atom, episode, client, false)
 	}
@@ -159,7 +159,7 @@ func decidePlannedOutputUpload(ctx context.Context, atom *model.Podcast, episode
 	key := episode.Output
 	localPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(key))
 	if client == nil {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:      "check-output-upload",
 			Bucket:    bucket,
 			Key:       key,
@@ -169,9 +169,9 @@ func decidePlannedOutputUpload(ctx context.Context, atom *model.Podcast, episode
 	}
 	exists, err := client.FileExists(ctx, bucket, key)
 	if err != nil {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
+		return workflowOperation{}, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
 	}
-	return episodeWorkflowOperation{
+	return workflowOperation{
 		Kind:           "upload-output",
 		Bucket:         bucket,
 		Key:            key,
@@ -193,16 +193,16 @@ func plannedOutputUploadReason(remoteExists, localOutputExists bool) string {
 	return "output will be encoded and remote output is missing"
 }
 
-func decideRemoteMasterRemoval(ctx context.Context, atom *model.Podcast, episode *model.Episode, client remoteMasterInfoClient) (episodeWorkflowOperation, error) {
+func decideRemoteMasterRemoval(ctx context.Context, atom *model.Podcast, episode *model.Episode, client remoteMasterInfoClient) (workflowOperation, error) {
 	bucket := atom.Config.Aws.Buckets.Input
 	key := normalizeStorageKey(atom, episode.Input)
 	localPath := localAssetPath(atom, key)
 	localInfo, localErr := os.Stat(localPath)
 	if localErr != nil && !os.IsNotExist(localErr) {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to check local master file %s: %w", localPath, localErr)
+		return workflowOperation{}, fmt.Errorf("failed to check local master file %s: %w", localPath, localErr)
 	}
 	if client == nil {
-		return episodeWorkflowOperation{
+		return workflowOperation{
 			Kind:        "skip-remote-master-delete",
 			Bucket:      bucket,
 			Key:         key,
@@ -215,7 +215,7 @@ func decideRemoteMasterRemoval(ctx context.Context, atom *model.Podcast, episode
 
 	remoteInfo, err := client.GetFileInfo(ctx, bucket, key)
 	if err != nil {
-		return episodeWorkflowOperation{}, fmt.Errorf("failed to get remote master file info: %w", err)
+		return workflowOperation{}, fmt.Errorf("failed to get remote master file info: %w", err)
 	}
 	remoteExists := remoteInfo != nil && remoteInfo.Exists
 	remoteSize := int64(0)
@@ -223,7 +223,7 @@ func decideRemoteMasterRemoval(ctx context.Context, atom *model.Podcast, episode
 		remoteSize = remoteInfo.Size
 	}
 	decision := s3store.EvaluateRemoteMasterRemoval(localErr == nil, fileSize(localInfo), remoteExists, remoteSize)
-	operation := episodeWorkflowOperation{
+	operation := workflowOperation{
 		Kind:           "skip-remote-master-delete",
 		Bucket:         bucket,
 		Key:            key,

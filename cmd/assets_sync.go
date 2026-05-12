@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -103,45 +102,24 @@ func syncReferencedImagesForPublish(ctx context.Context, atom *model.Podcast, pr
 		return fmt.Errorf("podcast is nil")
 	}
 	for _, image := range collectReferencedImages(atom) {
-		localPath := localAssetPath(atom, image.Key)
-		fi, err := os.Stat(localPath)
-		localExists := err == nil
-		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("failed to access local %s image %s: %w", image.Label, localPath, err)
-		}
-
-		if client == nil {
-			if !localExists {
-				return fmt.Errorf("missing local %s image %s", image.Label, localPath)
-			}
-			l.Info("Would publish local image", "label", image.Label, "key", image.Key, "path", localPath)
-			continue
-		}
-
-		info, err := client.GetFileInfo(ctx, atom.Config.Aws.Buckets.Output, image.Key)
+		operation, err := decidePublishImage(ctx, atom, image, client)
 		if err != nil {
-			return fmt.Errorf("failed to check remote %s image %s in bucket %s: %w", image.Label, image.Key, atom.Config.Aws.Buckets.Output, err)
+			return err
 		}
-
-		if !localExists {
-			if info != nil && info.Exists {
-				if err := client.DownloadFile(ctx, atom.Config.Aws.Buckets.Output, image.Key); err != nil {
-					return fmt.Errorf("failed to download remote %s image %s from bucket %s: %w", image.Label, image.Key, atom.Config.Aws.Buckets.Output, err)
-				}
-				continue
+		switch operation.Kind {
+		case "check-image-upload":
+			l.Info("Would publish local image", "label", image.Label, "key", image.Key, "path", operation.LocalPath)
+		case "download-image":
+			if err := client.DownloadFile(ctx, operation.Bucket, operation.Key); err != nil {
+				return fmt.Errorf("failed to download remote %s image %s from bucket %s: %w", image.Label, image.Key, operation.Bucket, err)
 			}
-			return fmt.Errorf("missing %s image %s locally and in output bucket %s", image.Label, image.Key, atom.Config.Aws.Buckets.Output)
-		}
-
-		remoteMatchesLocal := info != nil && info.Exists && info.Size == fi.Size()
-		if remoteMatchesLocal {
-			continue
-		}
-		if !prompter.Ask(ctx, "Upload %s image %s to S3?", image.Label, image.Key) {
-			return fmt.Errorf("required %s image %s was not uploaded to bucket %s", image.Label, image.Key, atom.Config.Aws.Buckets.Output)
-		}
-		if err := client.UploadFile(ctx, atom.Config.Aws.Buckets.Output, image.Key, localPath, &s3store.UploadOptions{ContentType: image.ContentType}); err != nil {
-			return fmt.Errorf("failed to upload %s image %s to bucket %s: %w", image.Label, image.Key, atom.Config.Aws.Buckets.Output, err)
+		case "upload-image":
+			if !prompter.Ask(ctx, "Upload %s image %s to S3?", image.Label, image.Key) {
+				return fmt.Errorf("required %s image %s was not uploaded to bucket %s", image.Label, image.Key, atom.Config.Aws.Buckets.Output)
+			}
+			if err := client.UploadFile(ctx, operation.Bucket, operation.Key, operation.LocalPath, &s3store.UploadOptions{ContentType: image.ContentType}); err != nil {
+				return fmt.Errorf("failed to upload %s image %s to bucket %s: %w", image.Label, image.Key, operation.Bucket, err)
+			}
 		}
 	}
 	return nil

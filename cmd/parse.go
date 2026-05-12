@@ -143,11 +143,15 @@ func runFeedWorkflow(ctx context.Context, args []string, options feedWorkflowOpt
 		if err := checkAndUploadPodcastImage(ctx, atom, prompter, storageClient); err != nil {
 			return err
 		}
+		feedOperation, err := decideFeedUpload(ctx, atom, feedPath, storageClient)
+		if err != nil {
+			return err
+		}
 		if err := storageClient.DiffTextObject(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, feedPath); err != nil {
 			l.Error("Failed to show diff", "error", err)
 		}
 		if prompter.Ask(ctx, "Upload new %s?", atom.FeedFile) {
-			if err := storageClient.UploadFile(ctx, atom.Config.Aws.Buckets.Output, atom.FeedFile, feedPath, &s3store.UploadOptions{ContentType: "text/xml"}); err != nil {
+			if err := storageClient.UploadFile(ctx, feedOperation.Bucket, feedOperation.Key, feedOperation.LocalPath, &s3store.UploadOptions{ContentType: "text/xml"}); err != nil {
 				return err
 			}
 		}

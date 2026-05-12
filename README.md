@@ -87,7 +87,7 @@ $ mkpod plan episode 16 --remote --remove-remote-master
 $ mkpod apply episode 16
 
 # Parse and upload podcast.rss
-$ mkpod plan feed --remote
+$ mkpod plan feed --remote --upload
 $ mkpod apply feed --upload
 
 # Commit changes to podspec.yaml

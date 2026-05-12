@@ -245,7 +245,7 @@ type episodeWorkflowPlan struct {
 	RemotePreview      bool
 	RemoteOutput       remoteObjectPlan
 	RemoteFeed         remoteObjectPlan
-	Operations         []episodeWorkflowOperation
+	Operations         []workflowOperation
 }
 
 type feedWorkflowPlan struct {
@@ -255,8 +255,10 @@ type feedWorkflowPlan struct {
 	OutputBucket    string
 	ValidEpisodes   int
 	SkippedEpisodes int
+	Upload          bool
 	RemotePreview   bool
 	RemoteFeed      remoteObjectPlan
+	Operations      []workflowOperation
 }
 
 type remoteObjectPlan struct {
@@ -567,8 +569,8 @@ func planEpisodeOperations(ctx context.Context, atom *model.Podcast, episode *mo
 	assetInfoClient
 	outputExistenceClient
 	remoteMasterInfoClient
-}, outputExists, willEncode, removeRemoteMaster bool) ([]episodeWorkflowOperation, error) {
-	operations := make([]episodeWorkflowOperation, 0, 5)
+}, outputExists, willEncode, removeRemoteMaster bool) ([]workflowOperation, error) {
+	operations := make([]workflowOperation, 0, 5)
 	buckets := []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}
 	for _, asset := range []struct {
 		key   string
@@ -611,6 +613,10 @@ func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*fee
 	if err != nil {
 		return nil, err
 	}
+	upload, err := cmd.Flags().GetBool("upload")
+	if err != nil {
+		return nil, err
+	}
 	atom, err := spec.New(specFile).Load(ctx)
 	if err != nil {
 		return nil, err
@@ -640,6 +646,7 @@ func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*fee
 		OutputBucket:    atom.Config.Aws.Buckets.Output,
 		ValidEpisodes:   validEpisodes,
 		SkippedEpisodes: skippedEpisodes,
+		Upload:          upload,
 		RemotePreview:   remotePreview,
 		RemoteFeed: remoteObjectPlan{
 			Bucket: atom.Config.Aws.Buckets.Output,
@@ -650,6 +657,19 @@ func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*fee
 	if remotePreview {
 		storageClient := s3store.New(atom, prompt.New(true, false))
 		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteFeed)
+		if upload {
+			operations, err := planFeedOperations(ctx, atom, feedPath, storageClient)
+			if err != nil {
+				return nil, err
+			}
+			plan.Operations = operations
+		}
+	} else if upload {
+		operations, err := planFeedOperations(ctx, atom, feedPath, nil)
+		if err != nil {
+			return nil, err
+		}
+		plan.Operations = operations
 	}
 	return plan, nil
 }
@@ -737,24 +757,7 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	fmt.Printf("Remote preview: %t\n", plan.RemotePreview)
 	printRemoteObjectPlan("Remote output", plan.RemoteOutput)
 	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
-	if len(plan.Operations) > 0 {
-		fmt.Println("Operations:")
-		for _, operation := range plan.Operations {
-			fmt.Printf("- %s: %s\n", operation.Kind, operation.Reason)
-			if operation.Bucket != "" && operation.Key != "" {
-				fmt.Printf("  Remote: s3://%s/%s\n", operation.Bucket, operation.Key)
-			}
-			if operation.LocalPath != "" {
-				fmt.Printf("  Local: %s\n", operation.LocalPath)
-			}
-			if operation.RequiresPrompt {
-				fmt.Println("  Prompt: required")
-			}
-			if operation.SafetyStatus != "" {
-				fmt.Printf("  Safety: %s\n", operation.SafetyStatus)
-			}
-		}
-	}
+	printWorkflowOperations(plan.Operations)
 }
 
 func printFeedPlan(plan *feedWorkflowPlan) {
@@ -765,8 +768,32 @@ func printFeedPlan(plan *feedWorkflowPlan) {
 	fmt.Printf("Output bucket: %s\n", plan.OutputBucket)
 	fmt.Printf("Valid episodes: %d\n", plan.ValidEpisodes)
 	fmt.Printf("Skipped episodes: %d\n", plan.SkippedEpisodes)
+	fmt.Printf("Upload: %t\n", plan.Upload)
 	fmt.Printf("Remote preview: %t\n", plan.RemotePreview)
 	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
+	printWorkflowOperations(plan.Operations)
+}
+
+func printWorkflowOperations(operations []workflowOperation) {
+	if len(operations) == 0 {
+		return
+	}
+	fmt.Println("Operations:")
+	for _, operation := range operations {
+		fmt.Printf("- %s: %s\n", operation.Kind, operation.Reason)
+		if operation.Bucket != "" && operation.Key != "" {
+			fmt.Printf("  Remote: s3://%s/%s\n", operation.Bucket, operation.Key)
+		}
+		if operation.LocalPath != "" {
+			fmt.Printf("  Local: %s\n", operation.LocalPath)
+		}
+		if operation.RequiresPrompt {
+			fmt.Println("  Prompt: required")
+		}
+		if operation.SafetyStatus != "" {
+			fmt.Printf("  Safety: %s\n", operation.SafetyStatus)
+		}
+	}
 }
 
 func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
@@ -811,6 +838,7 @@ func init() {
 
 	planFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planFeedCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for the planned remote feed")
+	planFeedCmd.Flags().BoolP("upload", "u", false, "Preview podcast.rss upload and referenced image publish operations")
 	addPlanOutputFlag(planFeedCmd)
 	applyFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyFeedCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to the configured output S3 bucket")

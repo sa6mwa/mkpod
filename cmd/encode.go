@@ -227,7 +227,7 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode
 	return askerAdapter.Ask(ctx, promptForOutputUpload(operation), episode.Output), nil
 }
 
-func promptForOutputUpload(operation episodeWorkflowOperation) string {
+func promptForOutputUpload(operation workflowOperation) string {
 	if operation.RemoteExists == "true" {
 		return "Overwrite remote file %s with newly encoded version?"
 	}
