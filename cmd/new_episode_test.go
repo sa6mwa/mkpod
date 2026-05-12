@@ -233,6 +233,9 @@ func TestNewEpisodeTUIRespondsToDetachedPTYResize(t *testing.T) {
 	if !strings.Contains(out, "TITLE_WIDTH=90") {
 		t.Fatalf("title bar did not adapt to resized pty width; output:\n%s", out)
 	}
+	if !strings.Contains(out, "VIEW_MIN_WIDTH=90") {
+		t.Fatalf("final resized frame did not repaint every row to the new pty width; output:\n%s", out)
+	}
 }
 
 type newEpisodeResizeProbe struct {
@@ -281,7 +284,13 @@ func TestNewEpisodeTUIResizePTYHelper(t *testing.T) {
 	if !ok {
 		t.Fatalf("resize helper returned unexpected model %T", finalModel)
 	}
-	fmt.Fprintf(os.Stdout, "\nFINAL_WIDTH=%d\nTITLE_WIDTH=%d\n", result.inner.width, ansi.StringWidth(result.inner.formLines()[0]))
+	viewMinWidth := result.inner.width
+	for _, line := range strings.Split(result.inner.View(), "\n") {
+		if width := ansi.StringWidth(line); width < viewMinWidth {
+			viewMinWidth = width
+		}
+	}
+	fmt.Fprintf(os.Stdout, "\nFINAL_WIDTH=%d\nTITLE_WIDTH=%d\nVIEW_MIN_WIDTH=%d\n", result.inner.width, ansi.StringWidth(result.inner.formLines()[0]), viewMinWidth)
 }
 
 func TestNewEpisodeTUIDescriptionBoxSpansContentWidth(t *testing.T) {
