@@ -67,6 +67,30 @@ Optionally, it can upload the RSS file to the configured S3 bucket.`,
 	},
 }
 
+var publishCmd = &cobra.Command{
+	Use:   "publish",
+	Short: "Generate and publish podcast RSS and referenced assets",
+	Long: `Generate the local podcast RSS feed, ensure referenced images are
+available in the output bucket, and upload the feed to the configured S3
+output bucket after the usual prompts.`,
+	Example: `  mkpod publish
+  mkpod publish --spec ./podcast/podspec.yaml
+  mkpod publish --force`,
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		options, err := feedWorkflowOptionsFromFlags(cmd)
+		if err != nil {
+			l.Error("Internal error", "error", err)
+			os.Exit(1)
+		}
+		options.Upload = true
+		if err := runFeedWorkflow(logger.WithDefaultLogger(context.Background()), args, options); err != nil {
+			l.Error("Failed to publish feed", "error", err)
+			os.Exit(1)
+		}
+	},
+}
+
 type feedWorkflowOptions struct {
 	SpecFile       string
 	AskNoQuestions bool
@@ -90,9 +114,12 @@ func feedWorkflowOptionsFromFlags(cmd *cobra.Command) (feedWorkflowOptions, erro
 			return feedWorkflowOptions{}, err
 		}
 	}
-	upload, err := cmd.Flags().GetBool("upload")
-	if err != nil {
-		return feedWorkflowOptions{}, err
+	upload := false
+	if cmd.Flags().Lookup("upload") != nil {
+		upload, err = cmd.Flags().GetBool("upload")
+		if err != nil {
+			return feedWorkflowOptions{}, err
+		}
 	}
 	return feedWorkflowOptions{SpecFile: specFile, AskNoQuestions: askNoQuestions, DryRun: dryRun, Upload: upload}, nil
 }
@@ -177,6 +204,7 @@ func checkAndUploadPodcastImage(ctx context.Context, atom *model.Podcast, askerA
 
 func init() {
 	rootCmd.AddCommand(parseCmd)
+	rootCmd.AddCommand(publishCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -192,6 +220,10 @@ func init() {
 	parseCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to \"output\" Amazon AWS S3 bucket defined in spec file")
 	parseCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
 	parseCmd.Flags().BoolP("dry-run", "n", false, "Behaves like the force option without modifying or producing anything. Will output RSS to stdout instead of file")
+
+	publishCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file (podspec.yaml)")
+	publishCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
+	publishCmd.Flags().BoolP("dry-run", "n", false, "Preview publish work without modifying or producing anything. Outputs RSS to stdout")
 }
 
 func joinBaseURLPath(baseURL, relPath string) string {

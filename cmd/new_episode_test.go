@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -723,6 +724,11 @@ func TestApplyNewEpisodePlanAppendsToSpec(t *testing.T) {
 
 func TestApplySavedNewEpisodePlan(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	writeSilentWaveForNewEpisodeTest(t, filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav"))
 	planPath := filepath.Join(t.TempDir(), "new.plan.json")
 	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
 		SpecFile: specFile,
@@ -732,12 +738,21 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 	if err := applySavedPlan(context.Background(), planPath); err != nil {
 		t.Fatalf("applySavedPlan() error = %v", err)
 	}
-	atom, err := specStoreLoadForTest(t, specFile)
+	atom, err = specStoreLoadForTest(t, specFile)
 	if err != nil {
 		t.Fatalf("reload spec fixture: %v", err)
 	}
 	if atom.Episodes[0].UID != 2 {
 		t.Fatalf("first UID = %d, want 2", atom.Episodes[0].UID)
+	}
+	if atom.Episodes[0].Output == "" {
+		t.Fatal("new episode output is empty, want local encode metadata")
+	}
+	if _, err := os.Stat(filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(atom.Episodes[0].Output))); err != nil {
+		t.Fatalf("encoded output missing: %v", err)
+	}
+	if _, err := os.Stat(atom.FeedFilePath()); err != nil {
+		t.Fatalf("generated RSS missing: %v", err)
 	}
 }
 
@@ -751,6 +766,54 @@ func episodeFixtureForNewPlan(uid int64) model.Episode {
 		Author:      "Host",
 		Image:       "artwork/cover.jpg",
 		Input:       "masters/new.wav",
+	}
+}
+
+func writeSilentWaveForNewEpisodeTest(t *testing.T, filename string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(filename), err)
+	}
+	file, err := os.Create(filename)
+	if err != nil {
+		t.Fatalf("Create(%q): %v", filename, err)
+	}
+	defer file.Close()
+
+	const sampleRate uint32 = 8000
+	const seconds uint32 = 1
+	const channels uint16 = 1
+	const bitsPerSample uint16 = 16
+	bytesPerSample := uint32(bitsPerSample / 8)
+	dataSize := sampleRate * seconds * uint32(channels) * bytesPerSample
+	byteRate := sampleRate * uint32(channels) * bytesPerSample
+	blockAlign := channels * bitsPerSample / 8
+
+	write := func(value any) {
+		if err := binary.Write(file, binary.LittleEndian, value); err != nil {
+			t.Fatalf("binary.Write(%q): %v", filename, err)
+		}
+	}
+	if _, err := file.Write([]byte("RIFF")); err != nil {
+		t.Fatalf("Write RIFF: %v", err)
+	}
+	write(uint32(36) + dataSize)
+	if _, err := file.Write([]byte("WAVEfmt ")); err != nil {
+		t.Fatalf("Write WAVEfmt: %v", err)
+	}
+	write(uint32(16))
+	write(uint16(1))
+	write(channels)
+	write(sampleRate)
+	write(byteRate)
+	write(blockAlign)
+	write(bitsPerSample)
+	if _, err := file.Write([]byte("data")); err != nil {
+		t.Fatalf("Write data: %v", err)
+	}
+	write(dataSize)
+	if _, err := file.Write(make([]byte, dataSize)); err != nil {
+		t.Fatalf("Write data bytes: %v", err)
 	}
 }
 

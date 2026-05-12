@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"al.essio.dev/pkg/shellescape"
 	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/logging"
@@ -34,7 +35,9 @@ var newCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printNewEpisodePlan(plan)
-		writePlan(cmd, "new", plan, defaultPlanPath("new", mustGetStringFlag(cmd, "spec")))
+		specFile := mustGetStringFlag(cmd, "spec")
+		planPath := writePlan(cmd, "new", plan, defaultPlanPath("new", specFile))
+		printNewEpisodeApplyHint(planPath, specFile)
 	},
 }
 
@@ -52,7 +55,9 @@ var planNewCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printNewEpisodePlan(plan)
-		writePlan(cmd, "new", plan, defaultPlanPath("new", mustGetStringFlag(cmd, "spec")))
+		specFile := mustGetStringFlag(cmd, "spec")
+		planPath := writePlan(cmd, "new", plan, defaultPlanPath("new", specFile))
+		printNewEpisodeApplyHint(planPath, specFile)
 	},
 }
 
@@ -82,6 +87,14 @@ type newEpisodeInputs struct {
 
 type blenderChaptersFile struct {
 	Chapters []id3v24.Chapter `yaml:"chapters"`
+}
+
+func printNewEpisodeApplyHint(planPath, specFile string) {
+	if planPath == defaultPlanPath("new", specFile) {
+		fmt.Printf("Apply with: mkpod apply %s\n", shellescape.Quote(planPath))
+		return
+	}
+	fmt.Printf("Apply with: mkpod apply %s\n", shellescape.Quote(planPath))
 }
 
 func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string) (*newEpisodePlan, error) {
@@ -378,6 +391,38 @@ func applyNewEpisodePlan(ctx context.Context, plan *newEpisodePlan) error {
 	}
 	atom.Episodes = append([]model.Episode{episode}, atom.Episodes...)
 	return savePodcastSpec(plan.SpecFile, atom)
+}
+
+func applyNewEpisodeWorkflow(ctx context.Context, plan *newEpisodePlan) error {
+	if err := applyNewEpisodePlan(ctx, plan); err != nil {
+		return err
+	}
+	if err := runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.Episode.UID, 10)}, encodeWorkflowOptions{
+		SpecFile:       plan.SpecFile,
+		All:            false,
+		AskNoQuestions: false,
+		LocalOnly:      true,
+	}); err != nil {
+		return err
+	}
+	if err := runFeedWorkflow(logger.WithDefaultLogger(ctx), nil, feedWorkflowOptions{
+		SpecFile:       plan.SpecFile,
+		AskNoQuestions: false,
+		DryRun:         false,
+		Upload:         false,
+	}); err != nil {
+		return err
+	}
+	printPostApplyPublishHint(plan.SpecFile)
+	return nil
+}
+
+func printPostApplyPublishHint(specFile string) {
+	if specFile == spec.DefaultSpecfile {
+		fmt.Println("Publish with: mkpod publish")
+		return
+	}
+	fmt.Printf("Publish with: mkpod publish --spec %s\n", shellescape.Quote(specFile))
 }
 
 func savePodcastSpec(path string, atom *model.Podcast) error {

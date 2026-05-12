@@ -44,23 +44,18 @@ S3 storage class handling is intentionally internal for now. mkpod keeps
 the behavior in the S3 layer, but does not expose storage-class controls
 as part of the main CLI workflow.
 
-mkpod uses a plan/apply workflow for the main operational commands. `plan`
-previews the files, tools, formats, and optional remote checks involved in a
-workflow and writes a default `WORKFLOW.plan.json` artifact. Spec-based plans
-are written next to the selected spec file. `apply` executes the same workflow.
-For deterministic workflows such as preprocessing and Blender add-on
-installation, mkpod can also apply a saved plan after checking that it is not
-stale:
+mkpod uses saved plan files for guided changes. `mkpod new` prepares a
+`new.plan.json` artifact next to the selected spec file. `mkpod inspect`
+shows what is in a saved plan, and `mkpod apply <plan.json>` applies it.
+Applying a new episode plan updates `podspec.yaml`, encodes the episode
+locally, and regenerates the local RSS file. Publishing remains an explicit
+step with `mkpod publish`.
 
 ```console
-$ mkpod plan preprocess MIC1.WAV
-$ mkpod apply --from preprocess.plan.json
-$ mkpod plan blender
-$ mkpod apply --from blender.plan.json
-$ mkpod plan feed --upload
-$ mkpod apply --from feed.plan.json
 $ mkpod new --non-interactive --title "Episode" --link https://example.com/episode --subtitle "Subtitle" --description "Description" --input masters/episode.flac
-$ mkpod apply --from new.plan.json
+$ mkpod inspect new.plan.json
+$ mkpod apply new.plan.json
+$ mkpod publish
 ```
 
 ## Quick Start
@@ -75,29 +70,23 @@ $ mkpod -h
 Generate and encode podcasts and publish to a cloud object store
 
 $ mkpod init --help
-$ mkpod plan --help
+$ mkpod new --help
+$ mkpod inspect --help
 $ mkpod apply --help
 
 # Optional raw-track cleanup before editing
-$ mkpod plan preprocess MIC1.WAV
-$ mkpod apply --from preprocess.plan.json
-
-# Install the Blender marker exporter
-$ mkpod plan blender
-$ mkpod apply --from blender.plan.json
+$ mkpod preprocess MIC1.WAV
 
 # Prepare a new episode entry
 $ mkpod new
-$ mkpod apply --from new.plan.json
+$ mkpod inspect new.plan.json
+$ mkpod apply new.plan.json
 
 # Encode a single episode selected by the uid field in podspec.yaml
-$ mkpod plan episode 16
-$ mkpod plan episode 16 --remote --remove-remote-master
-$ mkpod apply episode 16
+$ mkpod encode 16
 
 # Parse and upload podcast.rss
-$ mkpod plan feed --remote --upload
-$ mkpod apply feed --upload
+$ mkpod publish
 
 # Commit changes to podspec.yaml
 $ git add podspec.yaml ; git commit -m 'Update pod' ; git push

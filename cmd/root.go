@@ -17,25 +17,24 @@ var rootCmd = &cobra.Command{
 workspace, encode episode media with host-provided tools, render RSS, and
 publish the results to AWS S3.
 
-The emerging workflow is:
-  1. mkpod plan <workflow>
-  2. mkpod apply <workflow>
+The main workflow is:
+  1. mkpod new
+  2. mkpod inspect new.plan.json
+  3. mkpod apply new.plan.json
+  4. mkpod publish
 
 Legacy encode/parse/preprocess commands remain available during the
-plan/apply migration, but are hidden from the primary help surface.
+workflow migration, but are hidden from the primary help surface.
 
 mkpod preprocess remains available as an optional thin utility for raw
 microphone cleanup before editing; it is not required for the main publish
 pipeline.`,
 	Example: `  mkpod init ./podcast
-  mkpod plan preprocess masters/raw.wav
-  mkpod apply preprocess masters/raw.wav
   mkpod new
-  mkpod apply --from new.plan.json
-  mkpod plan episode --spec ./podcast/podspec.yaml 16
-  mkpod apply episode --spec ./podcast/podspec.yaml 16
-  mkpod plan feed --spec ./podcast/podspec.yaml
-  mkpod apply feed --spec ./podcast/podspec.yaml --upload`,
+  mkpod inspect new.plan.json
+  mkpod apply new.plan.json
+  mkpod publish
+  mkpod publish --spec ./podcast/podspec.yaml`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

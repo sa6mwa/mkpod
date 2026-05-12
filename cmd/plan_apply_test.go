@@ -67,6 +67,28 @@ func TestDefaultPlanPath(t *testing.T) {
 	}
 }
 
+func TestApplyCommandHasNoWorkflowSubcommands(t *testing.T) {
+	if got := len(applyCmd.Commands()); got != 0 {
+		t.Fatalf("apply subcommands = %d, want none", got)
+	}
+	if got, want := applyCmd.Use, "apply <plan.json>"; got != want {
+		t.Fatalf("apply Use = %q, want %q", got, want)
+	}
+}
+
+func TestInspectSavedNewEpisodePlan(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	planPath := filepath.Join(t.TempDir(), "new.plan.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	})
+
+	if err := inspectSavedPlan(planPath); err != nil {
+		t.Fatalf("inspectSavedPlan() error = %v", err)
+	}
+}
+
 func TestApplySavedPreprocessPlanRejectsStalePlan(t *testing.T) {
 	plan := preprocessPlanFixture(t)
 	plan.Prefix = "changed-"

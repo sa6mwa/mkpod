@@ -80,6 +80,7 @@ type encodeWorkflowOptions struct {
 	All                bool
 	AskNoQuestions     bool
 	RemoveRemoteMaster bool
+	LocalOnly          bool
 }
 
 func encodeWorkflowOptionsFromFlags(cmd *cobra.Command) (encodeWorkflowOptions, error) {
@@ -125,9 +126,15 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 
 	prompter := prompt.New(false, options.AskNoQuestions)
 	encoderService := encode.New(prompter)
-	storageClient := s3store.New(atom, prompter)
+	var storageClient *s3store.Client
+	if !options.LocalOnly {
+		storageClient = s3store.New(atom, prompter)
+	}
 
 	postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
+		if options.LocalOnly {
+			return nil
+		}
 		if options.RemoveRemoteMaster && episode.Input != "" {
 			operation, err := decideRemoteMasterRemoval(ctx, atom, episode, storageClient)
 			if err != nil {
@@ -159,6 +166,9 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 	metadataChanged := false
 
 	prepareEpisode := func(ctx context.Context, atom *model.Podcast, episode *model.Episode) error {
+		if options.LocalOnly {
+			return nil
+		}
 		return prepareEpisodeAssetsForEncode(ctx, atom, episode, storageClient)
 	}
 

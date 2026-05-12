@@ -27,21 +27,36 @@ var planCmd = &cobra.Command{
 }
 
 var applyCmd = &cobra.Command{
-	Use:   "apply <workflow>",
-	Short: "Execute mkpod workflow operations",
+	Use:   "apply <plan.json>",
+	Short: "Apply a saved mkpod workflow plan",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("provide exactly one saved plan JSON file")
+		}
+		return nil
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
-		from, err := cmd.Flags().GetString("from")
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-		if strings.TrimSpace(from) == "" {
-			_ = cmd.Help()
-			os.Exit(1)
-		}
-		if err := applySavedPlan(context.Background(), from); err != nil {
+		if err := applySavedPlan(context.Background(), args[0]); err != nil {
 			l.Error("Unable to apply saved workflow plan", "error", err)
+			os.Exit(1)
+		}
+	},
+}
+
+var inspectCmd = &cobra.Command{
+	Use:   "inspect <plan.json>",
+	Short: "Inspect a saved mkpod workflow plan",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("provide exactly one saved plan JSON file")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		if err := inspectSavedPlan(args[0]); err != nil {
+			l.Error("Unable to inspect saved workflow plan", "error", err)
 			os.Exit(1)
 		}
 	},
@@ -74,33 +89,6 @@ var planBlenderCmd = &cobra.Command{
 	},
 }
 
-var applyBlenderCmd = &cobra.Command{
-	Use:   "blender",
-	Short: "Install the Blender marker exporter add-on",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		blender, err := cmd.Flags().GetString("blender")
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-		repo, err := cmd.Flags().GetString("repo")
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-
-		plan, err := blenderaddon.Apply(context.Background(), blenderaddon.Options{Blender: blender, Repo: repo}, nil)
-		if err != nil {
-			l.Error("Unable to install Blender marker exporter", "error", err)
-			os.Exit(1)
-		}
-
-		printBlenderPlan(plan)
-		fmt.Println("Installed Blender marker exporter.")
-	},
-}
-
 var planPreprocessCmd = &cobra.Command{
 	Use:     "preprocess [flags] audiofiles...",
 	Aliases: []string{"pre"},
@@ -114,26 +102,6 @@ var planPreprocessCmd = &cobra.Command{
 		}
 		printPreprocessPlan(plan)
 		writePlan(cmd, "preprocess", plan, defaultPlanPath("preprocess", ""))
-	},
-}
-
-var applyPreprocessCmd = &cobra.Command{
-	Use:     "preprocess [flags] audiofiles...",
-	Aliases: []string{"pre"},
-	Short:   "Execute audio preprocessing operations",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		plan, err := buildPreprocessPlan(cmd, args)
-		if err != nil {
-			l.Error("Unable to plan preprocessing", "error", err)
-			os.Exit(1)
-		}
-		if err := preprocess.ExecutePlan(context.Background(), plan); err != nil {
-			l.Error("Unable to apply preprocessing", "error", err)
-			os.Exit(1)
-		}
-		printPreprocessPlan(plan)
-		fmt.Println("Applied preprocessing.")
 	},
 }
 
@@ -159,31 +127,6 @@ var planEpisodeCmd = &cobra.Command{
 	},
 }
 
-var applyEpisodeCmd = &cobra.Command{
-	Use:   "episode <uid>",
-	Short: "Execute episode encoding workflow",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return fmt.Errorf("provide exactly one episode UID")
-		}
-		_, err := strconv.ParseInt(args[0], 10, 64)
-		return err
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		options, err := encodeWorkflowOptionsFromFlags(cmd)
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-		options.All = false
-		if err := runEncodeWorkflow(logger.WithDefaultLogger(context.Background()), args, options); err != nil {
-			l.Error("Unable to apply episode workflow", "error", err)
-			os.Exit(1)
-		}
-	},
-}
-
 var planFeedCmd = &cobra.Command{
 	Use:   "feed",
 	Short: "Preview RSS feed generation workflow",
@@ -202,23 +145,6 @@ var planFeedCmd = &cobra.Command{
 type savedPlan struct {
 	Workflow string          `json:"workflow"`
 	Plan     json.RawMessage `json:"plan"`
-}
-
-var applyFeedCmd = &cobra.Command{
-	Use:   "feed",
-	Short: "Execute RSS feed generation workflow",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		options, err := feedWorkflowOptionsFromFlags(cmd)
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-		if err := runFeedWorkflow(logger.WithDefaultLogger(context.Background()), args, options); err != nil {
-			l.Error("Unable to apply feed workflow", "error", err)
-			os.Exit(1)
-		}
-	},
 }
 
 type episodeWorkflowPlan struct {
@@ -292,7 +218,7 @@ func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, e
 	return processor.Plan(args)
 }
 
-func writePlan(cmd *cobra.Command, workflow string, plan any, defaultPath string) {
+func writePlan(cmd *cobra.Command, workflow string, plan any, defaultPath string) string {
 	out, err := cmd.Flags().GetString("out")
 	if err != nil {
 		logger.DefaultLogger().Error("Unable to read workflow plan output path", "error", err)
@@ -317,6 +243,7 @@ func writePlan(cmd *cobra.Command, workflow string, plan any, defaultPath string
 		os.Exit(1)
 	}
 	fmt.Printf("Wrote plan: %s\n", out)
+	return out
 }
 
 func defaultPlanPath(workflow, specFile string) string {
@@ -407,7 +334,7 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
 			return err
 		}
-		return applyNewEpisodePlan(ctx, &plan)
+		return applyNewEpisodeWorkflow(ctx, &plan)
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -420,6 +347,48 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 	default:
 		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
 	}
+}
+
+func inspectSavedPlan(path string) error {
+	saved, err := loadSavedPlan(path)
+	if err != nil {
+		return err
+	}
+	switch saved.Workflow {
+	case "blender":
+		var plan blenderaddon.Plan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		printBlenderPlan(&plan)
+	case "episode":
+		var plan episodeWorkflowPlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		printEpisodePlan(&plan)
+	case "feed":
+		var plan feedWorkflowPlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		printFeedPlan(&plan)
+	case "new":
+		var plan newEpisodePlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		printNewEpisodePlan(&plan)
+	case "preprocess":
+		var plan preprocess.Plan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		printPreprocessPlan(&plan)
+	default:
+		return fmt.Errorf("saved plan workflow %q is not inspectable", saved.Workflow)
+	}
+	return nil
 }
 
 func validateSavedEpisodePlan(ctx context.Context, plan *episodeWorkflowPlan) error {
@@ -877,44 +846,30 @@ func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
 }
 
 func init() {
-	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(applyCmd)
-	applyCmd.Flags().String("from", "", "Apply a saved workflow plan JSON file")
+	rootCmd.AddCommand(inspectCmd)
 
 	planCmd.AddCommand(planBlenderCmd)
-	applyCmd.AddCommand(applyBlenderCmd)
 	planCmd.AddCommand(planPreprocessCmd)
-	applyCmd.AddCommand(applyPreprocessCmd)
 	planCmd.AddCommand(planEpisodeCmd)
-	applyCmd.AddCommand(applyEpisodeCmd)
 	planCmd.AddCommand(planFeedCmd)
-	applyCmd.AddCommand(applyFeedCmd)
 
 	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
 	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
 	addPlanOutputFlag(planBlenderCmd)
-	applyBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
-	applyBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
 
 	addPreprocessWorkflowFlags(planPreprocessCmd)
 	addPlanOutputFlag(planPreprocessCmd)
-	addPreprocessWorkflowFlags(applyPreprocessCmd)
 
 	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planEpisodeCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for planned remote objects")
 	planEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Preview remote input master removal after safety checks")
 	addPlanOutputFlag(planEpisodeCmd)
-	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
-	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")
-	applyEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Remove remote input master audio or video file after safety checks")
 
 	planFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planFeedCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for the planned remote feed")
 	planFeedCmd.Flags().BoolP("upload", "u", false, "Preview podcast.rss upload and referenced image publish operations")
 	addPlanOutputFlag(planFeedCmd)
-	applyFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
-	applyFeedCmd.Flags().BoolP("upload", "u", false, "Upload podcast.rss to the configured output S3 bucket")
-	applyFeedCmd.Flags().BoolP("force", "f", false, "Do not prompt before rewriting metadata, uploading RSS, or uploading missing images")
 }
 
 func addPlanOutputFlag(cmd *cobra.Command) {
