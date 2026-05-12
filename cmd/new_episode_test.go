@@ -749,6 +749,50 @@ func TestApplyNewEpisodePlanAppendsToSpec(t *testing.T) {
 	}
 }
 
+func TestApplyNewEpisodePlanResumesWhenExistingEpisodeMatchesPlan(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	if err := applyNewEpisodePlan(context.Background(), plan); err != nil {
+		t.Fatalf("first applyNewEpisodePlan() error = %v", err)
+	}
+
+	if err := applyNewEpisodePlan(context.Background(), plan); err != nil {
+		t.Fatalf("second applyNewEpisodePlan() error = %v, want resumable no-op", err)
+	}
+
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if len(atom.Episodes) != 2 {
+		t.Fatalf("episodes = %d, want no duplicate append", len(atom.Episodes))
+	}
+}
+
+func TestApplyNewEpisodePlanRejectsExistingEpisodeMismatch(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	if err := applyNewEpisodePlan(context.Background(), plan); err != nil {
+		t.Fatalf("first applyNewEpisodePlan() error = %v", err)
+	}
+
+	changed := *plan
+	changed.Episode.Title = "Different Episode"
+	err := applyNewEpisodePlan(context.Background(), &changed)
+	if err == nil {
+		t.Fatal("applyNewEpisodePlan() error = nil, want existing metadata conflict")
+	}
+	if !strings.Contains(err.Error(), "already exists with different metadata") {
+		t.Fatalf("applyNewEpisodePlan() error = %q, want metadata conflict", err)
+	}
+}
+
 func TestApplySavedNewEpisodePlan(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
@@ -780,6 +824,45 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 	}
 	if _, err := os.Stat(atom.FeedFilePath()); err != nil {
 		t.Fatalf("generated RSS missing: %v", err)
+	}
+}
+
+func TestApplySavedNewEpisodePlanResumesExistingMetadataAndEncodes(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	writeSilentWaveForNewEpisodeTest(t, filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav"))
+	episode := episodeFixtureForNewPlan(2)
+	atom.Episodes = append([]model.Episode{episode}, atom.Episodes...)
+	if err := savePodcastSpec(specFile, atom); err != nil {
+		t.Fatalf("save partially applied spec: %v", err)
+	}
+	planPath := filepath.Join(t.TempDir(), "new.plan.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episode,
+	})
+
+	if err := applySavedPlan(context.Background(), planPath); err != nil {
+		t.Fatalf("applySavedPlan() error = %v", err)
+	}
+	atom, err = specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if len(atom.Episodes) != 2 {
+		t.Fatalf("episodes = %d, want no duplicate append", len(atom.Episodes))
+	}
+	if atom.Episodes[0].UID != 2 {
+		t.Fatalf("first UID = %d, want 2", atom.Episodes[0].UID)
+	}
+	if atom.Episodes[0].Output == "" {
+		t.Fatal("new episode output is empty, want resumed local encode metadata")
+	}
+	if _, err := os.Stat(filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(atom.Episodes[0].Output))); err != nil {
+		t.Fatalf("encoded output missing: %v", err)
 	}
 }
 

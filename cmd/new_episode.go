@@ -478,11 +478,44 @@ func applyNewEpisodePlan(ctx context.Context, plan *newEpisodePlan) error {
 		return err
 	}
 	episode := plan.Episode
-	if err := validateNewEpisode(atom, &episode); err != nil {
+	if err := validateNewEpisodeFields(atom, &episode); err != nil {
 		return err
+	}
+	if index := atom.ContainsEpisode(episode.UID); index >= 0 {
+		if newEpisodePlanMatchesExisting(&episode, &atom.Episodes[index]) {
+			return nil
+		}
+		return fmt.Errorf("episode UID %d already exists with different metadata", episode.UID)
 	}
 	atom.Episodes = append([]model.Episode{episode}, atom.Episodes...)
 	return savePodcastSpec(plan.SpecFile, atom)
+}
+
+func newEpisodePlanMatchesExisting(planned, existing *model.Episode) bool {
+	if planned == nil || existing == nil {
+		return false
+	}
+	if planned.UID != existing.UID ||
+		strings.TrimSpace(planned.Title) != strings.TrimSpace(existing.Title) ||
+		strings.TrimSpace(planned.Link) != strings.TrimSpace(existing.Link) ||
+		strings.TrimSpace(planned.Subtitle) != strings.TrimSpace(existing.Subtitle) ||
+		strings.TrimSpace(planned.Description) != strings.TrimSpace(existing.Description) ||
+		strings.TrimSpace(planned.Author) != strings.TrimSpace(existing.Author) ||
+		strings.TrimSpace(planned.Image) != strings.TrimSpace(existing.Image) ||
+		strings.TrimSpace(planned.Input) != strings.TrimSpace(existing.Input) ||
+		strings.TrimSpace(planned.Format) != strings.TrimSpace(existing.Format) ||
+		strings.TrimSpace(planned.EncodingLanguage) != strings.TrimSpace(existing.EncodingLanguage) {
+		return false
+	}
+	if len(planned.Chapters) != len(existing.Chapters) {
+		return false
+	}
+	for i := range planned.Chapters {
+		if planned.Chapters[i] != existing.Chapters[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func applyNewEpisodeWorkflow(ctx context.Context, plan *newEpisodePlan) error {
@@ -531,6 +564,16 @@ func savePodcastSpec(path string, atom *model.Podcast) error {
 }
 
 func validateNewEpisode(atom *model.Podcast, episode *model.Episode) error {
+	if err := validateNewEpisodeFields(atom, episode); err != nil {
+		return err
+	}
+	if atom.ContainsEpisode(episode.UID) >= 0 {
+		return fmt.Errorf("episode UID %d already exists", episode.UID)
+	}
+	return nil
+}
+
+func validateNewEpisodeFields(atom *model.Podcast, episode *model.Episode) error {
 	var missing []string
 	if episode.UID <= 0 {
 		missing = append(missing, "uid")
@@ -555,9 +598,6 @@ func validateNewEpisode(atom *model.Podcast, episode *model.Episode) error {
 	}
 	if err := spec.ApplyEpisodeDefaultsForEncoding(atom, episode); err != nil {
 		missing = append(missing, strings.TrimPrefix(err.Error(), "episode "))
-	}
-	if atom.ContainsEpisode(episode.UID) >= 0 {
-		return fmt.Errorf("episode UID %d already exists", episode.UID)
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required new episode fields: %s", strings.Join(missing, ", "))
