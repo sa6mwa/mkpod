@@ -233,6 +233,7 @@ func (m newEpisodeTUIModel) View() string {
 		return ""
 	}
 	lines := m.formLines()
+	lines = visualLines(lines)
 	if m.picking {
 		if len(lines) > 0 {
 			lines[len(lines)-1] = ""
@@ -415,14 +416,8 @@ func (m newEpisodeTUIModel) overlayPicker(lines []string) []string {
 	if m.picker != nil {
 		body = m.picker.View()
 	}
-	overlay := []string{
-		m.overlayBox(clampInt(m.width-4, 60, 120), body),
-	}
-	top := 3
-	if m.height > 28 {
-		top = 4
-	}
-	return overlayLines(lines, overlay, top)
+	overlay := visualLines([]string{m.overlayBox(clampInt(m.width-4, 60, 120), body)})
+	return overlayLines(lines, overlay, m.pickerOverlayTop())
 }
 
 func (m newEpisodeTUIModel) overlayBox(width int, body string) string {
@@ -450,6 +445,21 @@ func overlayLines(base []string, overlay []string, top int) []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+func visualLines(lines []string) []string {
+	var out []string
+	for _, line := range lines {
+		out = append(out, strings.Split(line, "\n")...)
+	}
+	return out
+}
+
+func (m newEpisodeTUIModel) pickerOverlayTop() int {
+	if m.height < 20 {
+		return 2
+	}
+	return 4
 }
 
 func (m newEpisodeTUIModel) renderScreen(lines []string) string {
@@ -492,14 +502,14 @@ func (m *newEpisodeTUIModel) startFilePicker(field int) tea.Cmd {
 		Value(&m.pickValue).
 		FileAllowed(true).
 		DirAllowed(false).
-		Picking(true).
-		Height(m.pickerHeight())
+		Picking(true)
 	if !m.pickerAllowsOutsideLocalStorage() {
 		picker = picker.Description("from localStorageDir")
 	}
 	picker = picker.WithWidth(m.pickerWidth()).(*huh.FilePicker)
 	picker = picker.WithTheme(huh.ThemeCharm()).(*huh.FilePicker)
 	picker = picker.WithKeyMap(huh.NewDefaultKeyMap()).(*huh.FilePicker)
+	picker = picker.Height(m.pickerHeight())
 	m.picker = picker
 	return m.picker.Focus()
 }

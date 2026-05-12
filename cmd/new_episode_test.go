@@ -268,6 +268,29 @@ func TestNewEpisodeTUIEnterOpensFilePickerScreen(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+	tui.focusField(newEpisodeFieldInput)
+
+	model, _ := tui.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated := model.(newEpisodeTUIModel)
+	view := updated.View()
+	picker := strings.Index(view, "from localStorageDir")
+	description := strings.Index(view, "Description")
+	if picker < 0 {
+		t.Fatalf("picker overlay missing localStorageDir description: %q", view)
+	}
+	if description >= 0 && picker > description {
+		t.Fatalf("picker rendered below description, want visual overlay before it: picker=%d description=%d view=%q", picker, description, view)
+	}
+}
+
 func TestNewEpisodeTUIPickerStartsInsideLocalStorage(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
