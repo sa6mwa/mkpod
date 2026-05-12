@@ -22,6 +22,7 @@ func TestDefaultNewEpisodeInputsUsePreviousEpisodeTemplate(t *testing.T) {
 	atom.Episodes[0].Input = "audiopod/masters/previous.flac"
 	atom.Episodes[0].Format = "m4a"
 	atom.Episodes[0].EncodingLanguage = "SWE"
+	atom.Encoding.Language = "eng"
 
 	defaults := defaultNewEpisodeInputs(atom, specFile)
 	if defaults.UID != "2" {
@@ -38,6 +39,26 @@ func TestDefaultNewEpisodeInputsUsePreviousEpisodeTemplate(t *testing.T) {
 	}
 	if defaults.Format != "m4a" || defaults.EncodingLanguage != "SWE" {
 		t.Fatalf("format/language = %q/%q, want m4a/SWE", defaults.Format, defaults.EncodingLanguage)
+	}
+	if defaults.InheritedEncodingLanguage != "eng" {
+		t.Fatalf("InheritedEncodingLanguage = %q, want eng", defaults.InheritedEncodingLanguage)
+	}
+}
+
+func TestDefaultNewEpisodeInputsDoesNotCopyInheritedEncodingLanguage(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	atom.Encoding.Language = "swe"
+
+	defaults := defaultNewEpisodeInputs(atom, specFile)
+	if defaults.EncodingLanguage != "" {
+		t.Fatalf("EncodingLanguage = %q, want empty explicit override", defaults.EncodingLanguage)
+	}
+	if defaults.InheritedEncodingLanguage != "swe" {
+		t.Fatalf("InheritedEncodingLanguage = %q, want swe", defaults.InheritedEncodingLanguage)
 	}
 }
 
@@ -68,6 +89,62 @@ func TestNewEpisodePlanFromInputsParsesChapters(t *testing.T) {
 	}
 	if len(plan.Episode.Chapters) != 1 || plan.Episode.Chapters[0].Title != "Intro" {
 		t.Fatalf("Chapters = %+v, want parsed chapter", plan.Episode.Chapters)
+	}
+}
+
+func TestNewEpisodePlanFromInputsNormalizesLocalStoragePaths(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	input := filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav")
+	image := filepath.Join(atom.LocalStorageDirExpanded(), "artwork", "cover.jpg")
+
+	plan, err := newEpisodePlanFromInputs(atom, newEpisodeInputs{
+		SpecFile:       specFile,
+		UID:            "2",
+		Title:          "New Episode",
+		Link:           "https://example.com/new",
+		Subtitle:       "New subtitle",
+		Description:    "New description",
+		Input:          input,
+		Author:         "Host",
+		Image:          image,
+		NonInteractive: true,
+	})
+	if err != nil {
+		t.Fatalf("newEpisodePlanFromInputs() error = %v", err)
+	}
+	if plan.Episode.Input != "masters/new.wav" {
+		t.Fatalf("Input = %q, want relative input", plan.Episode.Input)
+	}
+	if plan.Episode.Image != "artwork/cover.jpg" {
+		t.Fatalf("Image = %q, want relative image", plan.Episode.Image)
+	}
+}
+
+func TestNewEpisodePlanFromInputsRejectsParentRelativePaths(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+
+	_, err = newEpisodePlanFromInputs(atom, newEpisodeInputs{
+		SpecFile:       specFile,
+		UID:            "2",
+		Title:          "New Episode",
+		Link:           "https://example.com/new",
+		Subtitle:       "New subtitle",
+		Description:    "New description",
+		Input:          "../outside.wav",
+		Author:         "Host",
+		Image:          "artwork/cover.jpg",
+		NonInteractive: true,
+	})
+	if err == nil {
+		t.Fatal("newEpisodePlanFromInputs() error = nil, want parent-relative path rejection")
 	}
 }
 

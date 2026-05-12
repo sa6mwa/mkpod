@@ -57,20 +57,21 @@ type newEpisodePlan struct {
 }
 
 type newEpisodeInputs struct {
-	SpecFile                 string
-	NonInteractive           bool
-	Description              string
-	DescriptionFromClipboard bool
-	UID                      string
-	Author                   string
-	Title                    string
-	Link                     string
-	Subtitle                 string
-	Image                    string
-	Input                    string
-	Format                   string
-	EncodingLanguage         string
-	Chapters                 string
+	SpecFile                  string
+	NonInteractive            bool
+	Description               string
+	DescriptionFromClipboard  bool
+	UID                       string
+	Author                    string
+	Title                     string
+	Link                      string
+	Subtitle                  string
+	Image                     string
+	Input                     string
+	Format                    string
+	EncodingLanguage          string
+	InheritedEncodingLanguage string
+	Chapters                  string
 }
 
 type blenderChaptersFile struct {
@@ -100,7 +101,7 @@ func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string)
 	}
 	interactive := !defaults.NonInteractive && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 	if interactive {
-		if err := runNewEpisodeForm(&defaults); err != nil {
+		if err := runNewEpisodeForm(atom, &defaults); err != nil {
 			return nil, err
 		}
 	} else {
@@ -198,6 +199,7 @@ func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInp
 		defaults.UID = "1"
 		defaults.Author = atom.Author
 		defaults.Image = atom.Config.DefaultPodImage
+		defaults.InheritedEncodingLanguage = atom.Encoding.Language
 		return defaults
 	}
 	previous := atom.Episodes[0]
@@ -210,6 +212,7 @@ func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInp
 	defaults.Author = spec.EffectiveEpisodeAuthor(atom, &previous)
 	defaults.Image = spec.EffectiveEpisodeImage(atom, &previous)
 	defaults.Format = previous.Format
+	defaults.InheritedEncodingLanguage = atom.Encoding.Language
 	defaults.EncodingLanguage = previous.EncodingLanguage
 	if strings.TrimSpace(previous.Input) != "" {
 		dir := filepath.ToSlash(filepath.Dir(previous.Input))
@@ -262,7 +265,7 @@ func mergeNewEpisodeInputs(defaults *newEpisodeInputs, overrides newEpisodeInput
 	}
 }
 
-func runNewEpisodeForm(inputs *newEpisodeInputs) error {
+func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
 	chapters := inputs.Chapters
 	if strings.TrimSpace(chapters) == "" {
 		home, err := os.UserHomeDir()
@@ -272,22 +275,65 @@ func runNewEpisodeForm(inputs *newEpisodeInputs) error {
 	}
 	form := huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().Title("UID").Value(&inputs.UID).Validate(validateInt64String),
-			huh.NewInput().Title("Title").Value(&inputs.Title).Validate(huh.ValidateNotEmpty()),
-			huh.NewInput().Title("Link").Value(&inputs.Link).Validate(huh.ValidateNotEmpty()),
-			huh.NewInput().Title("Subtitle").Value(&inputs.Subtitle).Validate(huh.ValidateNotEmpty()),
+			huh.NewInput().Title("UID").Value(&inputs.UID),
+			huh.NewInput().Title("Title").Value(&inputs.Title),
+			huh.NewInput().Title("Link").Value(&inputs.Link),
+			huh.NewInput().Title("Subtitle").Value(&inputs.Subtitle),
 			huh.NewInput().Title("Author").Value(&inputs.Author),
-			huh.NewInput().Title("Image").Value(&inputs.Image),
-			huh.NewInput().Title("Input").Description("Path relative to localStorageDir").Value(&inputs.Input).Validate(huh.ValidateNotEmpty()),
+			localStorageFilePicker(atom, "Image", "Stored relative to localStorageDir", inputs.Image, &inputs.Image),
+			localStorageFilePicker(atom, "Input", "Edited master, stored relative to localStorageDir", inputs.Input, &inputs.Input),
 			huh.NewInput().Title("Format").Description("Optional: mp3, m4a, m4b, audio, video").Value(&inputs.Format),
-			huh.NewInput().Title("Encoding language").Value(&inputs.EncodingLanguage),
+			huh.NewInput().Title("Encoding language").Description(encodingLanguageDescription(inputs)).Placeholder(inputs.InheritedEncodingLanguage).Value(&inputs.EncodingLanguage),
 			huh.NewFilePicker().Title("Chapters file").CurrentDirectory(chaptersPickerDirectory(chapters)).Value(&inputs.Chapters).FileAllowed(true).DirAllowed(false),
 		),
 		huh.NewGroup(
-			huh.NewText().Title("Description").Value(&inputs.Description).Lines(12).Validate(huh.ValidateNotEmpty()),
+			huh.NewText().Title("Description").Value(&inputs.Description).Lines(12),
 		),
 	).WithTheme(huh.ThemeCharm())
 	return form.Run()
+}
+
+func localStorageFilePicker(atom *model.Podcast, title, description, current string, value *string) *huh.FilePicker {
+	return huh.NewFilePicker().
+		Title(title).
+		Description(description).
+		CurrentDirectory(localStoragePickerDirectory(atom, current)).
+		Value(value).
+		FileAllowed(true).
+		DirAllowed(false)
+}
+
+func localStoragePickerDirectory(atom *model.Podcast, current string) string {
+	root := "."
+	if atom != nil && strings.TrimSpace(atom.LocalStorageDirExpanded()) != "" {
+		root = atom.LocalStorageDirExpanded()
+	}
+	current = strings.TrimSpace(current)
+	if current == "" {
+		return root
+	}
+	if filepath.IsAbs(current) {
+		rel, err := localStorageRelativePath(atom, current, "path", false)
+		if err != nil {
+			return root
+		}
+		current = rel
+	}
+	dir := filepath.Dir(filepath.FromSlash(current))
+	if dir == "." {
+		return root
+	}
+	return filepath.Join(root, dir)
+}
+
+func encodingLanguageDescription(inputs *newEpisodeInputs) string {
+	if strings.TrimSpace(inputs.EncodingLanguage) != "" {
+		return "Explicit on this episode; clear to inherit podcast encoding language"
+	}
+	if strings.TrimSpace(inputs.InheritedEncodingLanguage) != "" {
+		return "Inherited from encoding.language unless explicitly set here"
+	}
+	return "Optional per-episode override"
 }
 
 func chaptersPickerDirectory(path string) string {
@@ -313,6 +359,44 @@ func chaptersPickerDirectory(path string) string {
 	return dir
 }
 
+func localStorageRelativePath(atom *model.Podcast, value, field string, required bool) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		if required {
+			return "", fmt.Errorf("%s is required", field)
+		}
+		return "", nil
+	}
+	root := "."
+	if atom != nil && strings.TrimSpace(atom.LocalStorageDirExpanded()) != "" {
+		root = atom.LocalStorageDirExpanded()
+	}
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve localStorageDir for %s: %w", field, err)
+	}
+
+	var rel string
+	if filepath.IsAbs(value) {
+		valueAbs, err := filepath.Abs(value)
+		if err != nil {
+			return "", fmt.Errorf("resolve %s path: %w", field, err)
+		}
+		rel, err = filepath.Rel(rootAbs, valueAbs)
+		if err != nil {
+			return "", fmt.Errorf("resolve %s relative to localStorageDir: %w", field, err)
+		}
+	} else {
+		rel = filepath.FromSlash(value)
+	}
+
+	clean := filepath.Clean(rel)
+	if clean == "." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) || clean == ".." || filepath.IsAbs(clean) {
+		return "", fmt.Errorf("%s must be a path inside localStorageDir and must not use ..", field)
+	}
+	return filepath.ToSlash(clean), nil
+}
+
 func newEpisodePlanFromInputs(atom *model.Podcast, inputs newEpisodeInputs) (*newEpisodePlan, error) {
 	uid, err := strconv.ParseInt(strings.TrimSpace(inputs.UID), 10, 64)
 	if err != nil || uid <= 0 {
@@ -326,7 +410,7 @@ func newEpisodePlanFromInputs(atom *model.Podcast, inputs newEpisodeInputs) (*ne
 		Description:      strings.TrimSpace(inputs.Description),
 		Author:           strings.TrimSpace(inputs.Author),
 		Image:            strings.TrimSpace(inputs.Image),
-		Input:            filepath.ToSlash(strings.TrimSpace(inputs.Input)),
+		Input:            strings.TrimSpace(inputs.Input),
 		Format:           strings.TrimSpace(strings.ToLower(inputs.Format)),
 		EncodingLanguage: strings.TrimSpace(inputs.EncodingLanguage),
 	}
@@ -335,6 +419,12 @@ func newEpisodePlanFromInputs(atom *model.Podcast, inputs newEpisodeInputs) (*ne
 	}
 	if strings.TrimSpace(episode.Image) == "" {
 		episode.Image = atom.Config.DefaultPodImage
+	}
+	if episode.Image, err = localStorageRelativePath(atom, episode.Image, "image", false); err != nil {
+		return nil, err
+	}
+	if episode.Input, err = localStorageRelativePath(atom, episode.Input, "input", true); err != nil {
+		return nil, err
 	}
 	if chaptersPath := strings.TrimSpace(inputs.Chapters); chaptersPath != "" {
 		chapters, err := loadChaptersFile(chaptersPath)
