@@ -368,15 +368,14 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 
 func (m newEpisodeTUIModel) renderTopFields(width int) string {
 	full := lipgloss.NewStyle().Width(width)
-	leftWidth := (width - 8) / 2
-	rightWidth := width - leftWidth - 8
+	leftWidth, rightWidth, gapText := newEpisodePairLayout(width)
 	left := lipgloss.NewStyle().Width(leftWidth)
 	right := lipgloss.NewStyle().Width(rightWidth)
 
 	rows := []string{
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			left.Render(m.renderInput(newEpisodeFieldUID, leftWidth)),
-			"        ",
+			gapText,
 			right.Render(m.renderInput(newEpisodeFieldAuthor, rightWidth)),
 		),
 		full.Render(m.renderInput(newEpisodeFieldTitle, width)),
@@ -386,7 +385,7 @@ func (m newEpisodeTUIModel) renderTopFields(width int) string {
 		full.Render(m.renderInput(newEpisodeFieldInput, width)),
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			left.Render(m.renderInput(newEpisodeFieldFormat, leftWidth)),
-			"        ",
+			gapText,
 			right.Render(m.renderInput(newEpisodeFieldEncodingLanguage, rightWidth)),
 		),
 		full.Render(m.renderInput(newEpisodeFieldChapters, width)),
@@ -394,7 +393,31 @@ func (m newEpisodeTUIModel) renderTopFields(width int) string {
 	return strings.Join(rows, "\n\n")
 }
 
+func newEpisodePairLayout(width int) (int, int, string) {
+	gap := newEpisodeColumnGap(width)
+	leftWidth := (width - gap) / 2
+	if width < 48 {
+		leftWidth = minInt(10, maxInt(1, width-gap-1))
+	}
+	rightWidth := maxInt(1, width-leftWidth-gap)
+	return leftWidth, rightWidth, strings.Repeat(" ", gap)
+}
+
+func newEpisodeColumnGap(width int) int {
+	switch {
+	case width >= 72:
+		return 8
+	case width >= 44:
+		return 6
+	case width >= 28:
+		return 3
+	default:
+		return 1
+	}
+}
+
 func (m newEpisodeTUIModel) renderInput(field int, width int) string {
+	width = maxInt(1, width)
 	label := newEpisodeFieldLabels[field]
 	labelStyle := m.labelStyle
 	if field == m.focus {
@@ -404,8 +427,9 @@ func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	if m.isFileField(field) {
 		labelLine += " " + m.helpStyle.Render("enter to choose")
 	}
+	labelLine = ansi.Truncate(labelLine, width, "")
 	value := m.fields[field].View()
-	value = lipgloss.NewStyle().Width(maxInt(8, width)).Render(value)
+	value = ansi.Truncate(lipgloss.NewStyle().Width(width).Render(value), width, "")
 	return labelLine + "\n" + value
 }
 
@@ -613,7 +637,7 @@ func (m newEpisodeTUIModel) renderScreenRow(line string) string {
 }
 
 func (m newEpisodeTUIModel) bodyWidth() int {
-	return clampInt(m.contentWidth(), 64, 118)
+	return clampInt(m.contentWidth(), 1, 118)
 }
 
 func (m newEpisodeTUIModel) contentWidth() int {

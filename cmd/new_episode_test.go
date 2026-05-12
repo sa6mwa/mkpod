@@ -218,6 +218,31 @@ func TestNewEpisodeTUIWindowSizeEventClearsImmediately(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIFitsNarrowTerminalWidth(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(34, 44)
+
+	if got, want := tui.bodyWidth(), 32; got != want {
+		t.Fatalf("bodyWidth() = %d, want %d", got, want)
+	}
+	view := tui.View()
+	for i, line := range strings.Split(view, "\n") {
+		if got, want := ansi.StringWidth(line), 34; got > want {
+			t.Fatalf("line %d width = %d, want <= %d: %q\nview:\n%s", i, got, want, line, view)
+		}
+	}
+	for _, want := range []string{"Author", "Host", "Encoding Language"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("narrow view missing %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestNewEpisodeTUIRespondsToDetachedPTYResize(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
