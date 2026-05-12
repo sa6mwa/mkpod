@@ -253,6 +253,8 @@ Initial workflow slices:
   - [x] Preview RSS rendering.
   - [x] Use read-only S3 checks to preview upload/overwrite/skip/remove
     decisions.
+  - [x] Use the same decision helpers as apply for asset sync, output upload,
+    and remote-master deletion safety.
 - [x] `mkpod plan feed`
   - [x] Load the podcast spec.
   - [x] Preview feed path and local feed state.
@@ -266,6 +268,8 @@ Initial workflow slices:
     mkpod has today.
   - [x] Preserve remote-master deletion safety checks.
   - [x] Preserve prompts where decisions remain interactive.
+  - [x] Execute asset sync, output upload, and remote-master deletion through
+    the shared workflow decision helpers.
 
 Longer-term direction:
 

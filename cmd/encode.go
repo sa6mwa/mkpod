@@ -25,7 +25,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"time"
 
@@ -130,45 +129,27 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 
 	postEncodeFunc := func(atom *model.Podcast, episode *model.Episode, wasEncoded bool) error {
 		if options.RemoveRemoteMaster && episode.Input != "" {
-			localMasterPath := path.Join(atom.LocalStorageDirExpanded(), episode.Input)
-			bucket := atom.Config.Aws.Buckets.Input
-			key := episode.Input
-
-			localStat, err := os.Stat(localMasterPath)
-			if err != nil && !os.IsNotExist(err) {
-				l.Warn("Failed to check local master file", "error", err, "file", localMasterPath)
-			} else {
-				remoteInfo, err := storageClient.GetFileInfo(ctx, bucket, key)
-				if err != nil {
-					l.Warn("Failed to get remote master file info", "error", err, "file", episode.Input)
-				} else {
-					decision := s3store.EvaluateRemoteMasterRemoval(err == nil, fileSize(localStat), remoteInfo.Exists, remoteInfo.Size)
-					switch decision.Reason {
-					case s3store.RemovalLocalMissing:
-						l.Warn("Skipping remote master removal: local master file does not exist", "localFile", localMasterPath, "remoteFile", episode.Input)
-					case s3store.RemovalRemoteMissing:
-						l.Info("Remote master file does not exist, nothing to remove", "file", episode.Input)
-					case s3store.RemovalLocalTooSmall:
-						l.Warn("Skipping remote master removal: local file is too small compared to remote", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize, "minRequired", decision.MinRequiredSize)
-					case s3store.RemovalAllowed:
-						l.Info("Safety checks passed for remote master removal", "localFile", localMasterPath, "localSize", decision.LocalSize, "remoteSize", decision.RemoteSize)
-						if err := storageClient.DeleteRemoteFile(ctx, bucket, key); err != nil {
-							l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
-						}
-					}
+			operation, err := decideRemoteMasterRemoval(ctx, atom, episode, storageClient)
+			if err != nil {
+				l.Warn("Failed to get remote master removal decision", "error", err, "file", episode.Input)
+			} else if operation.SafetyStatus == string(s3store.RemovalAllowed) {
+				l.Info("Safety checks passed for remote master removal", "localFile", operation.LocalPath, "localSize", operation.LocalSize, "remoteSize", operation.RemoteSize)
+				if err := storageClient.DeleteRemoteFile(ctx, operation.Bucket, operation.Key); err != nil {
+					l.Warn("Failed to remove remote master file", "error", err, "file", episode.Input)
 				}
+			} else {
+				l.Warn("Skipping remote master removal", "file", episode.Input, "reason", operation.Reason)
 			}
 		}
 
 		if episode.Output != "" {
-			shouldUpload, err := checkForMissingOutputFile(ctx, atom, episode, prompter, storageClient, wasEncoded)
+			operation, err := decideOutputUpload(ctx, atom, episode, storageClient, wasEncoded)
 			if err != nil {
 				return fmt.Errorf("failed to check for missing output file: %w", err)
 			}
 
-			if shouldUpload {
-				localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
-				return storageClient.UploadFile(ctx, atom.Config.Aws.Buckets.Output, episode.Output, localPath, nil)
+			if operation.Kind == "upload-output" && prompter.Ask(ctx, promptForOutputUpload(operation), episode.Output) {
+				return storageClient.UploadFile(ctx, operation.Bucket, operation.Key, operation.LocalPath, nil)
 			}
 		}
 		return nil
@@ -235,38 +216,22 @@ func checkForMissingOutputFile(ctx context.Context, atom *model.Podcast, episode
 }, storageClient interface {
 	FileExists(context.Context, string, string) (bool, error)
 }, wasEncoded bool) (bool, error) {
-	l := logger.FromContext(ctx)
-
-	// Build full local path
-	localPath := path.Join(atom.LocalStorageDirExpanded(), episode.Output)
-
-	// Check if local file exists
-	if _, err := os.Stat(localPath); os.IsNotExist(err) {
-		return false, nil // No local file, nothing to upload
-	} else if err != nil {
-		return false, fmt.Errorf("failed to access local encoded file %s: %w", localPath, err)
+	operation, err := decideOutputUpload(ctx, atom, episode, storageClient, wasEncoded)
+	if err != nil {
+		return false, err
 	}
-
-	// Check if remote file exists
-	if storageClient != nil {
-		bucket := atom.Config.Aws.Buckets.Output
-		key := episode.Output
-		exists, err := storageClient.FileExists(ctx, bucket, key)
-		if err != nil {
-			return false, fmt.Errorf("failed to check remote output %s in bucket %s: %w", key, bucket, err)
-		}
-
-		if !exists {
-			l.Info("Local output file exists but is missing from output bucket", "file", episode.Output, "localPath", localPath)
-			return askerAdapter.Ask(ctx, "Upload local file %s to output bucket?", episode.Output), nil
-		} else if wasEncoded {
-			// File exists remotely but was just re-encoded locally, ask if we should overwrite
-			l.Info("Output file was re-encoded and remote file exists", "file", episode.Output)
-			return askerAdapter.Ask(ctx, "Overwrite remote file %s with newly encoded version?", episode.Output), nil
-		}
+	if operation.Kind != "upload-output" {
+		return false, nil
 	}
+	logger.FromContext(ctx).Info(operation.Reason, "file", episode.Output, "localPath", operation.LocalPath)
+	return askerAdapter.Ask(ctx, promptForOutputUpload(operation), episode.Output), nil
+}
 
-	return false, nil
+func promptForOutputUpload(operation episodeWorkflowOperation) string {
+	if operation.RemoteExists == "true" {
+		return "Overwrite remote file %s with newly encoded version?"
+	}
+	return "Upload local file %s to output bucket?"
 }
 
 func init() {

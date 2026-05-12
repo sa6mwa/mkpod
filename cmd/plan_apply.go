@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/blenderaddon"
 	"github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/media/encode"
@@ -221,28 +222,30 @@ var applyFeedCmd = &cobra.Command{
 }
 
 type episodeWorkflowPlan struct {
-	UID               int64
-	Title             string
-	Input             string
-	InputPath         string
-	InputContentType  string
-	Output            string
-	OutputPath        string
-	OutputExists      bool
-	WillEncode        bool
-	EncodeReason      string
-	EncodeMode        string
-	PreferredFormat   string
-	EpisodeFormat     string
-	MetadataWillWrite bool
-	FeedFile          string
-	FeedPath          string
-	FeedExists        bool
-	RSSReady          bool
-	RSSMissingFields  []string
-	RemotePreview     bool
-	RemoteOutput      remoteObjectPlan
-	RemoteFeed        remoteObjectPlan
+	UID                int64
+	Title              string
+	RemoveRemoteMaster bool
+	Input              string
+	InputPath          string
+	InputContentType   string
+	Output             string
+	OutputPath         string
+	OutputExists       bool
+	WillEncode         bool
+	EncodeReason       string
+	EncodeMode         string
+	PreferredFormat    string
+	EpisodeFormat      string
+	MetadataWillWrite  bool
+	FeedFile           string
+	FeedPath           string
+	FeedExists         bool
+	RSSReady           bool
+	RSSMissingFields   []string
+	RemotePreview      bool
+	RemoteOutput       remoteObjectPlan
+	RemoteFeed         remoteObjectPlan
+	Operations         []episodeWorkflowOperation
 }
 
 type feedWorkflowPlan struct {
@@ -450,6 +453,10 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	if err != nil {
 		return nil, err
 	}
+	removeRemoteMaster, err := cmd.Flags().GetBool("remove-remote-master")
+	if err != nil {
+		return nil, err
+	}
 	uid, err := strconv.ParseInt(uidString, 10, 64)
 	if err != nil {
 		return nil, err
@@ -511,26 +518,27 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	}
 
 	plan := &episodeWorkflowPlan{
-		UID:               uid,
-		Title:             episode.Title,
-		Input:             episode.Input,
-		InputPath:         inputPath,
-		InputContentType:  inputContentType,
-		Output:            encodingPlan.Output,
-		OutputPath:        outputPath,
-		OutputExists:      outputExists,
-		WillEncode:        willEncode,
-		EncodeReason:      encodeReason,
-		EncodeMode:        encodingPlan.Mode,
-		PreferredFormat:   encodingPlan.Preferred,
-		EpisodeFormat:     encodingPlan.EpisodeFormat,
-		MetadataWillWrite: strings.TrimSpace(episode.Output) != encodingPlan.Output,
-		FeedFile:          atom.FeedFile,
-		FeedPath:          feedPath,
-		FeedExists:        feedExists,
-		RSSReady:          len(rssMissing) == 0,
-		RSSMissingFields:  rssMissing,
-		RemotePreview:     remotePreview,
+		UID:                uid,
+		Title:              episode.Title,
+		RemoveRemoteMaster: removeRemoteMaster,
+		Input:              episode.Input,
+		InputPath:          inputPath,
+		InputContentType:   inputContentType,
+		Output:             encodingPlan.Output,
+		OutputPath:         outputPath,
+		OutputExists:       outputExists,
+		WillEncode:         willEncode,
+		EncodeReason:       encodeReason,
+		EncodeMode:         encodingPlan.Mode,
+		PreferredFormat:    encodingPlan.Preferred,
+		EpisodeFormat:      encodingPlan.EpisodeFormat,
+		MetadataWillWrite:  strings.TrimSpace(episode.Output) != encodingPlan.Output,
+		FeedFile:           atom.FeedFile,
+		FeedPath:           feedPath,
+		FeedExists:         feedExists,
+		RSSReady:           len(rssMissing) == 0,
+		RSSMissingFields:   rssMissing,
+		RemotePreview:      remotePreview,
 		RemoteOutput: remoteObjectPlan{
 			Bucket: atom.Config.Aws.Buckets.Output,
 			Key:    encodingPlan.Output,
@@ -546,8 +554,49 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 		storageClient := s3store.New(atom, prompt.New(true, false))
 		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteOutput)
 		fillRemoteObjectPlan(ctx, storageClient, &plan.RemoteFeed)
+		operations, err := planEpisodeOperations(ctx, atom, &plannedEpisode, storageClient, outputExists, willEncode, removeRemoteMaster)
+		if err != nil {
+			return nil, err
+		}
+		plan.Operations = operations
 	}
 	return plan, nil
+}
+
+func planEpisodeOperations(ctx context.Context, atom *model.Podcast, episode *model.Episode, storageClient interface {
+	assetInfoClient
+	outputExistenceClient
+	remoteMasterInfoClient
+}, outputExists, willEncode, removeRemoteMaster bool) ([]episodeWorkflowOperation, error) {
+	operations := make([]episodeWorkflowOperation, 0, 5)
+	buckets := []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}
+	for _, asset := range []struct {
+		key   string
+		label string
+	}{
+		{key: episode.Input, label: fmt.Sprintf("episode %d input", episode.UID)},
+		{key: atom.Encoding.Coverfront, label: "cover image"},
+		{key: spec.EffectiveEpisodeImage(atom, episode), label: fmt.Sprintf("episode %d image", episode.UID)},
+	} {
+		operation, err := decideLocalAssetSync(ctx, atom, storageClient, buckets, asset.key, asset.label)
+		if err != nil {
+			return nil, err
+		}
+		operations = append(operations, operation)
+	}
+	outputOperation, err := decidePlannedOutputUpload(ctx, atom, episode, storageClient, outputExists, willEncode)
+	if err != nil {
+		return nil, err
+	}
+	operations = append(operations, outputOperation)
+	if removeRemoteMaster {
+		operation, err := decideRemoteMasterRemoval(ctx, atom, episode, storageClient)
+		if err != nil {
+			return nil, err
+		}
+		operations = append(operations, operation)
+	}
+	return operations, nil
 }
 
 func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*feedWorkflowPlan, error) {
@@ -688,6 +737,24 @@ func printEpisodePlan(plan *episodeWorkflowPlan) {
 	fmt.Printf("Remote preview: %t\n", plan.RemotePreview)
 	printRemoteObjectPlan("Remote output", plan.RemoteOutput)
 	printRemoteObjectPlan("Remote feed", plan.RemoteFeed)
+	if len(plan.Operations) > 0 {
+		fmt.Println("Operations:")
+		for _, operation := range plan.Operations {
+			fmt.Printf("- %s: %s\n", operation.Kind, operation.Reason)
+			if operation.Bucket != "" && operation.Key != "" {
+				fmt.Printf("  Remote: s3://%s/%s\n", operation.Bucket, operation.Key)
+			}
+			if operation.LocalPath != "" {
+				fmt.Printf("  Local: %s\n", operation.LocalPath)
+			}
+			if operation.RequiresPrompt {
+				fmt.Println("  Prompt: required")
+			}
+			if operation.SafetyStatus != "" {
+				fmt.Printf("  Safety: %s\n", operation.SafetyStatus)
+			}
+		}
+	}
 }
 
 func printFeedPlan(plan *feedWorkflowPlan) {
@@ -736,6 +803,7 @@ func init() {
 
 	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	planEpisodeCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for planned remote objects")
+	planEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Preview remote input master removal after safety checks")
 	addPlanOutputFlag(planEpisodeCmd)
 	applyEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
 	applyEpisodeCmd.Flags().BoolP("force", "f", false, "Do not prompt when applying the episode workflow")

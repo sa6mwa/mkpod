@@ -83,6 +83,7 @@ $ mkpod apply --from blender.plan.json
 
 # Encode a single episode selected by the uid field in podspec.yaml
 $ mkpod plan episode 16
+$ mkpod plan episode 16 --remote --remove-remote-master
 $ mkpod apply episode 16
 
 # Parse and upload podcast.rss

@@ -55,38 +55,17 @@ func normalizeStorageKey(atom *model.Podcast, raw string) string {
 }
 
 func syncLocalAssetFromBuckets(ctx context.Context, atom *model.Podcast, client assetInfoClient, buckets []string, key, label string) error {
-	key = normalizeStorageKey(atom, key)
-	if key == "" {
+	operation, err := decideLocalAssetSync(ctx, atom, client, buckets, key, label)
+	if err != nil {
+		return err
+	}
+	if operation.Kind != "download-asset" {
 		return nil
 	}
-	localPath := localAssetPath(atom, key)
-	if _, err := os.Stat(localPath); err == nil {
-		return nil
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("failed to access local %s %s: %w", label, localPath, err)
+	if err := client.DownloadFile(ctx, operation.Bucket, operation.Key); err != nil {
+		return fmt.Errorf("failed to download remote %s %s from bucket %s: %w", label, operation.Key, operation.Bucket, err)
 	}
-	if client == nil {
-		return fmt.Errorf("missing local %s %s and no remote storage client is configured", label, localPath)
-	}
-
-	for _, bucket := range buckets {
-		bucket = strings.TrimSpace(bucket)
-		if bucket == "" {
-			continue
-		}
-		info, err := client.GetFileInfo(ctx, bucket, key)
-		if err != nil {
-			return fmt.Errorf("failed to check remote %s %s in bucket %s: %w", label, key, bucket, err)
-		}
-		if info != nil && info.Exists {
-			if err := client.DownloadFile(ctx, bucket, key); err != nil {
-				return fmt.Errorf("failed to download remote %s %s from bucket %s: %w", label, key, bucket, err)
-			}
-			return nil
-		}
-	}
-
-	return fmt.Errorf("missing %s %s locally and in configured S3 buckets", label, key)
+	return nil
 }
 
 func collectReferencedImages(atom *model.Podcast) []referencedImage {
