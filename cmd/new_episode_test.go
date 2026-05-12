@@ -2,13 +2,18 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/creack/pty"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/spec"
 )
@@ -32,6 +37,9 @@ func TestDefaultNewEpisodeInputsUsePreviousEpisodeTemplate(t *testing.T) {
 	}
 	if defaults.Author != "Previous Author" {
 		t.Fatalf("Author = %q, want previous author", defaults.Author)
+	}
+	if defaults.InheritedAuthor != "Host" {
+		t.Fatalf("InheritedAuthor = %q, want podcast author", defaults.InheritedAuthor)
 	}
 	if defaults.Image != "artwork/previous.jpg" {
 		t.Fatalf("Image = %q, want previous image", defaults.Image)
@@ -184,6 +192,133 @@ func TestNewEpisodeTUITitleBarSpansBodyWidth(t *testing.T) {
 	screenLine := strings.Split(tui.View(), "\n")[0]
 	if got, want := ansi.StringWidth(screenLine), 80; got != want {
 		t.Fatalf("screen title line width = %d, want %d", got, want)
+	}
+}
+
+func TestNewEpisodeTUIRespondsToDetachedPTYResize(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestNewEpisodeTUIResizePTYHelper$")
+	cmd.Env = append(os.Environ(), "MKPOD_TUI_RESIZE_HELPER=1")
+	tty, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 24, Cols: 60})
+	if err != nil {
+		t.Fatalf("start detached pty helper: %v", err)
+	}
+	defer tty.Close()
+
+	resized := make(chan error, 1)
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		resized <- pty.Setsize(tty, &pty.Winsize{Rows: 24, Cols: 90})
+	}()
+
+	output, readErr := io.ReadAll(tty)
+	if err := <-resized; err != nil {
+		t.Fatalf("resize detached pty: %v", err)
+	}
+	waitErr := cmd.Wait()
+	if ctx.Err() != nil {
+		t.Fatalf("detached pty helper timed out; output:\n%s", string(output))
+	}
+	if readErr != nil && !strings.Contains(readErr.Error(), "input/output") {
+		t.Fatalf("read detached pty output: %v", readErr)
+	}
+	if waitErr != nil {
+		t.Fatalf("detached pty helper failed: %v\noutput:\n%s", waitErr, string(output))
+	}
+	out := string(output)
+	if !strings.Contains(out, "FINAL_WIDTH=90") {
+		t.Fatalf("detached pty resize did not reach TUI model; output:\n%s", out)
+	}
+	if !strings.Contains(out, "TITLE_WIDTH=90") {
+		t.Fatalf("title bar did not adapt to resized pty width; output:\n%s", out)
+	}
+}
+
+type newEpisodeResizeProbe struct {
+	inner newEpisodeTUIModel
+}
+
+func (m newEpisodeResizeProbe) Init() tea.Cmd {
+	return m.inner.Init()
+}
+
+func (m newEpisodeResizeProbe) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	model, cmd := m.inner.Update(msg)
+	if updated, ok := model.(newEpisodeTUIModel); ok {
+		m.inner = updated
+	}
+	if size, ok := msg.(tea.WindowSizeMsg); ok && size.Width >= 90 {
+		return m, tea.Quit
+	}
+	return m, cmd
+}
+
+func (m newEpisodeResizeProbe) View() string {
+	return m.inner.View()
+}
+
+func TestNewEpisodeTUIResizePTYHelper(t *testing.T) {
+	if os.Getenv("MKPOD_TUI_RESIZE_HELPER") != "1" {
+		t.Skip("helper only runs as a detached PTY child")
+	}
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	program := tea.NewProgram(
+		newEpisodeResizeProbe{inner: newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))},
+		tea.WithAltScreen(),
+		tea.WithInput(os.Stdin),
+		tea.WithOutput(os.Stdout),
+	)
+	finalModel, err := program.Run()
+	if err != nil {
+		t.Fatalf("run resize helper tui: %v", err)
+	}
+	result, ok := finalModel.(newEpisodeResizeProbe)
+	if !ok {
+		t.Fatalf("resize helper returned unexpected model %T", finalModel)
+	}
+	fmt.Fprintf(os.Stdout, "\nFINAL_WIDTH=%d\nTITLE_WIDTH=%d\n", result.inner.width, ansi.StringWidth(result.inner.formLines()[0]))
+}
+
+func TestNewEpisodeTUIDescriptionBoxSpansContentWidth(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+
+	lines := strings.Split(tui.View(), "\n")
+	descriptionLine := -1
+	for i, line := range lines {
+		if strings.Contains(line, "Description") {
+			descriptionLine = i
+			break
+		}
+	}
+	if descriptionLine < 0 || descriptionLine+3 >= len(lines) {
+		t.Fatalf("description block not found in view: %q", tui.View())
+	}
+	for _, idx := range []int{descriptionLine + 1, descriptionLine + 2, descriptionLine + 3} {
+		line := lines[idx]
+		if got, want := ansi.StringWidth(line), 80; got != want {
+			t.Fatalf("description line %d width = %d, want %d: %q", idx, got, want, line)
+		}
+		if !strings.HasPrefix(line, " ") {
+			t.Fatalf("description line %d missing left screen margin: %q", idx, line)
+		}
+		if strings.HasPrefix(line, "  ") {
+			t.Fatalf("description line %d has more than one left margin: %q", idx, line)
+		}
+		trimmedRight := strings.TrimRight(line, " ")
+		if ansi.StringWidth(trimmedRight) < 79 {
+			t.Fatalf("description line %d does not reach right screen margin: visual width %d line %q", idx, ansi.StringWidth(trimmedRight), line)
+		}
 	}
 }
 

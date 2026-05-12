@@ -195,9 +195,9 @@ func newEpisodeInputsFromFlags(cmd *cobra.Command) (newEpisodeInputs, error) {
 
 func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInputs {
 	defaults := newEpisodeInputs{SpecFile: specFile}
+	defaults.InheritedAuthor = atom.Author
 	if len(atom.Episodes) == 0 {
 		defaults.UID = "1"
-		defaults.InheritedAuthor = atom.Author
 		defaults.Image = atom.Config.DefaultPodImage
 		defaults.InheritedEncodingLanguage = atom.Encoding.Language
 		return defaults
@@ -211,8 +211,6 @@ func defaultNewEpisodeInputs(atom *model.Podcast, specFile string) newEpisodeInp
 	defaults.UID = strconv.FormatInt(previous.UID+1, 10)
 	if strings.TrimSpace(previous.Author) != "" {
 		defaults.Author = previous.Author
-	} else {
-		defaults.InheritedAuthor = atom.Author
 	}
 	defaults.Image = spec.EffectiveEpisodeImage(atom, &previous)
 	defaults.Format = previous.Format

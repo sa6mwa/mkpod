@@ -257,7 +257,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 		"",
 		m.renderTopFields(bodyWidth),
 		"",
-		m.renderDescription(bodyWidth),
+		m.renderDescription(m.contentWidth()),
 	)
 	if m.message != "" {
 		lines = append(lines, m.errorStyle.Render(m.message))
@@ -298,7 +298,7 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 	m.fields[newEpisodeFieldImage].Width = fullInputWidth
 	m.fields[newEpisodeFieldInput].Width = fullInputWidth
 	m.fields[newEpisodeFieldChapters].Width = fullInputWidth
-	m.desc.SetWidth(fullWidth)
+	m.desc.SetWidth(maxInt(20, m.contentWidth()-4))
 
 	topHeight := lipgloss.Height(m.renderTopFields(bodyWidth))
 	const outerPaddingRows = 0
@@ -418,7 +418,7 @@ func (m newEpisodeTUIModel) renderDescription(width int) string {
 	if m.focus == newEpisodeFieldDescription {
 		labelStyle = m.focusedStyle.Bold(true)
 	}
-	return labelStyle.Render(label) + "\n" + m.descriptionStyle.Width(width-2).Render(m.desc.View())
+	return labelStyle.Render(label) + "\n" + m.descriptionStyle.Width(maxInt(1, width-2)).Render(m.desc.View())
 }
 
 func (m newEpisodeTUIModel) helpText() string {
@@ -570,7 +570,6 @@ func (m newEpisodeTUIModel) fieldVisualRow(field int) int {
 func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 	contentWidth := m.contentWidth()
 	height := maxInt(1, m.height)
-	style := lipgloss.NewStyle().Width(contentWidth)
 	content := strings.Join(lines, "\n")
 	plainLines := strings.Split(content, "\n")
 	if len(plainLines) > height {
@@ -595,17 +594,17 @@ func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 			plainLines[i] = " " + line + " "
 			continue
 		}
-		line = ansi.Truncate(line, contentWidth-2, "")
-		if pad := contentWidth - 2 - ansi.StringWidth(line); pad > 0 {
+		line = ansi.Truncate(line, contentWidth, "")
+		if pad := contentWidth - ansi.StringWidth(line); pad > 0 {
 			line += strings.Repeat(" ", pad)
 		}
-		plainLines[i] = " " + style.Render(line) + " "
+		plainLines[i] = " " + line + " "
 	}
 	return strings.Join(plainLines, "\n")
 }
 
 func (m newEpisodeTUIModel) bodyWidth() int {
-	return clampInt(m.contentWidth()-2, 64, 118)
+	return clampInt(m.contentWidth(), 64, 118)
 }
 
 func (m newEpisodeTUIModel) contentWidth() int {

@@ -17,6 +17,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/log v1.0.0
 	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/creack/pty v1.1.24
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/gomarkdown/markdown v0.0.0-20260417124207-7d523f7318df
 	github.com/hexops/gotextdiff v1.0.3
