@@ -13,11 +13,12 @@ does not contain credentials).
 The main commands are:
 
 - `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
-- `mkpod plan preprocess` / `mkpod apply preprocess` for optional raw audio cleanup before editing
-- `mkpod plan blender` / `mkpod apply blender` to install the embedded Blender marker exporter
-- `mkpod new` / `mkpod plan new` to prepare a new episode entry
-- `mkpod plan episode` / `mkpod apply episode` to encode an edited master into an episode artifact
-- `mkpod plan feed` / `mkpod apply feed` to generate and optionally upload `podcast.rss`
+- `mkpod preprocess` for optional raw audio cleanup before editing
+- `mkpod new` to prepare a saved new episode plan
+- `mkpod edit <plan.json>` or `mkpod new --edit <plan.json>` to revise a saved new episode plan
+- `mkpod inspect <plan.json>` to inspect a saved plan
+- `mkpod apply <plan.json>` to apply a saved plan locally
+- `mkpod publish` to publish the generated feed and referenced assets
 
 See [docs/architecture.md](docs/architecture.md) for the current simplified
 package and boundary layout.
@@ -45,14 +46,17 @@ the behavior in the S3 layer, but does not expose storage-class controls
 as part of the main CLI workflow.
 
 mkpod uses saved plan files for guided changes. `mkpod new` prepares a
-`new.plan.json` artifact next to the selected spec file. `mkpod inspect`
-shows what is in a saved plan, and `mkpod apply <plan.json>` applies it.
-Applying a new episode plan updates `podspec.yaml`, encodes the episode
-locally, and regenerates the local RSS file. Publishing remains an explicit
-step with `mkpod publish`.
+`new.plan.json` artifact next to the selected spec file. `mkpod edit
+<plan.json>` and `mkpod new --edit <plan.json>` reopen that saved new episode
+plan and save the revised JSON back to the same path unless `--out` is set.
+`mkpod inspect` shows what is in a saved plan, and `mkpod apply <plan.json>`
+applies it. Applying a new episode plan updates `podspec.yaml`, encodes the
+episode locally, and regenerates the local RSS file. Publishing remains an
+explicit step with `mkpod publish`.
 
 ```console
 $ mkpod new --non-interactive --title "Episode" --link https://example.com/episode --subtitle "Subtitle" --description "Description" --input masters/episode.flac
+$ mkpod edit new.plan.json
 $ mkpod inspect new.plan.json
 $ mkpod apply new.plan.json
 $ mkpod publish
@@ -71,6 +75,7 @@ Generate and encode podcasts and publish to a cloud object store
 
 $ mkpod init --help
 $ mkpod new --help
+$ mkpod edit --help
 $ mkpod inspect --help
 $ mkpod apply --help
 
@@ -79,6 +84,7 @@ $ mkpod preprocess MIC1.WAV
 
 # Prepare a new episode entry
 $ mkpod new
+$ mkpod edit new.plan.json
 $ mkpod inspect new.plan.json
 $ mkpod apply new.plan.json
 

@@ -64,6 +64,16 @@ func TestCLICommands(t *testing.T) {
 			expected: "Inspect a saved mkpod workflow plan",
 		},
 		{
+			name:     "edit help",
+			args:     []string{"edit", "--help"},
+			expected: "Edit a saved new episode plan",
+		},
+		{
+			name:     "new help includes edit flag",
+			args:     []string{"new", "--help"},
+			expected: "--edit",
+		},
+		{
 			name:     "apply help",
 			args:     []string{"apply", "--help"},
 			expected: "Apply a saved mkpod workflow plan",

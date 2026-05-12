@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -26,7 +27,8 @@ var newCmd = &cobra.Command{
 	Short: "Plan a new podcast episode",
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
-		plan, err := buildNewEpisodePlan(context.Background(), cmd, args)
+		editPath := mustGetStringFlag(cmd, "edit")
+		plan, planPath, err := buildAndWriteNewEpisodePlan(context.Background(), cmd, args, editPath)
 		if err != nil {
 			if errors.Is(err, errNewEpisodeFormCancelled) {
 				os.Exit(130)
@@ -35,9 +37,31 @@ var newCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		printNewEpisodePlan(plan)
-		specFile := mustGetStringFlag(cmd, "spec")
-		planPath := writePlan(cmd, "new", plan, defaultPlanPath("new", specFile))
-		printNewEpisodeApplyHint(planPath, specFile)
+		printNewEpisodeApplyHint(planPath)
+	},
+}
+
+var editCmd = &cobra.Command{
+	Use:   "edit <plan.json>",
+	Short: "Edit a saved new episode plan",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("provide exactly one saved new episode plan JSON file")
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		l := logger.DefaultLogger()
+		plan, planPath, err := buildAndWriteNewEpisodePlan(context.Background(), cmd, nil, args[0])
+		if err != nil {
+			if errors.Is(err, errNewEpisodeFormCancelled) {
+				os.Exit(130)
+			}
+			l.Error("Unable to edit new episode plan", "error", err)
+			os.Exit(1)
+		}
+		printNewEpisodePlan(plan)
+		printNewEpisodeApplyHint(planPath)
 	},
 }
 
@@ -46,7 +70,7 @@ var planNewCmd = &cobra.Command{
 	Short: "Preview adding a new podcast episode",
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
-		plan, err := buildNewEpisodePlan(context.Background(), cmd, args)
+		plan, err := buildNewEpisodePlan(context.Background(), cmd, args, "")
 		if err != nil {
 			if errors.Is(err, errNewEpisodeFormCancelled) {
 				os.Exit(130)
@@ -57,7 +81,7 @@ var planNewCmd = &cobra.Command{
 		printNewEpisodePlan(plan)
 		specFile := mustGetStringFlag(cmd, "spec")
 		planPath := writePlan(cmd, "new", plan, defaultPlanPath("new", specFile))
-		printNewEpisodeApplyHint(planPath, specFile)
+		printNewEpisodeApplyHint(planPath)
 	},
 }
 
@@ -83,21 +107,31 @@ type newEpisodeInputs struct {
 	InheritedEncodingLanguage string
 	InheritedAuthor           string
 	Chapters                  string
+	ExistingChapters          []id3v24.Chapter
 }
 
 type blenderChaptersFile struct {
 	Chapters []id3v24.Chapter `yaml:"chapters"`
 }
 
-func printNewEpisodeApplyHint(planPath, specFile string) {
-	if planPath == defaultPlanPath("new", specFile) {
-		fmt.Printf("Apply with: mkpod apply %s\n", shellescape.Quote(planPath))
-		return
-	}
+func printNewEpisodeApplyHint(planPath string) {
 	fmt.Printf("Apply with: mkpod apply %s\n", shellescape.Quote(planPath))
 }
 
-func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string) (*newEpisodePlan, error) {
+func buildAndWriteNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string, editPath string) (*newEpisodePlan, string, error) {
+	plan, err := buildNewEpisodePlan(ctx, cmd, args, editPath)
+	if err != nil {
+		return nil, "", err
+	}
+	defaultPath := defaultPlanPath("new", plan.SpecFile)
+	if strings.TrimSpace(editPath) != "" {
+		defaultPath = editPath
+	}
+	planPath := writePlan(cmd, "new", plan, defaultPath)
+	return plan, planPath, nil
+}
+
+func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string, editPath string) (*newEpisodePlan, error) {
 	if len(args) > 0 {
 		return nil, fmt.Errorf("new does not take positional arguments")
 	}
@@ -105,19 +139,37 @@ func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string)
 	if err != nil {
 		return nil, err
 	}
-	atom, err := spec.New(inputs.SpecFile).Load(ctx)
-	if err != nil {
-		return nil, err
+	var defaults newEpisodeInputs
+	if strings.TrimSpace(editPath) != "" {
+		editPlan, err := loadSavedNewEpisodePlan(editPath)
+		if err != nil {
+			return nil, err
+		}
+		defaults = newEpisodeInputsFromPlan(editPlan)
+		if cmd.Flags().Lookup("spec") != nil && !cmd.Flags().Changed("spec") {
+			inputs.SpecFile = ""
+		}
+	} else {
+		atom, err := spec.New(inputs.SpecFile).Load(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defaults = defaultNewEpisodeInputs(atom, inputs.SpecFile)
 	}
-	defaults := defaultNewEpisodeInputs(atom, inputs.SpecFile)
-	mergeNewEpisodeInputs(&defaults, inputs)
 	if inputs.DescriptionFromClipboard {
 		description, err := readClipboardDescription()
 		if err != nil {
 			return nil, err
 		}
-		defaults.Description = description
+		inputs.Description = description
 	}
+	mergeNewEpisodeInputs(&defaults, inputs)
+	atom, err := spec.New(defaults.SpecFile).Load(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defaults.InheritedAuthor = atom.Author
+	defaults.InheritedEncodingLanguage = atom.Encoding.Language
 	interactive := !defaults.NonInteractive && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 	if interactive {
 		if err := runNewEpisodeForm(atom, &defaults); err != nil {
@@ -126,12 +178,50 @@ func buildNewEpisodePlan(ctx context.Context, cmd *cobra.Command, args []string)
 	} else {
 		defaults.NonInteractive = true
 	}
-	if defaults.NonInteractive {
+	if defaults.NonInteractive && strings.TrimSpace(editPath) == "" {
 		if err := validateNonInteractiveNewEpisodeFlags(inputs); err != nil {
 			return nil, err
 		}
 	}
 	return newEpisodePlanFromInputs(atom, defaults)
+}
+
+func loadSavedNewEpisodePlan(path string) (*newEpisodePlan, error) {
+	saved, err := loadSavedPlan(path)
+	if err != nil {
+		return nil, err
+	}
+	if saved.Workflow != "new" {
+		return nil, fmt.Errorf("saved plan workflow %q is not new", saved.Workflow)
+	}
+	var plan newEpisodePlan
+	if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(plan.SpecFile) == "" {
+		return nil, errors.New("stale or invalid new episode plan: specFile is required")
+	}
+	return &plan, nil
+}
+
+func newEpisodeInputsFromPlan(plan *newEpisodePlan) newEpisodeInputs {
+	episode := plan.Episode
+	return newEpisodeInputs{
+		SpecFile:         plan.SpecFile,
+		UID:              strconv.FormatInt(episode.UID, 10),
+		Author:           episode.Author,
+		Title:            episode.Title,
+		Link:             episode.Link,
+		Subtitle:         episode.Subtitle,
+		Description:      episode.Description,
+		Image:            episode.Image,
+		Input:            episode.Input,
+		Format:           episode.Format,
+		EncodingLanguage: episode.EncodingLanguage,
+		ExistingChapters: append([]id3v24.Chapter(nil), episode.Chapters...),
+		Chapters:         "",
+		NonInteractive:   false,
+	}
 }
 
 func newEpisodeInputsFromFlags(cmd *cobra.Command) (newEpisodeInputs, error) {
@@ -369,6 +459,8 @@ func newEpisodePlanFromInputs(atom *model.Podcast, inputs newEpisodeInputs) (*ne
 			return nil, err
 		}
 		episode.Chapters = chapters
+	} else if len(inputs.ExistingChapters) > 0 {
+		episode.Chapters = append([]id3v24.Chapter(nil), inputs.ExistingChapters...)
 	}
 	if err := validateNewEpisode(atom, &episode); err != nil {
 		return nil, err
@@ -560,11 +652,15 @@ func printNewEpisodePlan(plan *newEpisodePlan) {
 
 func init() {
 	rootCmd.AddCommand(newCmd)
+	rootCmd.AddCommand(editCmd)
 	planCmd.AddCommand(planNewCmd)
 	addNewEpisodeFlags(newCmd)
+	addNewEpisodeFlags(editCmd)
 	addNewEpisodeFlags(planNewCmd)
 	addPlanOutputFlag(newCmd)
+	addPlanOutputFlag(editCmd)
 	addPlanOutputFlag(planNewCmd)
+	newCmd.Flags().StringP("edit", "e", "", "Edit a saved new episode plan JSON file")
 }
 
 func addNewEpisodeFlags(cmd *cobra.Command) {

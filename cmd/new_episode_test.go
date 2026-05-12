@@ -16,8 +16,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/creack/pty"
+	"github.com/sa6mwa/id3v24"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/spec"
+	"github.com/spf13/cobra"
 )
 
 func TestDefaultNewEpisodeInputsUsePreviousEpisodeTemplate(t *testing.T) {
@@ -753,6 +755,96 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 	}
 	if _, err := os.Stat(atom.FeedFilePath()); err != nil {
 		t.Fatalf("generated RSS missing: %v", err)
+	}
+}
+
+func TestEditSavedNewEpisodePlanWritesBackToSamePath(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	planPath := filepath.Join(t.TempDir(), "new.post.json")
+	episode := episodeFixtureForNewPlan(2)
+	episode.Chapters = []id3v24.Chapter{{Title: "Intro", Start: "00:00:00.000"}}
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episode,
+	})
+
+	cmd := newTestNewEpisodeCommand(t)
+	mustSetFlag(t, cmd, "non-interactive", "true")
+	mustSetFlag(t, cmd, "title", "Edited Episode")
+
+	plan, out, err := buildAndWriteNewEpisodePlan(context.Background(), cmd, nil, planPath)
+	if err != nil {
+		t.Fatalf("buildAndWriteNewEpisodePlan() error = %v", err)
+	}
+	if out != planPath {
+		t.Fatalf("output path = %q, want edit path %q", out, planPath)
+	}
+	if plan.Episode.Title != "Edited Episode" {
+		t.Fatalf("plan title = %q, want edited title", plan.Episode.Title)
+	}
+
+	saved, err := loadSavedNewEpisodePlan(planPath)
+	if err != nil {
+		t.Fatalf("loadSavedNewEpisodePlan() error = %v", err)
+	}
+	if saved.Episode.Title != "Edited Episode" {
+		t.Fatalf("saved title = %q, want edited title", saved.Episode.Title)
+	}
+	if len(saved.Episode.Chapters) != 1 || saved.Episode.Chapters[0].Title != "Intro" {
+		t.Fatalf("saved chapters = %+v, want preserved chapter", saved.Episode.Chapters)
+	}
+}
+
+func TestEditSavedNewEpisodePlanCanWriteToOutPath(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	planPath := filepath.Join(t.TempDir(), "new.post.json")
+	outPath := filepath.Join(t.TempDir(), "edited.post.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	})
+
+	cmd := newTestNewEpisodeCommand(t)
+	mustSetFlag(t, cmd, "non-interactive", "true")
+	mustSetFlag(t, cmd, "out", outPath)
+	mustSetFlag(t, cmd, "subtitle", "Edited subtitle")
+
+	_, out, err := buildAndWriteNewEpisodePlan(context.Background(), cmd, nil, planPath)
+	if err != nil {
+		t.Fatalf("buildAndWriteNewEpisodePlan() error = %v", err)
+	}
+	if out != outPath {
+		t.Fatalf("output path = %q, want --out path %q", out, outPath)
+	}
+	original, err := loadSavedNewEpisodePlan(planPath)
+	if err != nil {
+		t.Fatalf("load original plan: %v", err)
+	}
+	if original.Episode.Subtitle == "Edited subtitle" {
+		t.Fatal("original plan was modified despite --out")
+	}
+	edited, err := loadSavedNewEpisodePlan(outPath)
+	if err != nil {
+		t.Fatalf("load edited plan: %v", err)
+	}
+	if edited.Episode.Subtitle != "Edited subtitle" {
+		t.Fatalf("edited subtitle = %q, want override", edited.Episode.Subtitle)
+	}
+}
+
+func newTestNewEpisodeCommand(t *testing.T) *cobra.Command {
+	t.Helper()
+	cmd := &cobra.Command{Use: "new"}
+	addNewEpisodeFlags(cmd)
+	addPlanOutputFlag(cmd)
+	cmd.Flags().StringP("edit", "e", "", "Edit a saved new episode plan JSON file")
+	return cmd
+}
+
+func mustSetFlag(t *testing.T, cmd *cobra.Command, name, value string) {
+	t.Helper()
+	if err := cmd.Flags().Set(name, value); err != nil {
+		t.Fatalf("set flag %s: %v", name, err)
 	}
 }
 
