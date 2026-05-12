@@ -286,9 +286,7 @@ func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
 			huh.NewInput().Title("Format").Description("Optional: mp3, m4a, m4b, audio, video").Value(&inputs.Format).Inline(true),
 			huh.NewInput().Title("Encoding language").Description(encodingLanguageDescription(inputs)).Placeholder(inputs.InheritedEncodingLanguage).Value(&inputs.EncodingLanguage).Inline(true),
 			huh.NewFilePicker().Title("Chapters file").CurrentDirectory(chaptersPickerDirectory(chapters)).Value(&inputs.Chapters).FileAllowed(true).DirAllowed(false),
-		),
-		huh.NewGroup(
-			huh.NewText().Title("Description").Value(&inputs.Description).Lines(18),
+			huh.NewText().Title("Description").Value(&inputs.Description).Lines(newEpisodeDescriptionLines()),
 		),
 	).WithTheme(huh.ThemeCharm()).WithProgramOptions(
 		tea.WithOutput(os.Stderr),
@@ -296,6 +294,22 @@ func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
 		tea.WithAltScreen(),
 	)
 	return form.Run()
+}
+
+func newEpisodeDescriptionLines() int {
+	_, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || height <= 0 {
+		_, height, err = term.GetSize(int(os.Stderr.Fd()))
+	}
+	if err != nil || height <= 0 {
+		return 18
+	}
+	const reservedFormRows = 32
+	lines := height - reservedFormRows
+	if lines < 8 {
+		return 8
+	}
+	return lines
 }
 
 func localStorageFilePicker(atom *model.Podcast, title, description, current string, value *string) *huh.FilePicker {
