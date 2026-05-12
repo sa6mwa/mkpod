@@ -402,6 +402,12 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 			DryRun:         false,
 			Upload:         plan.Upload,
 		})
+	case "new":
+		var plan newEpisodePlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		return applyNewEpisodePlan(ctx, &plan)
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {

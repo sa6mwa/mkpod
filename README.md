@@ -15,6 +15,7 @@ The main commands are:
 - `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
 - `mkpod plan preprocess` / `mkpod apply preprocess` for optional raw audio cleanup before editing
 - `mkpod plan blender` / `mkpod apply blender` to install the embedded Blender marker exporter
+- `mkpod new` / `mkpod plan new` to prepare a new episode entry
 - `mkpod plan episode` / `mkpod apply episode` to encode an edited master into an episode artifact
 - `mkpod plan feed` / `mkpod apply feed` to generate and optionally upload `podcast.rss`
 
@@ -58,6 +59,8 @@ $ mkpod plan blender
 $ mkpod apply --from blender.plan.json
 $ mkpod plan feed --upload
 $ mkpod apply --from feed.plan.json
+$ mkpod new --non-interactive --title "Episode" --link https://example.com/episode --subtitle "Subtitle" --description "Description" --input masters/episode.flac
+$ mkpod apply --from new.plan.json
 ```
 
 ## Quick Start
@@ -82,6 +85,10 @@ $ mkpod apply --from preprocess.plan.json
 # Install the Blender marker exporter
 $ mkpod plan blender
 $ mkpod apply --from blender.plan.json
+
+# Prepare a new episode entry
+$ mkpod new
+$ mkpod apply --from new.plan.json
 
 # Encode a single episode selected by the uid field in podspec.yaml
 $ mkpod plan episode 16

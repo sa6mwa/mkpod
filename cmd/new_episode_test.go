@@ -1,0 +1,154 @@
+package cmd
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/sa6mwa/mkpod/internal/app/model"
+	"github.com/sa6mwa/mkpod/internal/spec"
+)
+
+func TestDefaultNewEpisodeInputsUsePreviousEpisodeTemplate(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	atom.Episodes[0].Author = "Previous Author"
+	atom.Episodes[0].Image = "artwork/previous.jpg"
+	atom.Episodes[0].Input = "audiopod/masters/previous.flac"
+	atom.Episodes[0].Format = "m4a"
+	atom.Episodes[0].EncodingLanguage = "SWE"
+
+	defaults := defaultNewEpisodeInputs(atom, specFile)
+	if defaults.UID != "2" {
+		t.Fatalf("UID = %q, want 2", defaults.UID)
+	}
+	if defaults.Author != "Previous Author" {
+		t.Fatalf("Author = %q, want previous author", defaults.Author)
+	}
+	if defaults.Image != "artwork/previous.jpg" {
+		t.Fatalf("Image = %q, want previous image", defaults.Image)
+	}
+	if defaults.Input != "audiopod/masters/" {
+		t.Fatalf("Input = %q, want input directory", defaults.Input)
+	}
+	if defaults.Format != "m4a" || defaults.EncodingLanguage != "SWE" {
+		t.Fatalf("format/language = %q/%q, want m4a/SWE", defaults.Format, defaults.EncodingLanguage)
+	}
+}
+
+func TestNewEpisodePlanFromInputsParsesChapters(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	chaptersPath := filepath.Join(t.TempDir(), "chapters.yaml")
+	writeFile(t, chaptersPath, []byte("chapters:\n- title: Intro\n  start: \"00:00:00.000\"\n"))
+
+	plan, err := newEpisodePlanFromInputs(atom, newEpisodeInputs{
+		SpecFile:       specFile,
+		UID:            "2",
+		Title:          "New Episode",
+		Link:           "https://example.com/new",
+		Subtitle:       "New subtitle",
+		Description:    "New description",
+		Input:          "masters/new.wav",
+		Author:         "Host",
+		Image:          "artwork/cover.jpg",
+		Chapters:       chaptersPath,
+		NonInteractive: true,
+	})
+	if err != nil {
+		t.Fatalf("newEpisodePlanFromInputs() error = %v", err)
+	}
+	if len(plan.Episode.Chapters) != 1 || plan.Episode.Chapters[0].Title != "Intro" {
+		t.Fatalf("Chapters = %+v, want parsed chapter", plan.Episode.Chapters)
+	}
+}
+
+func TestValidateNonInteractiveNewEpisodeFlagsRequiresContentFields(t *testing.T) {
+	err := validateNonInteractiveNewEpisodeFlags(newEpisodeInputs{Title: "Title"})
+	if err == nil {
+		t.Fatal("validateNonInteractiveNewEpisodeFlags() error = nil, want missing flags")
+	}
+	for _, field := range []string{"link", "subtitle", "description", "input"} {
+		if !strings.Contains(err.Error(), field) {
+			t.Fatalf("error %q missing field %q", err.Error(), field)
+		}
+	}
+}
+
+func TestApplyNewEpisodePlanAppendsToSpec(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+
+	if err := applyNewEpisodePlan(context.Background(), plan); err != nil {
+		t.Fatalf("applyNewEpisodePlan() error = %v", err)
+	}
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if len(atom.Episodes) != 2 {
+		t.Fatalf("episodes = %d, want 2", len(atom.Episodes))
+	}
+	if atom.Episodes[0].UID != 2 || atom.Episodes[0].Title != "New Episode" {
+		t.Fatalf("first episode = %+v, want newly prepended episode", atom.Episodes[0])
+	}
+}
+
+func TestApplySavedNewEpisodePlan(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	planPath := filepath.Join(t.TempDir(), "new.plan.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	})
+
+	if err := applySavedPlan(context.Background(), planPath); err != nil {
+		t.Fatalf("applySavedPlan() error = %v", err)
+	}
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if atom.Episodes[0].UID != 2 {
+		t.Fatalf("first UID = %d, want 2", atom.Episodes[0].UID)
+	}
+}
+
+func episodeFixtureForNewPlan(uid int64) model.Episode {
+	return model.Episode{
+		UID:         uid,
+		Title:       "New Episode",
+		Link:        "https://example.com/new",
+		Subtitle:    "New subtitle",
+		Description: "New description",
+		Author:      "Host",
+		Image:       "artwork/cover.jpg",
+		Input:       "masters/new.wav",
+	}
+}
+
+func specStoreLoadForTest(t *testing.T, specFile string) (*model.Podcast, error) {
+	t.Helper()
+	return spec.New(specFile).Load(context.Background())
+}
+
+func TestLoadChaptersFileRejectsWrongShape(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chapters.yaml")
+	if err := os.WriteFile(path, []byte("notChapters: []\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", path, err)
+	}
+	if _, err := loadChaptersFile(path); err == nil {
+		t.Fatal("loadChaptersFile() error = nil, want wrong-shape error")
+	}
+}

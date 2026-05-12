@@ -30,6 +30,8 @@ pipeline.`,
 	Example: `  mkpod init ./podcast
   mkpod plan preprocess masters/raw.wav
   mkpod apply preprocess masters/raw.wav
+  mkpod new
+  mkpod apply --from new.plan.json
   mkpod plan episode --spec ./podcast/podspec.yaml 16
   mkpod apply episode --spec ./podcast/podspec.yaml 16
   mkpod plan feed --spec ./podcast/podspec.yaml

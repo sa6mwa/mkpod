@@ -274,6 +274,13 @@ Initial workflow slices:
   - [x] Preserve prompts where decisions remain interactive.
   - [x] Execute asset sync, output upload, and remote-master deletion through
     the shared workflow decision helpers.
+- [x] `mkpod new`
+  - [x] Use a `huh` form interactively.
+  - [x] Infer UID, author, image, format, encoding language, and input
+    directory from the previous episode where possible.
+  - [x] Support strict non-interactive flag-driven planning.
+  - [x] Decode Blender chapter YAML into the typed episode chapter model.
+  - [x] Apply the saved plan by appending the episode to `podspec.yaml`.
 
 Longer-term direction:
 
