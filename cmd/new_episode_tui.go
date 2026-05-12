@@ -44,6 +44,20 @@ var newEpisodeFieldLabels = []string{
 	"Description",
 }
 
+var newEpisodeFocusOrder = []int{
+	newEpisodeFieldUID,
+	newEpisodeFieldAuthor,
+	newEpisodeFieldTitle,
+	newEpisodeFieldSubtitle,
+	newEpisodeFieldLink,
+	newEpisodeFieldImage,
+	newEpisodeFieldInput,
+	newEpisodeFieldFormat,
+	newEpisodeFieldEncodingLanguage,
+	newEpisodeFieldChapters,
+	newEpisodeFieldDescription,
+}
+
 type newEpisodeTUIModel struct {
 	atom      *model.Podcast
 	inputs    newEpisodeInputs
@@ -286,19 +300,28 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 }
 
 func (m *newEpisodeTUIModel) focusNext() {
-	next := m.focus + 1
-	if next >= newEpisodeFieldCount {
-		next = 0
-	}
-	m.focusField(next)
+	m.focusField(newEpisodeAdjacentFocus(m.focus, 1))
 }
 
 func (m *newEpisodeTUIModel) focusPrev() {
-	prev := m.focus - 1
-	if prev < 0 {
-		prev = newEpisodeFieldCount - 1
+	m.focusField(newEpisodeAdjacentFocus(m.focus, -1))
+}
+
+func newEpisodeAdjacentFocus(current, delta int) int {
+	for i, field := range newEpisodeFocusOrder {
+		if field != current {
+			continue
+		}
+		next := i + delta
+		if next < 0 {
+			next = len(newEpisodeFocusOrder) - 1
+		}
+		if next >= len(newEpisodeFocusOrder) {
+			next = 0
+		}
+		return newEpisodeFocusOrder[next]
 	}
-	m.focusField(prev)
+	return newEpisodeFieldTitle
 }
 
 func (m *newEpisodeTUIModel) focusField(next int) {

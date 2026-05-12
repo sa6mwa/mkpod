@@ -201,6 +201,27 @@ func TestNewEpisodeTUIFieldOrderAndNoArrowFocus(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUITabFollowsVisualRowOrder(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.focusField(newEpisodeFieldUID)
+
+	model, _ := tui.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated := model.(newEpisodeTUIModel)
+	if updated.focus != newEpisodeFieldAuthor {
+		t.Fatalf("focus after uid tab = %d, want author", updated.focus)
+	}
+	model, _ = updated.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated = model.(newEpisodeTUIModel)
+	if updated.focus != newEpisodeFieldTitle {
+		t.Fatalf("focus after author tab = %d, want title", updated.focus)
+	}
+}
+
 func TestNewEpisodeTUITabDoesNotOpenFilePicker(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
