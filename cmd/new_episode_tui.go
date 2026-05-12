@@ -83,7 +83,6 @@ type newEpisodeTUIModel struct {
 	helpStyle        lipgloss.Style
 	errorStyle       lipgloss.Style
 	descriptionStyle lipgloss.Style
-	screenStyle      lipgloss.Style
 }
 
 func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
@@ -160,7 +159,6 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		helpStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
 		descriptionStyle: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
-		screenStyle:      lipgloss.NewStyle().Background(lipgloss.Color("0")),
 	}
 	m.focusField(m.focus)
 	m.resize(100, 32)
@@ -611,7 +609,7 @@ func (m newEpisodeTUIModel) renderScreenRow(line string) string {
 	if pad := m.width - ansi.StringWidth(line); pad > 0 {
 		line += strings.Repeat(" ", pad)
 	}
-	return m.screenStyle.Width(m.width).Render(line)
+	return line
 }
 
 func (m newEpisodeTUIModel) bodyWidth() int {
