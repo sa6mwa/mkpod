@@ -219,7 +219,7 @@ func (m newEpisodeTUIModel) View() string {
 		return ""
 	}
 	bodyWidth := clampInt(m.width-4, 60, 120)
-	outer := lipgloss.NewStyle().Width(m.width).Padding(1, 2)
+	outer := lipgloss.NewStyle().Width(m.width).Padding(0, 2)
 
 	var lines []string
 	lines = append(lines,
@@ -248,24 +248,37 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 		m.height = height
 	}
 	bodyWidth := clampInt(m.width-4, 60, 120)
-	inputWidth := maxInt(16, (bodyWidth/2)-22)
+	labelWidth := newEpisodeLabelWidth(bodyWidth)
+	inputWidth := maxInt(8, ((bodyWidth-6)/2)-labelWidth)
 	for i := range m.fields {
 		m.fields[i].Width = inputWidth
 	}
 	fullWidth := maxInt(20, bodyWidth-4)
-	m.fields[newEpisodeFieldTitle].Width = fullWidth
-	m.fields[newEpisodeFieldLink].Width = fullWidth
-	m.fields[newEpisodeFieldSubtitle].Width = fullWidth
-	m.fields[newEpisodeFieldAuthor].Width = fullWidth
-	m.fields[newEpisodeFieldImage].Width = fullWidth
-	m.fields[newEpisodeFieldInput].Width = fullWidth
-	m.fields[newEpisodeFieldChapters].Width = fullWidth
+	fullInputWidth := maxInt(8, fullWidth-labelWidth)
+	m.fields[newEpisodeFieldTitle].Width = fullInputWidth
+	m.fields[newEpisodeFieldLink].Width = fullInputWidth
+	m.fields[newEpisodeFieldSubtitle].Width = fullInputWidth
+	m.fields[newEpisodeFieldAuthor].Width = fullInputWidth
+	m.fields[newEpisodeFieldImage].Width = fullInputWidth
+	m.fields[newEpisodeFieldInput].Width = fullInputWidth
+	m.fields[newEpisodeFieldChapters].Width = fullInputWidth
 	m.desc.SetWidth(fullWidth)
 
-	const reservedRows = 24
-	descHeight := m.height - reservedRows
-	if descHeight < 6 {
-		descHeight = 6
+	topHeight := lipgloss.Height(m.renderTopFields(bodyWidth))
+	const outerPaddingRows = 0
+	const headerRows = 3
+	const descriptionChromeRows = 4
+	const helpRows = 1
+	fixedRows := outerPaddingRows + headerRows + topHeight + descriptionChromeRows + helpRows
+	if m.message != "" {
+		fixedRows++
+	}
+	if m.picking {
+		fixedRows += m.pickerHeight() + 4
+	}
+	descHeight := m.height - fixedRows
+	if descHeight < 3 {
+		descHeight = 3
 	}
 	m.desc.SetHeight(descHeight)
 }
@@ -309,24 +322,24 @@ func (m newEpisodeTUIModel) renderTopFields(width int) string {
 	right := lipgloss.NewStyle().Width(rightWidth)
 
 	rows := []string{
-		left.Render(m.renderInput(newEpisodeFieldUID)),
-		full.Render(m.renderInput(newEpisodeFieldTitle)),
-		full.Render(m.renderInput(newEpisodeFieldLink)),
-		full.Render(m.renderInput(newEpisodeFieldSubtitle)),
-		full.Render(m.renderInput(newEpisodeFieldAuthor)),
-		full.Render(m.renderInput(newEpisodeFieldImage)),
-		full.Render(m.renderInput(newEpisodeFieldInput)),
+		left.Render(m.renderInput(newEpisodeFieldUID, leftWidth)),
+		full.Render(m.renderInput(newEpisodeFieldTitle, width)),
+		full.Render(m.renderInput(newEpisodeFieldLink, width)),
+		full.Render(m.renderInput(newEpisodeFieldSubtitle, width)),
+		full.Render(m.renderInput(newEpisodeFieldAuthor, width)),
+		full.Render(m.renderInput(newEpisodeFieldImage, width)),
+		full.Render(m.renderInput(newEpisodeFieldInput, width)),
 		lipgloss.JoinHorizontal(lipgloss.Top,
-			left.Render(m.renderInput(newEpisodeFieldFormat)),
+			left.Render(m.renderInput(newEpisodeFieldFormat, leftWidth)),
 			"      ",
-			right.Render(m.renderInput(newEpisodeFieldEncodingLanguage)),
+			right.Render(m.renderInput(newEpisodeFieldEncodingLanguage, rightWidth)),
 		),
-		full.Render(m.renderInput(newEpisodeFieldChapters)),
+		full.Render(m.renderInput(newEpisodeFieldChapters, width)),
 	}
 	return strings.Join(rows, "\n\n")
 }
 
-func (m newEpisodeTUIModel) renderInput(field int) string {
+func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	label := newEpisodeFieldLabels[field]
 	if field == m.focus {
 		label = ">" + label
@@ -344,14 +357,29 @@ func (m newEpisodeTUIModel) renderInput(field int) string {
 	case newEpisodeFieldChapters:
 		note = " optional"
 	}
-	labelLine := m.labelStyle.Render(label) + m.helpStyle.Render(note)
+	labelText := label
+	if note != "" {
+		labelText += note
+	}
+	labelWidth := newEpisodeLabelWidth(width)
+	labelLine := m.labelStyle.Width(labelWidth).MaxWidth(labelWidth).Render(labelText)
 	value := m.fields[field].View()
 	if field == m.focus {
 		value = m.focusedStyle.Render(value)
 	} else {
 		value = m.blurredStyle.Render(value)
 	}
-	return labelLine + "\n" + value
+	return labelLine + value
+}
+
+func newEpisodeLabelWidth(rowWidth int) int {
+	if rowWidth < 52 {
+		return 18
+	}
+	if rowWidth < 80 {
+		return 24
+	}
+	return 34
 }
 
 func (m newEpisodeTUIModel) renderDescription(width int) string {

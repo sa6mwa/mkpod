@@ -165,6 +165,21 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIViewFitsTerminalHeight(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+
+	viewHeight := strings.Count(tui.View(), "\n") + 1
+	if viewHeight > 32 {
+		t.Fatalf("View() height = %d, want <= 32", viewHeight)
+	}
+}
+
 func TestNewEpisodeTUIPickerStartsInsideLocalStorage(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
