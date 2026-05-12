@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -44,17 +44,19 @@ var newEpisodeFieldLabels = []string{
 }
 
 type newEpisodeTUIModel struct {
-	atom       *model.Podcast
-	inputs     newEpisodeInputs
-	fields     []textinput.Model
-	desc       textarea.Model
-	focus      int
-	width      int
-	height     int
-	message    string
-	completion string
-	cancelled  bool
-	submitted  bool
+	atom      *model.Podcast
+	inputs    newEpisodeInputs
+	fields    []textinput.Model
+	desc      textarea.Model
+	focus     int
+	width     int
+	height    int
+	message   string
+	cancelled bool
+	submitted bool
+	picking   bool
+	picker    filepicker.Model
+	pickField int
 
 	titleStyle       lipgloss.Style
 	subtitleStyle    lipgloss.Style
@@ -63,8 +65,8 @@ type newEpisodeTUIModel struct {
 	blurredStyle     lipgloss.Style
 	helpStyle        lipgloss.Style
 	errorStyle       lipgloss.Style
-	borderStyle      lipgloss.Style
 	descriptionStyle lipgloss.Style
+	pickerStyle      lipgloss.Style
 }
 
 func runNewEpisodeForm(atom *model.Podcast, inputs *newEpisodeInputs) error {
@@ -140,8 +142,8 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		blurredStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("250")),
 		helpStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
-		borderStyle:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
 		descriptionStyle: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
+		pickerStyle:      lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("238")).Padding(0, 1),
 	}
 	m.focusField(m.focus)
 	m.resize(100, 32)
@@ -159,7 +161,9 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resize(msg.Width, msg.Height)
 	case tea.KeyMsg:
 		m.message = ""
-		m.completion = ""
+		if m.picking {
+			return m.updateFilePicker(msg)
+		}
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.cancelled = true
@@ -172,6 +176,9 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+k", "up":
 			m.focusPrev()
 		case "enter":
+			if m.isFileField(m.focus) {
+				return m, m.startFilePicker(m.focus)
+			}
 			if m.focus == newEpisodeFieldDescription {
 				var cmd tea.Cmd
 				m.desc, cmd = m.desc.Update(msg)
@@ -181,8 +188,8 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+tab":
 			m.focusPrev()
 		case "tab":
-			if m.focus == newEpisodeFieldImage || m.focus == newEpisodeFieldInput || m.focus == newEpisodeFieldChapters {
-				m.completeFocusedPath()
+			if m.isFileField(m.focus) {
+				return m, m.startFilePicker(m.focus)
 			} else {
 				m.focusNext()
 			}
@@ -226,8 +233,8 @@ func (m newEpisodeTUIModel) View() string {
 	if m.message != "" {
 		lines = append(lines, m.errorStyle.Render(m.message))
 	}
-	if m.completion != "" {
-		lines = append(lines, m.helpStyle.Render(m.completion))
+	if m.picking {
+		lines = append(lines, "", m.renderPicker(bodyWidth))
 	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
 	return outer.Render(strings.Join(lines, "\n"))
@@ -246,7 +253,10 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 		m.fields[i].Width = inputWidth
 	}
 	fullWidth := maxInt(20, bodyWidth-4)
+	m.fields[newEpisodeFieldTitle].Width = fullWidth
 	m.fields[newEpisodeFieldLink].Width = fullWidth
+	m.fields[newEpisodeFieldSubtitle].Width = fullWidth
+	m.fields[newEpisodeFieldAuthor].Width = fullWidth
 	m.fields[newEpisodeFieldImage].Width = fullWidth
 	m.fields[newEpisodeFieldInput].Width = fullWidth
 	m.fields[newEpisodeFieldChapters].Width = fullWidth
@@ -293,33 +303,27 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 
 func (m newEpisodeTUIModel) renderTopFields(width int) string {
 	full := lipgloss.NewStyle().Width(width)
-	leftWidth := (width - 2) / 2
-	rightWidth := width - leftWidth - 2
+	leftWidth := (width - 6) / 2
+	rightWidth := width - leftWidth - 6
 	left := lipgloss.NewStyle().Width(leftWidth)
 	right := lipgloss.NewStyle().Width(rightWidth)
 
 	rows := []string{
-		lipgloss.JoinHorizontal(lipgloss.Top,
-			left.Render(m.renderInput(newEpisodeFieldUID)),
-			"  ",
-			right.Render(m.renderInput(newEpisodeFieldAuthor)),
-		),
-		lipgloss.JoinHorizontal(lipgloss.Top,
-			left.Render(m.renderInput(newEpisodeFieldTitle)),
-			"  ",
-			right.Render(m.renderInput(newEpisodeFieldSubtitle)),
-		),
+		left.Render(m.renderInput(newEpisodeFieldUID)),
+		full.Render(m.renderInput(newEpisodeFieldTitle)),
 		full.Render(m.renderInput(newEpisodeFieldLink)),
+		full.Render(m.renderInput(newEpisodeFieldSubtitle)),
+		full.Render(m.renderInput(newEpisodeFieldAuthor)),
 		full.Render(m.renderInput(newEpisodeFieldImage)),
 		full.Render(m.renderInput(newEpisodeFieldInput)),
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			left.Render(m.renderInput(newEpisodeFieldFormat)),
-			"  ",
+			"      ",
 			right.Render(m.renderInput(newEpisodeFieldEncodingLanguage)),
 		),
 		full.Render(m.renderInput(newEpisodeFieldChapters)),
 	}
-	return strings.Join(rows, "\n")
+	return strings.Join(rows, "\n\n")
 }
 
 func (m newEpisodeTUIModel) renderInput(field int) string {
@@ -359,107 +363,158 @@ func (m newEpisodeTUIModel) renderDescription(width int) string {
 }
 
 func (m newEpisodeTUIModel) helpText() string {
+	if m.picking {
+		return "enter select/open  arrows/j/k move  backspace/left parent  esc close picker"
+	}
 	if m.focus == newEpisodeFieldDescription {
 		return "ctrl+s save plan  esc cancel  ctrl+j/ctrl+k move fields  enter newline"
 	}
-	if m.focus == newEpisodeFieldImage || m.focus == newEpisodeFieldInput || m.focus == newEpisodeFieldChapters {
-		return "tab complete path  enter/ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
+	if m.isFileField(m.focus) {
+		return "enter/tab choose file  ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
 	}
 	return "enter/ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
 }
 
-func (m *newEpisodeTUIModel) completeFocusedPath() {
-	if m.focus < 0 || m.focus >= len(m.fields) {
-		return
+func (m newEpisodeTUIModel) renderPicker(width int) string {
+	title := "Choose " + strings.ToLower(newEpisodeFieldLabels[m.pickField])
+	if !m.pickerAllowsOutsideLocalStorage() {
+		title += " from localStorageDir"
 	}
-	current := m.fields[m.focus].Value()
-	completed, ambiguous, err := m.completePath(current, m.focus == newEpisodeFieldChapters)
-	if err != nil {
-		m.message = err.Error()
-		return
-	}
-	if completed != current {
-		m.fields[m.focus].SetValue(completed)
-		m.fields[m.focus].CursorEnd()
-	}
-	if len(ambiguous) > 0 {
-		m.completion = "matches: " + strings.Join(ambiguous, "  ")
-	}
+	body := strings.TrimRight(m.picker.View(), "\n")
+	return m.labelStyle.Render(title) + "\n" + m.pickerStyle.Width(width-2).Render(body)
 }
 
-func (m newEpisodeTUIModel) completePath(current string, allowOutsideLocalStorage bool) (string, []string, error) {
-	current = filepath.ToSlash(strings.TrimSpace(current))
-	root := "."
+func (m newEpisodeTUIModel) isFileField(field int) bool {
+	return field == newEpisodeFieldImage || field == newEpisodeFieldInput || field == newEpisodeFieldChapters
+}
+
+func (m *newEpisodeTUIModel) startFilePicker(field int) tea.Cmd {
+	picker := filepicker.New()
+	picker.ShowPermissions = false
+	picker.ShowSize = false
+	picker.FileAllowed = true
+	picker.DirAllowed = false
+	picker.CurrentDirectory = m.pickerStartDirectory(field)
+	picker.SetHeight(m.pickerHeight())
+	m.picker = picker
+	m.picking = true
+	m.pickField = field
+	return m.picker.Init()
+}
+
+func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "esc" {
+		m.picking = false
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.picker, cmd = m.picker.Update(msg)
+	if !m.pickerAllowsOutsideLocalStorage() && !pathInsideRoot(m.localStorageRoot(), m.picker.CurrentDirectory) {
+		m.picker.CurrentDirectory = m.localStorageRoot()
+		cmd = m.picker.Init()
+	}
+	if selected, path := m.picker.DidSelectFile(msg); selected {
+		value := path
+		if !m.pickerAllowsOutsideLocalStorage() {
+			rel, err := localStorageRelativePath(m.atom, path, strings.ToLower(newEpisodeFieldLabels[m.pickField]), true)
+			if err != nil {
+				m.message = err.Error()
+				return m, cmd
+			}
+			value = rel
+		}
+		m.fields[m.pickField].SetValue(filepath.ToSlash(value))
+		m.fields[m.pickField].CursorEnd()
+		m.picking = false
+	}
+	return m, cmd
+}
+
+func (m newEpisodeTUIModel) pickerAllowsOutsideLocalStorage() bool {
+	return m.pickField == newEpisodeFieldChapters
+}
+
+func (m newEpisodeTUIModel) pickerHeight() int {
+	height := m.height / 3
+	if height < 6 {
+		return 6
+	}
+	if height > 14 {
+		return 14
+	}
+	return height
+}
+
+func (m newEpisodeTUIModel) pickerStartDirectory(field int) string {
+	value := ""
+	if field >= 0 && field < len(m.fields) {
+		value = strings.TrimSpace(m.fields[field].Value())
+	}
+	if field == newEpisodeFieldChapters {
+		return existingDirectoryForPicker(value, homeDirOrDot())
+	}
+	root := m.localStorageRoot()
+	if value == "" {
+		return root
+	}
+	if filepath.IsAbs(value) {
+		if pathInsideRoot(root, value) {
+			return existingDirectoryForPicker(value, root)
+		}
+		return root
+	}
+	clean := filepath.Clean(filepath.FromSlash(value))
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+		return root
+	}
+	return existingDirectoryForPicker(filepath.Join(root, clean), root)
+}
+
+func (m newEpisodeTUIModel) localStorageRoot() string {
 	if m.atom != nil && strings.TrimSpace(m.atom.LocalStorageDirExpanded()) != "" {
-		root = m.atom.LocalStorageDirExpanded()
+		return m.atom.LocalStorageDirExpanded()
 	}
-	if allowOutsideLocalStorage {
-		if current == "" {
-			home, err := os.UserHomeDir()
-			if err == nil {
-				root = home
-			}
-		} else if filepath.IsAbs(current) {
-			root = string(filepath.Separator)
-		}
+	return "."
+}
+
+func existingDirectoryForPicker(path, fallback string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return fallback
 	}
-	dirPart, filePart := splitCompletionPath(current)
-	if !allowOutsideLocalStorage && strings.HasPrefix(filepath.Clean(filepath.FromSlash(dirPart)), "..") {
-		return current, nil, fmt.Errorf("path must stay inside localStorageDir")
+	info, err := os.Stat(path)
+	if err == nil && info.IsDir() {
+		return path
 	}
-	searchDir := filepath.Join(root, filepath.FromSlash(dirPart))
-	if filepath.IsAbs(current) && allowOutsideLocalStorage {
-		searchDir = filepath.Join(string(filepath.Separator), filepath.FromSlash(dirPart))
+	dir := filepath.Dir(path)
+	if info, err := os.Stat(dir); err == nil && info.IsDir() {
+		return dir
 	}
-	entries, err := os.ReadDir(searchDir)
+	return fallback
+}
+
+func homeDirOrDot() string {
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return current, nil, fmt.Errorf("complete %s: %w", current, err)
+		return "."
 	}
-	matches := make([]string, 0)
-	for _, entry := range entries {
-		name := entry.Name()
-		if strings.HasPrefix(name, filePart) {
-			suffix := ""
-			if entry.IsDir() {
-				suffix = "/"
-			}
-			matches = append(matches, name+suffix)
-		}
-	}
-	sort.Strings(matches)
-	if len(matches) == 0 {
-		return current, nil, nil
-	}
-	prefix := longestCommonPrefix(matches)
-	next := filepath.ToSlash(filepath.Join(dirPart, prefix))
-	if dirPart == "" {
-		next = prefix
-	}
-	if len(matches) == 1 {
-		return next, nil, nil
-	}
-	return next, matches, nil
+	return home
 }
 
-func splitCompletionPath(path string) (string, string) {
-	if strings.HasSuffix(path, "/") {
-		return path, ""
+func pathInsideRoot(root, path string) bool {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return false
 	}
-	dir, file := filepath.Split(filepath.FromSlash(path))
-	return filepath.ToSlash(strings.TrimSuffix(dir, string(filepath.Separator))), file
-}
-
-func longestCommonPrefix(values []string) string {
-	if len(values) == 0 {
-		return ""
+	pathAbs, err := filepath.Abs(path)
+	if err != nil {
+		return false
 	}
-	prefix := values[0]
-	for _, value := range values[1:] {
-		for !strings.HasPrefix(value, prefix) && prefix != "" {
-			prefix = prefix[:len(prefix)-1]
-		}
+	rel, err := filepath.Rel(rootAbs, pathAbs)
+	if err != nil {
+		return false
 	}
-	return prefix
+	return rel == "." || (!strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." && !filepath.IsAbs(rel))
 }
 
 func (m newEpisodeTUIModel) collectInputs() newEpisodeInputs {

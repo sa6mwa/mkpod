@@ -165,36 +165,34 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	}
 }
 
-func TestNewEpisodeTUICompletesLocalStoragePath(t *testing.T) {
+func TestNewEpisodeTUIPickerStartsInsideLocalStorage(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
 	if err != nil {
 		t.Fatalf("load spec fixture: %v", err)
 	}
 	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.fields[newEpisodeFieldImage].SetValue("artwork/cover.jpg")
 
-	completed, matches, err := tui.completePath("artwork/co", false)
-	if err != nil {
-		t.Fatalf("completePath() error = %v", err)
-	}
-	if len(matches) != 0 {
-		t.Fatalf("matches = %v, want no ambiguity", matches)
-	}
-	if completed != "artwork/cover.jpg" {
-		t.Fatalf("completed = %q, want artwork/cover.jpg", completed)
+	got := tui.pickerStartDirectory(newEpisodeFieldImage)
+	want := filepath.Join(atom.LocalStorageDirExpanded(), "artwork")
+	if got != want {
+		t.Fatalf("pickerStartDirectory() = %q, want %q", got, want)
 	}
 }
 
-func TestNewEpisodeTUIRejectsParentRelativeCompletion(t *testing.T) {
+func TestNewEpisodeTUIPickerRejectsParentRelativeStart(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
 	if err != nil {
 		t.Fatalf("load spec fixture: %v", err)
 	}
 	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.fields[newEpisodeFieldInput].SetValue("../outside.wav")
 
-	if _, _, err := tui.completePath("../", false); err == nil {
-		t.Fatal("completePath() error = nil, want parent-relative path rejection")
+	got := tui.pickerStartDirectory(newEpisodeFieldInput)
+	if got != atom.LocalStorageDirExpanded() {
+		t.Fatalf("pickerStartDirectory() = %q, want localStorageDir", got)
 	}
 }
 
