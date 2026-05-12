@@ -459,10 +459,45 @@ func visualLines(lines []string) []string {
 }
 
 func (m newEpisodeTUIModel) pickerOverlayTop() int {
-	if m.height < 20 {
+	top := m.fieldVisualRow(m.pickField)
+	height := m.pickerHeight()
+	maxTop := m.height - height - 1
+	if maxTop < 2 {
+		maxTop = 2
+	}
+	if top > maxTop {
+		return maxTop
+	}
+	if top < 2 {
 		return 2
 	}
-	return 4
+	return top
+}
+
+func (m newEpisodeTUIModel) fieldVisualRow(field int) int {
+	const topFieldsStart = 3
+	switch field {
+	case newEpisodeFieldUID, newEpisodeFieldAuthor:
+		return topFieldsStart
+	case newEpisodeFieldTitle:
+		return topFieldsStart + 3
+	case newEpisodeFieldSubtitle:
+		return topFieldsStart + 6
+	case newEpisodeFieldLink:
+		return topFieldsStart + 9
+	case newEpisodeFieldImage:
+		return topFieldsStart + 12
+	case newEpisodeFieldInput:
+		return topFieldsStart + 15
+	case newEpisodeFieldFormat, newEpisodeFieldEncodingLanguage:
+		return topFieldsStart + 18
+	case newEpisodeFieldChapters:
+		return topFieldsStart + 21
+	case newEpisodeFieldDescription:
+		return topFieldsStart + lipgloss.Height(m.renderTopFields(m.bodyWidth())) + 1
+	default:
+		return topFieldsStart
+	}
 }
 
 func (m newEpisodeTUIModel) renderScreen(lines []string) string {
@@ -584,7 +619,8 @@ func (m newEpisodeTUIModel) pickerHeightForDirectory(field int, dir string) int 
 		chrome++
 	}
 	height := visibleEntries + chrome
-	maxHeight := m.height - m.pickerOverlayTop() - 3
+	top := m.fieldVisualRow(field)
+	maxHeight := m.height - top - 1
 	if maxHeight < 6 {
 		maxHeight = 6
 	}

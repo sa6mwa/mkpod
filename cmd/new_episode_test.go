@@ -289,6 +289,10 @@ func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
 	if description >= 0 && picker > description {
 		t.Fatalf("picker rendered below description, want visual overlay before it: picker=%d description=%d view=%q", picker, description, view)
 	}
+	lines := strings.Split(view, "\n")
+	if !strings.Contains(lines[18], "Input") {
+		t.Fatalf("picker did not align to input row: line 18 = %q view=%q", lines[18], view)
+	}
 }
 
 func TestNewEpisodeTUIPickerShowsMultipleFilesAndClosesOnSelection(t *testing.T) {
