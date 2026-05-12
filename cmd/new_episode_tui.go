@@ -180,6 +180,7 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.picker = m.picker.WithWidth(m.pickerWidth()).(*huh.FilePicker)
 			m.picker = m.picker.Height(m.pickerHeight())
 		}
+		return m, tea.ClearScreen
 	case tea.KeyMsg:
 		m.message = ""
 		if m.picking {

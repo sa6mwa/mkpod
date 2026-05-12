@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -192,6 +193,28 @@ func TestNewEpisodeTUITitleBarSpansBodyWidth(t *testing.T) {
 	screenLine := strings.Split(tui.View(), "\n")[0]
 	if got, want := ansi.StringWidth(screenLine), 80; got != want {
 		t.Fatalf("screen title line width = %d, want %d", got, want)
+	}
+}
+
+func TestNewEpisodeTUIWindowSizeEventClearsImmediately(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+
+	model, cmd := tui.Update(tea.WindowSizeMsg{Width: 132, Height: 36})
+	if cmd == nil {
+		t.Fatal("WindowSizeMsg returned nil command, want immediate clear-screen repaint command")
+	}
+	updated := model.(newEpisodeTUIModel)
+	if updated.width != 132 || updated.height != 36 {
+		t.Fatalf("size = %dx%d, want 132x36", updated.width, updated.height)
+	}
+	msg := cmd()
+	if got, want := reflect.TypeOf(msg).String(), "tea.clearScreenMsg"; got != want {
+		t.Fatalf("WindowSizeMsg command = %s, want %s", got, want)
 	}
 }
 
