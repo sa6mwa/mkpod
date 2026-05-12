@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/spec"
 )
@@ -163,6 +164,22 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	}
 	if tui.desc.Height() < 16 {
 		t.Fatalf("description height = %d, want terminal-adapted height", tui.desc.Height())
+	}
+}
+
+func TestNewEpisodeTUITitleBarSpansBodyWidth(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+
+	titleLine := strings.Split(tui.View(), "\n")[0]
+	got, want := ansi.StringWidth(titleLine), 80
+	if got != want {
+		t.Fatalf("title line width = %d, want %d", got, want)
 	}
 }
 

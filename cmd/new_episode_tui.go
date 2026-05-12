@@ -252,7 +252,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.titleStyle.Render(m.formHeaderTitle()),
+		m.renderTitleBar(bodyWidth),
 		m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
@@ -264,6 +264,10 @@ func (m newEpisodeTUIModel) formLines() []string {
 	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
 	return lines
+}
+
+func (m newEpisodeTUIModel) renderTitleBar(width int) string {
+	return m.titleStyle.Width(width).Render(m.formHeaderTitle())
 }
 
 func (m newEpisodeTUIModel) formHeaderTitle() string {
