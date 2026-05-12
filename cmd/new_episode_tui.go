@@ -106,8 +106,8 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		"https://example.com/episode",
 		"short episode subtitle",
 		"episode author",
-		"artwork/cover.jpg",
-		"audiopod/masters/episode.flac",
+		"relative image path",
+		"relative edited master",
 		"m4a",
 		inputs.InheritedEncodingLanguage,
 		"optional chapters.yaml",
@@ -219,7 +219,12 @@ func (m newEpisodeTUIModel) View() string {
 		return ""
 	}
 	bodyWidth := clampInt(m.width-4, 60, 120)
-	outer := lipgloss.NewStyle().Width(m.width).Padding(0, 2)
+	outer := lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		MaxHeight(m.height).
+		Padding(0, 2).
+		Background(lipgloss.Color("0"))
 
 	var lines []string
 	lines = append(lines,
@@ -237,7 +242,7 @@ func (m newEpisodeTUIModel) View() string {
 		lines = append(lines, "", m.renderPicker(bodyWidth))
 	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
-	return outer.Render(strings.Join(lines, "\n"))
+	return outer.Render(lipgloss.NewStyle().MaxHeight(m.height).Render(strings.Join(lines, "\n")))
 }
 
 func (m *newEpisodeTUIModel) resize(width, height int) {
@@ -248,7 +253,7 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 		m.height = height
 	}
 	bodyWidth := clampInt(m.width-4, 60, 120)
-	labelWidth := newEpisodeLabelWidth(bodyWidth)
+	labelWidth := newEpisodeLabelWidth()
 	inputWidth := maxInt(8, ((bodyWidth-6)/2)-labelWidth)
 	for i := range m.fields {
 		m.fields[i].Width = inputWidth
@@ -336,7 +341,7 @@ func (m newEpisodeTUIModel) renderTopFields(width int) string {
 		),
 		full.Render(m.renderInput(newEpisodeFieldChapters, width)),
 	}
-	return strings.Join(rows, "\n\n")
+	return strings.Join(rows, "\n")
 }
 
 func (m newEpisodeTUIModel) renderInput(field int, width int) string {
@@ -344,25 +349,8 @@ func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	if field == m.focus {
 		label = ">" + label
 	}
-	var note string
-	switch field {
-	case newEpisodeFieldImage:
-		note = " relative to localStorageDir"
-	case newEpisodeFieldInput:
-		note = " edited master, relative to localStorageDir"
-	case newEpisodeFieldEncodingLanguage:
-		if strings.TrimSpace(m.inputs.InheritedEncodingLanguage) != "" && strings.TrimSpace(m.fields[field].Value()) == "" {
-			note = " inherits " + m.inputs.InheritedEncodingLanguage
-		}
-	case newEpisodeFieldChapters:
-		note = " optional"
-	}
-	labelText := label
-	if note != "" {
-		labelText += note
-	}
-	labelWidth := newEpisodeLabelWidth(width)
-	labelLine := m.labelStyle.Width(labelWidth).MaxWidth(labelWidth).Render(labelText)
+	labelWidth := newEpisodeLabelWidth()
+	labelLine := m.labelStyle.Width(labelWidth).MaxWidth(labelWidth).Render(label)
 	value := m.fields[field].View()
 	if field == m.focus {
 		value = m.focusedStyle.Render(value)
@@ -372,14 +360,8 @@ func (m newEpisodeTUIModel) renderInput(field int, width int) string {
 	return labelLine + value
 }
 
-func newEpisodeLabelWidth(rowWidth int) int {
-	if rowWidth < 52 {
-		return 18
-	}
-	if rowWidth < 80 {
-		return 24
-	}
-	return 34
+func newEpisodeLabelWidth() int {
+	return 20
 }
 
 func (m newEpisodeTUIModel) renderDescription(width int) string {
