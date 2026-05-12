@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/spec"
 )
@@ -177,6 +178,49 @@ func TestNewEpisodeTUIViewFitsTerminalHeight(t *testing.T) {
 	viewHeight := strings.Count(tui.View(), "\n") + 1
 	if viewHeight > 32 {
 		t.Fatalf("View() height = %d, want <= 32", viewHeight)
+	}
+}
+
+func TestNewEpisodeTUITabDoesNotOpenFilePicker(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.focusField(newEpisodeFieldImage)
+
+	model, _ := tui.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated := model.(newEpisodeTUIModel)
+	if updated.picking {
+		t.Fatal("tab opened file picker, want focus navigation only")
+	}
+	if updated.focus != newEpisodeFieldInput {
+		t.Fatalf("focus = %d, want input field", updated.focus)
+	}
+}
+
+func TestNewEpisodeTUIEnterOpensFilePickerScreen(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+	tui.focusField(newEpisodeFieldImage)
+
+	model, _ := tui.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated := model.(newEpisodeTUIModel)
+	if !updated.picking {
+		t.Fatal("enter did not open file picker")
+	}
+	view := updated.View()
+	if !strings.Contains(view, "Choose image from localStorageDir") {
+		t.Fatalf("picker view missing title: %q", view)
+	}
+	if viewHeight := strings.Count(view, "\n") + 1; viewHeight != 32 {
+		t.Fatalf("picker view height = %d, want 32", viewHeight)
 	}
 }
 

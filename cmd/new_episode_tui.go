@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
 
@@ -188,11 +189,7 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+tab":
 			m.focusPrev()
 		case "tab":
-			if m.isFileField(m.focus) {
-				return m, m.startFilePicker(m.focus)
-			} else {
-				m.focusNext()
-			}
+			m.focusNext()
 		default:
 			var cmd tea.Cmd
 			if m.focus == newEpisodeFieldDescription {
@@ -218,13 +215,10 @@ func (m newEpisodeTUIModel) View() string {
 	if m.width <= 0 {
 		return ""
 	}
+	if m.picking {
+		return m.renderPickerScreen()
+	}
 	bodyWidth := clampInt(m.width-4, 60, 120)
-	outer := lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		MaxHeight(m.height).
-		Padding(0, 2).
-		Background(lipgloss.Color("0"))
 
 	var lines []string
 	lines = append(lines,
@@ -238,11 +232,8 @@ func (m newEpisodeTUIModel) View() string {
 	if m.message != "" {
 		lines = append(lines, m.errorStyle.Render(m.message))
 	}
-	if m.picking {
-		lines = append(lines, "", m.renderPicker(bodyWidth))
-	}
 	lines = append(lines, m.helpStyle.Render(m.helpText()))
-	return outer.Render(lipgloss.NewStyle().MaxHeight(m.height).Render(strings.Join(lines, "\n")))
+	return m.renderScreen(lines)
 }
 
 func (m *newEpisodeTUIModel) resize(width, height int) {
@@ -277,9 +268,6 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 	fixedRows := outerPaddingRows + headerRows + topHeight + descriptionChromeRows + helpRows
 	if m.message != "" {
 		fixedRows++
-	}
-	if m.picking {
-		fixedRows += m.pickerHeight() + 4
 	}
 	descHeight := m.height - fixedRows
 	if descHeight < 3 {
@@ -380,18 +368,50 @@ func (m newEpisodeTUIModel) helpText() string {
 		return "ctrl+s save plan  esc cancel  ctrl+j/ctrl+k move fields  enter newline"
 	}
 	if m.isFileField(m.focus) {
-		return "enter/tab choose file  ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
+		return "enter choose file  tab/ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
 	}
 	return "enter/ctrl+j next  ctrl+k previous  ctrl+s save plan  esc cancel"
 }
 
-func (m newEpisodeTUIModel) renderPicker(width int) string {
+func (m newEpisodeTUIModel) renderPickerScreen() string {
+	bodyWidth := clampInt(m.width-4, 60, 120)
 	title := "Choose " + strings.ToLower(newEpisodeFieldLabels[m.pickField])
 	if !m.pickerAllowsOutsideLocalStorage() {
 		title += " from localStorageDir"
 	}
 	body := strings.TrimRight(m.picker.View(), "\n")
-	return m.labelStyle.Render(title) + "\n" + m.pickerStyle.Width(width-2).Render(body)
+	lines := []string{
+		m.titleStyle.Render("mkpod new episode"),
+		m.subtitleStyle.Render(title),
+		"",
+		m.helpStyle.Render("Current directory: " + filepath.ToSlash(m.picker.CurrentDirectory)),
+		"",
+		m.pickerStyle.Width(bodyWidth - 2).Render(body),
+		m.helpStyle.Render(m.helpText()),
+	}
+	return m.renderScreen(lines)
+}
+
+func (m newEpisodeTUIModel) renderScreen(lines []string) string {
+	width := maxInt(1, m.width)
+	height := maxInt(1, m.height)
+	style := lipgloss.NewStyle().Width(width).Background(lipgloss.Color("0"))
+	content := strings.Join(lines, "\n")
+	plainLines := strings.Split(content, "\n")
+	if len(plainLines) > height {
+		plainLines = plainLines[:height]
+	}
+	for len(plainLines) < height {
+		plainLines = append(plainLines, "")
+	}
+	for i, line := range plainLines {
+		line = ansi.Truncate(line, width, "")
+		if pad := width - ansi.StringWidth(line); pad > 0 {
+			line += strings.Repeat(" ", pad)
+		}
+		plainLines[i] = style.Render(line)
+	}
+	return strings.Join(plainLines, "\n")
 }
 
 func (m newEpisodeTUIModel) isFileField(field int) bool {
@@ -445,12 +465,12 @@ func (m newEpisodeTUIModel) pickerAllowsOutsideLocalStorage() bool {
 }
 
 func (m newEpisodeTUIModel) pickerHeight() int {
-	height := m.height / 3
-	if height < 6 {
-		return 6
+	height := m.height - 8
+	if height < 8 {
+		return 8
 	}
-	if height > 14 {
-		return 14
+	if height > 24 {
+		return 24
 	}
 	return height
 }
