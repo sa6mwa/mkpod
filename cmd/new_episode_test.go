@@ -667,6 +667,31 @@ func TestNewEpisodeTUIChaptersPickerUsesExplicitChaptersDirectory(t *testing.T) 
 	}
 }
 
+func TestNewEpisodeTUIShowsEmbeddedChaptersInEditMode(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	inputs := defaultNewEpisodeInputs(atom, specFile)
+	inputs.ExistingChapters = []id3v24.Chapter{
+		{Title: "Intro", Start: "00:00:00.000"},
+		{Title: "Main", Start: "00:01:00.000"},
+	}
+
+	tui := newNewEpisodeTUIModel(atom, inputs)
+	if got := tui.fields[newEpisodeFieldChapters].Value(); got != "" {
+		t.Fatalf("chapters field value = %q, want empty replacement path", got)
+	}
+	want := "2 embedded chapters in saved plan; enter to replace"
+	if got := tui.fields[newEpisodeFieldChapters].Placeholder; got != want {
+		t.Fatalf("chapters placeholder = %q, want %q", got, want)
+	}
+	if !strings.Contains(tui.View(), want) {
+		t.Fatalf("View() does not surface embedded chapters placeholder %q:\n%s", want, tui.View())
+	}
+}
+
 func TestNewEpisodeTUICollectInputs(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)

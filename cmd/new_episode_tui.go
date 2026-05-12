@@ -129,7 +129,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		"enter to choose edited master",
 		"m4a",
 		inputs.InheritedEncodingLanguage,
-		"enter to choose optional chapters file",
+		chaptersPlaceholder(inputs),
 	}
 	for i := range fields {
 		field := textinput.New()
@@ -536,6 +536,17 @@ func authorPlaceholder(inputs newEpisodeInputs) string {
 		return inputs.InheritedAuthor
 	}
 	return "episode author"
+}
+
+func chaptersPlaceholder(inputs newEpisodeInputs) string {
+	count := len(inputs.ExistingChapters)
+	if count == 1 {
+		return "1 embedded chapter in saved plan; enter to replace"
+	}
+	if count > 1 {
+		return fmt.Sprintf("%d embedded chapters in saved plan; enter to replace", count)
+	}
+	return "enter to choose optional chapters file"
 }
 
 func (m *newEpisodeTUIModel) ensureFocusVisible() {
