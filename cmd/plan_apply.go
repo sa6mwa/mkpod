@@ -345,11 +345,28 @@ func loadSavedPlan(path string) (*savedPlan, error) {
 }
 
 func applySavedPlan(ctx context.Context, path string) error {
+	return applySavedPlanWithBlenderRunner(ctx, path, nil)
+}
+
+func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRunner blenderaddon.Runner) error {
 	saved, err := loadSavedPlan(path)
 	if err != nil {
 		return err
 	}
 	switch saved.Workflow {
+	case "blender":
+		var plan blenderaddon.Plan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		if err := validateSavedBlenderPlan(&plan); err != nil {
+			return err
+		}
+		_, err := blenderaddon.Apply(ctx, blenderaddon.Options{
+			Blender: plan.BlenderPath,
+			Repo:    plan.Repo,
+		}, blenderRunner)
+		return err
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -362,6 +379,32 @@ func applySavedPlan(ctx context.Context, path string) error {
 	default:
 		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
 	}
+}
+
+func validateSavedBlenderPlan(plan *blenderaddon.Plan) error {
+	if strings.TrimSpace(plan.BlenderPath) == "" {
+		return errors.New("stale or invalid blender plan: blenderPath is required")
+	}
+	expected, err := blenderaddon.BuildPlan(blenderaddon.Options{
+		Blender: plan.BlenderPath,
+		Repo:    plan.Repo,
+	})
+	if err != nil {
+		return err
+	}
+	expected.BlenderTool = plan.BlenderTool
+	expectedJSON, err := json.Marshal(expected)
+	if err != nil {
+		return err
+	}
+	actualJSON, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if string(expectedJSON) != string(actualJSON) {
+		return errors.New("saved blender plan is stale; rerun mkpod plan blender")
+	}
+	return nil
 }
 
 func validateSavedPreprocessPlan(plan *preprocess.Plan) error {

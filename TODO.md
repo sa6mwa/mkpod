@@ -235,13 +235,14 @@ Initial workflow slices:
   `scripts/export_markers.py`.
 - [x] `mkpod plan blender`
   - [x] Detect `blender` on `PATH` first.
-  - [ ] Optionally search common install paths only if needed.
+  - [x] Optionally search common install paths only if needed.
   - [x] Preview the add-on installation/enabling operation.
 - [x] `mkpod apply blender`
   - [x] Install and enable the embedded marker exporter in Blender.
   - [x] Prefer Blender's official extension CLI, for example
     `blender --command extension install-file -r user_default -e <package>`.
   - [x] Report where Blender installed the add-on.
+  - [x] Replay `blender.plan.json` through `mkpod apply --from`.
 - [x] `mkpod plan episode <uid>`
   - [x] Load the podcast spec.
   - [x] Select and validate the episode.

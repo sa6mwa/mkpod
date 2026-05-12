@@ -31,12 +31,12 @@ type Options struct {
 }
 
 type Plan struct {
-	BlenderTool string
-	BlenderPath string
-	Repo        string
-	AddonName   string
-	AddonModule string
-	Actions     []string
+	BlenderTool string   `json:"blenderTool"`
+	BlenderPath string   `json:"blenderPath"`
+	Repo        string   `json:"repo"`
+	AddonName   string   `json:"addonName"`
+	AddonModule string   `json:"addonModule"`
+	Actions     []string `json:"actions"`
 }
 
 type Runner interface {

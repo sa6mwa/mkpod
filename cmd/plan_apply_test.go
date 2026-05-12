@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/sa6mwa/mkpod/internal/blenderaddon"
 	"github.com/sa6mwa/mkpod/internal/media/preprocess"
 )
 
@@ -78,6 +80,72 @@ func TestApplySavedPreprocessPlanRejectsStalePlan(t *testing.T) {
 	if !strings.Contains(err.Error(), "stale") {
 		t.Fatalf("applySavedPlan() error = %v, want stale plan error", err)
 	}
+}
+
+func TestApplySavedBlenderPlanRunsInstaller(t *testing.T) {
+	tool, err := exec.LookPath("sh")
+	if err != nil {
+		t.Fatalf("test requires sh on PATH: %v", err)
+	}
+	plan, err := blenderaddon.BuildPlan(blenderaddon.Options{Blender: tool})
+	if err != nil {
+		t.Fatalf("BuildPlan() error = %v", err)
+	}
+	planPath := filepath.Join(t.TempDir(), "plan.json")
+	writeSavedPlanFixture(t, planPath, "blender", plan)
+	runner := &savedBlenderRunner{}
+
+	if err := applySavedPlanWithBlenderRunner(context.Background(), planPath, runner); err != nil {
+		t.Fatalf("applySavedPlanWithBlenderRunner() error = %v", err)
+	}
+	if runner.name != tool {
+		t.Fatalf("runner name = %q, want %q", runner.name, tool)
+	}
+	wantPrefix := []string{"--command", "extension", "install-file", "-r", "user_default", "-e"}
+	if len(runner.args) != len(wantPrefix)+1 {
+		t.Fatalf("runner args = %v, want %v <package>", runner.args, wantPrefix)
+	}
+	for i := range wantPrefix {
+		if runner.args[i] != wantPrefix[i] {
+			t.Fatalf("runner args = %v, want %v <package>", runner.args, wantPrefix)
+		}
+	}
+	if !strings.HasSuffix(runner.args[len(runner.args)-1], ".zip") {
+		t.Fatalf("runner package arg = %q, want zip package", runner.args[len(runner.args)-1])
+	}
+}
+
+func TestApplySavedBlenderPlanRejectsStalePlan(t *testing.T) {
+	tool, err := exec.LookPath("sh")
+	if err != nil {
+		t.Fatalf("test requires sh on PATH: %v", err)
+	}
+	plan, err := blenderaddon.BuildPlan(blenderaddon.Options{Blender: tool})
+	if err != nil {
+		t.Fatalf("BuildPlan() error = %v", err)
+	}
+	plan.AddonModule = "changed"
+	planPath := filepath.Join(t.TempDir(), "plan.json")
+	writeSavedPlanFixture(t, planPath, "blender", plan)
+
+	err = applySavedPlanWithBlenderRunner(context.Background(), planPath, &savedBlenderRunner{})
+	if err == nil {
+		t.Fatal("applySavedPlanWithBlenderRunner() error = nil, want stale plan error")
+	}
+	if !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("applySavedPlanWithBlenderRunner() error = %v, want stale plan error", err)
+	}
+}
+
+type savedBlenderRunner struct {
+	name string
+	args []string
+}
+
+func (r *savedBlenderRunner) Run(_ context.Context, name string, args ...string) error {
+	r.name = name
+	r.args = append([]string(nil), args...)
+	return nil
 }
 
 func preprocessPlanFixture(t *testing.T) *preprocess.Plan {
