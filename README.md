@@ -56,6 +56,8 @@ $ mkpod plan preprocess MIC1.WAV
 $ mkpod apply --from preprocess.plan.json
 $ mkpod plan blender
 $ mkpod apply --from blender.plan.json
+$ mkpod plan feed --upload
+$ mkpod apply --from feed.plan.json
 ```
 
 ## Quick Start

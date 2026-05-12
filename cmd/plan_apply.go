@@ -222,6 +222,7 @@ var applyFeedCmd = &cobra.Command{
 }
 
 type episodeWorkflowPlan struct {
+	SpecFile           string
 	UID                int64
 	Title              string
 	RemoveRemoteMaster bool
@@ -249,6 +250,7 @@ type episodeWorkflowPlan struct {
 }
 
 type feedWorkflowPlan struct {
+	SpecFile        string
 	FeedFile        string
 	FeedPath        string
 	FeedExists      bool
@@ -372,6 +374,34 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 			Repo:    plan.Repo,
 		}, blenderRunner)
 		return err
+	case "episode":
+		var plan episodeWorkflowPlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		if err := validateSavedEpisodePlan(ctx, &plan); err != nil {
+			return err
+		}
+		return runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.UID, 10)}, encodeWorkflowOptions{
+			SpecFile:           plan.SpecFile,
+			All:                false,
+			AskNoQuestions:     false,
+			RemoveRemoteMaster: plan.RemoveRemoteMaster,
+		})
+	case "feed":
+		var plan feedWorkflowPlan
+		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
+			return err
+		}
+		if err := validateSavedFeedPlan(ctx, &plan); err != nil {
+			return err
+		}
+		return runFeedWorkflow(logger.WithDefaultLogger(ctx), nil, feedWorkflowOptions{
+			SpecFile:       plan.SpecFile,
+			AskNoQuestions: false,
+			DryRun:         false,
+			Upload:         plan.Upload,
+		})
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -386,6 +416,34 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 	}
 }
 
+func validateSavedEpisodePlan(ctx context.Context, plan *episodeWorkflowPlan) error {
+	if strings.TrimSpace(plan.SpecFile) == "" {
+		return errors.New("stale or invalid episode plan: specFile is required")
+	}
+	expected, err := buildEpisodePlanFromOptions(ctx, plan.SpecFile, plan.RemotePreview, plan.RemoveRemoteMaster, plan.UID)
+	if err != nil {
+		return err
+	}
+	if err := requireSamePlan(expected, plan, "episode"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateSavedFeedPlan(ctx context.Context, plan *feedWorkflowPlan) error {
+	if strings.TrimSpace(plan.SpecFile) == "" {
+		return errors.New("stale or invalid feed plan: specFile is required")
+	}
+	expected, err := buildFeedPlanFromOptions(ctx, plan.SpecFile, plan.RemotePreview, plan.Upload)
+	if err != nil {
+		return err
+	}
+	if err := requireSamePlan(expected, plan, "feed"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func validateSavedBlenderPlan(plan *blenderaddon.Plan) error {
 	if strings.TrimSpace(plan.BlenderPath) == "" {
 		return errors.New("stale or invalid blender plan: blenderPath is required")
@@ -398,16 +456,23 @@ func validateSavedBlenderPlan(plan *blenderaddon.Plan) error {
 		return err
 	}
 	expected.BlenderTool = plan.BlenderTool
+	if err := requireSamePlan(expected, plan, "blender"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func requireSamePlan(expected, actual any, workflow string) error {
 	expectedJSON, err := json.Marshal(expected)
 	if err != nil {
 		return err
 	}
-	actualJSON, err := json.Marshal(plan)
+	actualJSON, err := json.Marshal(actual)
 	if err != nil {
 		return err
 	}
 	if string(expectedJSON) != string(actualJSON) {
-		return errors.New("saved blender plan is stale; rerun mkpod plan blender")
+		return fmt.Errorf("saved %s plan is stale; rerun mkpod plan %s", workflow, workflow)
 	}
 	return nil
 }
@@ -424,16 +489,8 @@ func validateSavedPreprocessPlan(plan *preprocess.Plan) error {
 	if err != nil {
 		return err
 	}
-	expectedJSON, err := json.Marshal(expected)
-	if err != nil {
+	if err := requireSamePlan(expected, plan, "preprocess"); err != nil {
 		return err
-	}
-	actualJSON, err := json.Marshal(plan)
-	if err != nil {
-		return err
-	}
-	if string(expectedJSON) != string(actualJSON) {
-		return errors.New("saved preprocess plan is stale; rerun mkpod plan preprocess")
 	}
 	return nil
 }
@@ -463,7 +520,10 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	if err != nil {
 		return nil, err
 	}
+	return buildEpisodePlanFromOptions(ctx, specFile, remotePreview, removeRemoteMaster, uid)
+}
 
+func buildEpisodePlanFromOptions(ctx context.Context, specFile string, remotePreview, removeRemoteMaster bool, uid int64) (*episodeWorkflowPlan, error) {
 	atom, err := spec.New(specFile).Load(ctx)
 	if err != nil {
 		return nil, err
@@ -520,6 +580,7 @@ func buildEpisodePlan(ctx context.Context, cmd *cobra.Command, uidString string)
 	}
 
 	plan := &episodeWorkflowPlan{
+		SpecFile:           specFile,
 		UID:                uid,
 		Title:              episode.Title,
 		RemoveRemoteMaster: removeRemoteMaster,
@@ -617,6 +678,10 @@ func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*fee
 	if err != nil {
 		return nil, err
 	}
+	return buildFeedPlanFromOptions(ctx, specFile, remotePreview, upload)
+}
+
+func buildFeedPlanFromOptions(ctx context.Context, specFile string, remotePreview, upload bool) (*feedWorkflowPlan, error) {
 	atom, err := spec.New(specFile).Load(ctx)
 	if err != nil {
 		return nil, err
@@ -640,6 +705,7 @@ func buildFeedPlan(ctx context.Context, cmd *cobra.Command, args []string) (*fee
 	}
 
 	plan := &feedWorkflowPlan{
+		SpecFile:        specFile,
 		FeedFile:        atom.FeedFile,
 		FeedPath:        feedPath,
 		FeedExists:      feedExists,

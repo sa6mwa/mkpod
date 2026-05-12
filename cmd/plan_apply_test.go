@@ -137,6 +137,57 @@ func TestApplySavedBlenderPlanRejectsStalePlan(t *testing.T) {
 	}
 }
 
+func TestValidateSavedEpisodePlanRejectsStalePlan(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan, err := buildEpisodePlanFromOptions(context.Background(), specFile, false, false, 1)
+	if err != nil {
+		t.Fatalf("buildEpisodePlanFromOptions() error = %v", err)
+	}
+	plan.Title = "Changed"
+
+	err = validateSavedEpisodePlan(context.Background(), plan)
+	if err == nil {
+		t.Fatal("validateSavedEpisodePlan() error = nil, want stale plan error")
+	}
+	if !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("validateSavedEpisodePlan() error = %v, want stale plan error", err)
+	}
+}
+
+func TestApplySavedFeedPlanWritesFeed(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan, err := buildFeedPlanFromOptions(context.Background(), specFile, false, false)
+	if err != nil {
+		t.Fatalf("buildFeedPlanFromOptions() error = %v", err)
+	}
+	planPath := filepath.Join(t.TempDir(), "feed.plan.json")
+	writeSavedPlanFixture(t, planPath, "feed", plan)
+
+	if err := applySavedPlan(context.Background(), planPath); err != nil {
+		t.Fatalf("applySavedPlan() error = %v", err)
+	}
+	if _, err := os.Stat(plan.FeedPath); err != nil {
+		t.Fatalf("expected feed to be written at %s: %v", plan.FeedPath, err)
+	}
+}
+
+func TestValidateSavedFeedPlanRejectsStalePlan(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan, err := buildFeedPlanFromOptions(context.Background(), specFile, false, false)
+	if err != nil {
+		t.Fatalf("buildFeedPlanFromOptions() error = %v", err)
+	}
+	plan.ValidEpisodes++
+
+	err = validateSavedFeedPlan(context.Background(), plan)
+	if err == nil {
+		t.Fatal("validateSavedFeedPlan() error = nil, want stale plan error")
+	}
+	if !strings.Contains(err.Error(), "stale") {
+		t.Fatalf("validateSavedFeedPlan() error = %v, want stale plan error", err)
+	}
+}
+
 type savedBlenderRunner struct {
 	name string
 	args []string
@@ -170,4 +221,49 @@ func writeSavedPlanFixture(t *testing.T, path, workflow string, plan any) {
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("WriteFile(%q): %v", path, err)
 	}
+}
+
+func writeWorkflowSpecFixture(t *testing.T) string {
+	t.Helper()
+	workdir := t.TempDir()
+	mkdirAll(t, filepath.Join(workdir, "masters"))
+	mkdirAll(t, filepath.Join(workdir, "artwork"))
+	writeFile(t, filepath.Join(workdir, "masters", "episode.wav"), []byte("RIFF\x24\x00\x00\x00WAVEfmt "))
+	writeFile(t, filepath.Join(workdir, "episode.mp3"), []byte("ID3"))
+	writeFile(t, filepath.Join(workdir, "artwork", "cover.jpg"), []byte("jpeg"))
+	specFile := filepath.Join(workdir, "podspec.yaml")
+	content := `config:
+  baseURL: https://example.com/podcast
+  image: https://example.com/podcast/artwork/cover.jpg
+  defaultPodImage: artwork/cover.jpg
+  aws:
+    region: us-east-1
+    buckets:
+      input: input
+      output: output
+  localStorageDir: ` + workdir + `
+atom: podcast.rss
+title: Test Podcast
+ttl: 60
+language: en
+copyright: Copyright Test
+webMaster: webmaster@example.com
+description: Test description
+subtitle: Test subtitle
+ownerName: Owner
+ownerEmail: owner@example.com
+author: Host
+encoding:
+  coverfront: artwork/cover.jpg
+episodes:
+- uid: 1
+  title: Episode
+  input: masters/episode.wav
+  output: episode.mp3
+  image: artwork/cover.jpg
+`
+	if err := os.WriteFile(specFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile(%q): %v", specFile, err)
+	}
+	return specFile
 }
