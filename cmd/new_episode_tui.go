@@ -115,7 +115,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	}
 	for i := range fields {
 		field := textinput.New()
-		field.Prompt = "  "
+		field.Prompt = ""
 		field.SetValue(values[i])
 		field.Placeholder = placeholders[i]
 		field.CharLimit = 0
@@ -123,7 +123,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 	}
 
 	desc := textarea.New()
-	desc.Prompt = "  "
+	desc.Prompt = ""
 	desc.ShowLineNumbers = false
 	desc.Placeholder = "episode description"
 	desc.SetValue(inputs.Description)
@@ -136,10 +136,10 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		focus:            newEpisodeFieldTitle,
 		width:            100,
 		height:           32,
-		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")).Padding(0, 1, 0, 0),
+		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252")),
 		subtitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-		labelStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("99")),
-		focusedStyle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212")),
+		labelStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
+		focusedStyle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
 		blurredStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("252")),
 		helpStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("203")),
@@ -232,7 +232,7 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.boundary("mkpod new episode", false),
+		m.titleStyle.Render("mkpod new episode:"),
 		m.subtitleStyle.Render("Prepare a saved plan. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
@@ -304,8 +304,9 @@ func (m *newEpisodeTUIModel) focusPrev() {
 func (m *newEpisodeTUIModel) focusField(next int) {
 	for i := range m.fields {
 		m.fields[i].Blur()
-		m.fields[i].PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+		m.fields[i].PromptStyle = lipgloss.NewStyle()
 		m.fields[i].TextStyle = m.blurredStyle
+		m.fields[i].PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	}
 	m.desc.Blur()
 	m.focus = next
@@ -315,8 +316,9 @@ func (m *newEpisodeTUIModel) focusField(next int) {
 	}
 	if m.focus >= 0 && m.focus < len(m.fields) {
 		m.fields[m.focus].Focus()
-		m.fields[m.focus].PromptStyle = m.focusedStyle
+		m.fields[m.focus].PromptStyle = lipgloss.NewStyle()
 		m.fields[m.focus].TextStyle = m.blurredStyle
+		m.fields[m.focus].PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	}
 }
 
@@ -451,22 +453,6 @@ func (m newEpisodeTUIModel) renderScreen(lines []string) string {
 
 func (m newEpisodeTUIModel) bodyWidth() int {
 	return clampInt(m.width-4, 64, 118)
-}
-
-func (m newEpisodeTUIModel) boundary(text string, isError bool) string {
-	style := m.titleStyle
-	color := lipgloss.Color("99")
-	if isError {
-		style = m.errorStyle.Bold(true).Padding(0, 1, 0, 0)
-		color = lipgloss.Color("203")
-	}
-	return lipgloss.PlaceHorizontal(
-		m.bodyWidth(),
-		lipgloss.Left,
-		style.Render(text),
-		lipgloss.WithWhitespaceChars("/"),
-		lipgloss.WithWhitespaceForeground(color),
-	)
 }
 
 func (m newEpisodeTUIModel) isFileField(field int) bool {
