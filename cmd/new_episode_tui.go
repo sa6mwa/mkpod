@@ -217,6 +217,9 @@ func (m newEpisodeTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 	default:
+		if m.picking {
+			return m.updateFilePicker(msg)
+		}
 		var cmd tea.Cmd
 		if m.focus == newEpisodeFieldDescription {
 			m.desc, cmd = m.desc.Update(msg)
@@ -496,9 +499,9 @@ func (m *newEpisodeTUIModel) startFilePicker(field int) tea.Cmd {
 	m.picking = true
 	m.pickField = field
 	m.pickValue = ""
+	startDirectory := m.pickerStartDirectory(field)
 	picker := huh.NewFilePicker().
 		Title(newEpisodeFieldLabels[field]).
-		CurrentDirectory(m.pickerStartDirectory(field)).
 		Value(&m.pickValue).
 		FileAllowed(true).
 		DirAllowed(false).
@@ -509,15 +512,18 @@ func (m *newEpisodeTUIModel) startFilePicker(field int) tea.Cmd {
 	picker = picker.WithWidth(m.pickerWidth()).(*huh.FilePicker)
 	picker = picker.WithTheme(huh.ThemeCharm()).(*huh.FilePicker)
 	picker = picker.WithKeyMap(huh.NewDefaultKeyMap()).(*huh.FilePicker)
-	picker = picker.Height(m.pickerHeight())
+	picker = picker.Height(m.pickerHeightForDirectory(field, startDirectory))
+	picker = picker.CurrentDirectory(startDirectory)
 	m.picker = picker
 	return m.picker.Focus()
 }
 
-func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if msg.String() == "esc" {
-		m.picking = false
-		return m, nil
+func (m newEpisodeTUIModel) updateFilePicker(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if key, ok := msg.(tea.KeyMsg); ok {
+		if key.String() == "esc" {
+			m.picking = false
+			return m, nil
+		}
 	}
 	if m.picker == nil {
 		m.picking = false
@@ -527,8 +533,7 @@ func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	if picker, ok := next.(*huh.FilePicker); ok {
 		m.picker = picker
 	}
-	if strings.TrimSpace(m.pickValue) != "" {
-		value := m.pickValue
+	if value := m.selectedPickerValue(); value != "" {
 		if !m.pickerAllowsOutsideLocalStorage() {
 			rel, err := localStorageRelativePath(m.atom, value, strings.ToLower(newEpisodeFieldLabels[m.pickField]), true)
 			if err != nil {
@@ -544,17 +549,47 @@ func (m newEpisodeTUIModel) updateFilePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, cmd
 }
 
+func (m newEpisodeTUIModel) selectedPickerValue() string {
+	if value := strings.TrimSpace(m.pickValue); value != "" {
+		return value
+	}
+	if m.picker == nil {
+		return ""
+	}
+	value, ok := m.picker.GetValue().(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
 func (m newEpisodeTUIModel) pickerAllowsOutsideLocalStorage() bool {
 	return m.pickField == newEpisodeFieldChapters
 }
 
 func (m newEpisodeTUIModel) pickerHeight() int {
-	height := m.height - 8
-	if height < 10 {
-		return 10
+	return m.pickerHeightForDirectory(m.pickField, m.pickerStartDirectory(m.pickField))
+}
+
+func (m newEpisodeTUIModel) pickerHeightForDirectory(field int, dir string) int {
+	visibleEntries := countVisiblePickerEntries(dir)
+	if visibleEntries < 3 {
+		visibleEntries = 3
 	}
-	if height > 24 {
-		return 24
+	if visibleEntries > 8 {
+		visibleEntries = 8
+	}
+	chrome := 2
+	if field != newEpisodeFieldChapters {
+		chrome++
+	}
+	height := visibleEntries + chrome
+	maxHeight := m.height - m.pickerOverlayTop() - 3
+	if maxHeight < 6 {
+		maxHeight = 6
+	}
+	if height > maxHeight {
+		return maxHeight
 	}
 	return height
 }
@@ -586,6 +621,21 @@ func (m newEpisodeTUIModel) pickerStartDirectory(field int) string {
 		return root
 	}
 	return existingDirectoryForPicker(filepath.Join(root, clean), root)
+}
+
+func countVisiblePickerEntries(dir string) int {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func (m newEpisodeTUIModel) localStorageRoot() string {

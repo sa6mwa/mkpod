@@ -291,6 +291,37 @@ func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
 	}
 }
 
+func TestNewEpisodeTUIPickerShowsMultipleFilesAndClosesOnSelection(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	writeFile(t, filepath.Join(atom.LocalStorageDirExpanded(), "artwork", "qzj-1000x1000-english.jpg"), []byte("jpeg"))
+	writeFile(t, filepath.Join(atom.LocalStorageDirExpanded(), "artwork", "qzj-3000x3000-english.jpg"), []byte("jpeg"))
+	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
+	tui.resize(80, 32)
+	tui.focusField(newEpisodeFieldImage)
+
+	model, _ := tui.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	picking := model.(newEpisodeTUIModel)
+	view := picking.View()
+	for _, name := range []string{"cover.jpg", "qzj-1000x1000-english.jpg", "qzj-3000x3000-english.jpg"} {
+		if !strings.Contains(view, name) {
+			t.Fatalf("picker view missing %q: %q", name, view)
+		}
+	}
+
+	model, _ = picking.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	selected := model.(newEpisodeTUIModel)
+	if selected.picking {
+		t.Fatalf("picker stayed open after selection: %q", selected.View())
+	}
+	if got := selected.fields[newEpisodeFieldImage].Value(); got != "artwork/cover.jpg" {
+		t.Fatalf("image field after selection = %q, want artwork/cover.jpg", got)
+	}
+}
+
 func TestNewEpisodeTUIPickerStartsInsideLocalStorage(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)
