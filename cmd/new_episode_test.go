@@ -158,7 +158,7 @@ func TestNewEpisodeTUIResizeGrowsDescription(t *testing.T) {
 	tui := newNewEpisodeTUIModel(atom, defaultNewEpisodeInputs(atom, specFile))
 	tui.resize(100, 50)
 	view := tui.View()
-	if !strings.Contains(view, "Test Podcast: Prepare a plan for a new episode") {
+	if !strings.Contains(view, "Test Podcast") || !strings.Contains(view, "Prepare a plan for a new episode") {
 		t.Fatalf("View() missing title: %q", view)
 	}
 	if tui.desc.Height() < 16 {
@@ -321,6 +321,9 @@ func TestNewEpisodeTUIEnterOpensFilePickerScreen(t *testing.T) {
 	if !strings.Contains(view, "No files found.") && !strings.Contains(view, "Image") {
 		t.Fatalf("picker view missing huh file picker content: %q", view)
 	}
+	if !strings.Contains(view, "arrows/j/k move") || !strings.Contains(view, "esc close") {
+		t.Fatalf("picker view missing picker help: %q", view)
+	}
 }
 
 func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
@@ -345,8 +348,8 @@ func TestNewEpisodeTUIPickerOverlaysVisualRows(t *testing.T) {
 		t.Fatalf("picker rendered below description, want visual overlay before it: picker=%d description=%d view=%q", picker, description, view)
 	}
 	lines := strings.Split(view, "\n")
-	if !strings.Contains(lines[17], "Input") {
-		t.Fatalf("picker did not align to input row: line 17 = %q view=%q", lines[17], view)
+	if !strings.Contains(lines[18], "Input") {
+		t.Fatalf("picker did not align to input row: line 18 = %q view=%q", lines[18], view)
 	}
 }
 

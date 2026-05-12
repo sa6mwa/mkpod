@@ -151,7 +151,7 @@ func newNewEpisodeTUIModel(atom *model.Podcast, inputs newEpisodeInputs) newEpis
 		focus:            newEpisodeFieldTitle,
 		width:            100,
 		height:           32,
-		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("252")),
+		titleStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("0")).Background(lipgloss.Color("215")).Padding(0, 1),
 		subtitleStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
 		labelStyle:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
 		focusedStyle:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("215")),
@@ -252,7 +252,8 @@ func (m newEpisodeTUIModel) formLines() []string {
 	bodyWidth := m.bodyWidth()
 	var lines []string
 	lines = append(lines,
-		m.titleStyle.Render(m.formHeaderTitle()+":")+" "+m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
+		m.titleStyle.Render(m.formHeaderTitle()),
+		m.subtitleStyle.Render("Prepare a plan for a new episode. Nothing is written to podspec.yaml until apply."),
 		"",
 		m.renderTopFields(bodyWidth),
 		"",
@@ -297,7 +298,7 @@ func (m *newEpisodeTUIModel) resize(width, height int) {
 
 	topHeight := lipgloss.Height(m.renderTopFields(bodyWidth))
 	const outerPaddingRows = 0
-	const headerRows = 2
+	const headerRows = 3
 	const descriptionChromeRows = 4
 	const helpRows = 1
 	fixedRows := outerPaddingRows + headerRows + topHeight + descriptionChromeRows + helpRows
@@ -418,7 +419,7 @@ func (m newEpisodeTUIModel) renderDescription(width int) string {
 
 func (m newEpisodeTUIModel) helpText() string {
 	if m.picking {
-		return "arrows/j/k move  enter/l/right select/open  h/left parent  esc close picker"
+		return "arrows/j/k move  enter select/open  h/left parent  esc close"
 	}
 	if m.focus == newEpisodeFieldDescription {
 		return "ctrl+s save plan  esc cancel  ctrl+j/ctrl+k move fields  enter newline"
@@ -434,7 +435,14 @@ func (m newEpisodeTUIModel) overlayPicker(lines []string) []string {
 	if m.picker != nil {
 		body = m.picker.View()
 	}
-	overlay := visualLines([]string{m.overlayBox(clampInt(m.width-4, 60, 120), body)})
+	help := m.pickerHelpLine()
+	overlay := visualLines([]string{
+		m.overlayBox(clampInt(m.width-4, 60, 120), body),
+		help,
+	})
+	if len(overlay) > 0 {
+		overlay[len(overlay)-1] = help
+	}
 	return overlayLines(lines, overlay, m.pickerOverlayTop())
 }
 
@@ -444,6 +452,14 @@ func (m newEpisodeTUIModel) overlayBox(width int, body string) string {
 		lipgloss.Center,
 		lipgloss.NewStyle().Width(m.pickerWidth()).Render(body),
 	)
+}
+
+func (m newEpisodeTUIModel) pickerHelpLine() string {
+	return lipgloss.NewStyle().
+		MarginLeft(4).
+		Foreground(lipgloss.Color("244")).
+		MaxWidth(maxInt(20, m.width-8)).
+		Render(m.helpText())
 }
 
 func overlayLines(base []string, overlay []string, top int) []string {
@@ -522,7 +538,7 @@ func (m newEpisodeTUIModel) pickerOverlayTop() int {
 }
 
 func (m newEpisodeTUIModel) fieldVisualRow(field int) int {
-	const topFieldsStart = 2
+	const topFieldsStart = 3
 	switch field {
 	case newEpisodeFieldUID, newEpisodeFieldAuthor:
 		return topFieldsStart
