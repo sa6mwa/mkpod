@@ -157,13 +157,25 @@ func TestDecideEpisodeFullApplySchedulesEncodeAndSingleRSSRegeneration(t *testin
 		Metadata: appliedMetadata(),
 		Master:   syncedMaster(),
 		ProductionAudio: ObjectState{
-			Label: "episode output",
-			Key:   "episode.m4a",
+			Label:     "episode output",
+			Bucket:    "output",
+			Key:       "episode.m4a",
+			LocalPath: "/pod/episode.m4a",
 		},
 		RSSDirty: true,
 	}, Options{})
 
 	requireOperation(t, decision, OperationEncode)
+	upload := requireOperation(t, decision, OperationUploadProduction)
+	if upload.Bucket != "output" || upload.Key != "episode.m4a" || upload.LocalPath != "/pod/episode.m4a" {
+		t.Fatalf("upload operation = %+v, want planned production upload", upload)
+	}
+	if upload.Reason != "newly encoded production audio will be uploaded" {
+		t.Fatalf("upload reason = %q", upload.Reason)
+	}
+	if !upload.RequiresPrompt {
+		t.Fatal("upload RequiresPrompt = false, want true")
+	}
 	rssOps := countOperations(decision, OperationRegenerateRSS)
 	if rssOps != 1 {
 		t.Fatalf("RSS operations = %d, want 1: %+v", rssOps, decision.Operations)

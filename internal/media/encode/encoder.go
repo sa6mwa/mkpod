@@ -31,6 +31,7 @@ type EncodeOptions struct {
 	All            bool
 	EpisodeUID     *int64
 	ForceReencode  bool
+	NeverReencode  bool
 	PrepareEpisode PrepareEncodeFunc
 }
 
@@ -72,6 +73,8 @@ func (e *Service) shouldEncode(ctx context.Context, options EncodeOptions, filen
 		return true
 	} else if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return true
+	} else if options.NeverReencode {
+		return false
 	} else if options.All {
 		return false
 	}

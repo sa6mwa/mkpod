@@ -321,6 +321,18 @@ func decideProduction(production ObjectState, productionKnown, masterSynced, ree
 			Reason:     "production audio is missing",
 			DefaultYes: true,
 		})
+		if production.Key != "" {
+			addOperation(Operation{
+				Kind:           OperationUploadProduction,
+				ObjectKind:     ObjectProductionAudio,
+				Label:          label,
+				Bucket:         production.Bucket,
+				Key:            production.Key,
+				LocalPath:      production.LocalPath,
+				Reason:         "newly encoded production audio will be uploaded",
+				RequiresPrompt: true,
+			})
+		}
 		return false
 	}
 	addCheck("production", label, false, "production audio is missing and master is not ready")

@@ -30,6 +30,12 @@ func TestShouldEncodeUsesExplicitOptions(t *testing.T) {
 	if !service.shouldEncode(context.Background(), EncodeOptions{ForceReencode: true}, existing) {
 		t.Fatal("ForceReencode should re-encode existing files")
 	}
+	if service.shouldEncode(context.Background(), EncodeOptions{NeverReencode: true}, existing) {
+		t.Fatal("NeverReencode should skip existing files")
+	}
+	if !service.shouldEncode(context.Background(), EncodeOptions{NeverReencode: true}, filepath.Join(tempDir, "missing.mp3")) {
+		t.Fatal("NeverReencode should still encode missing output files")
+	}
 	if service.shouldEncode(context.Background(), EncodeOptions{All: true}, existing) {
 		t.Fatal("All without force should skip existing files")
 	}

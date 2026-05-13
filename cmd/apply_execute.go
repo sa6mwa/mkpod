@@ -111,7 +111,8 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 				All:                   false,
 				AskNoQuestions:        true,
 				ForceReencode:         operation.Kind == workflow.OperationEncode && options.Reencode,
-				SkipOutputUpload:      options.Reencode && planUploadsProduction,
+				NeverReencode:         operation.Kind == workflow.OperationRepairMetadata,
+				SkipOutputUpload:      planUploadsProduction,
 				LocalOnly:             storage == nil,
 				PreserveLastBuildDate: true,
 			}); err != nil {

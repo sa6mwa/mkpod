@@ -115,6 +115,38 @@ func TestBuildNewEpisodeApplyDecisionRemoteProductionWithCompleteMetadataDoesNot
 	}
 }
 
+func TestBuildNewEpisodeApplyDecisionMissingProductionPlansUploadAfterEncode(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	masterPath := filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.flac")
+	writeFile(t, masterPath, []byte("master"))
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	plan.Episode.Input = "masters/new.flac"
+	plan.Episode.Output = "new.m4a"
+	remote := &applyPreflightRemote{infos: map[string]*s3store.FileInfo{
+		"input/masters/new.flac": {Exists: true, Size: int64(len("master"))},
+	}}
+
+	decision, err := buildNewEpisodeApplyDecision(context.Background(), plan, applyPreflightOptions{}, remote)
+	if err != nil {
+		t.Fatalf("buildNewEpisodeApplyDecision() error = %v", err)
+	}
+	requireWorkflowOperation(t, decision, workflow.OperationEncode)
+	upload := requireWorkflowOperation(t, decision, workflow.OperationUploadProduction)
+	if upload.Bucket != "output" || upload.Key != "new.m4a" {
+		t.Fatalf("upload operation = %+v, want output/new.m4a", upload)
+	}
+	if !upload.RequiresPrompt {
+		t.Fatal("upload RequiresPrompt = false, want true")
+	}
+}
+
 func TestBuildNewEpisodeApplyDecisionReencodeExistingLocalProduction(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)

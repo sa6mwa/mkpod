@@ -83,6 +83,7 @@ type encodeWorkflowOptions struct {
 	LocalOnly             bool
 	PreserveLastBuildDate bool
 	ForceReencode         bool
+	NeverReencode         bool
 	SkipOutputUpload      bool
 }
 
@@ -195,6 +196,7 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 			result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
 				EpisodeUID:     &uid,
 				ForceReencode:  options.ForceReencode,
+				NeverReencode:  options.NeverReencode,
 				PrepareEpisode: prepareEpisode,
 			}, postEncodeFunc)
 			if err != nil {
