@@ -37,7 +37,12 @@ var applyCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		l := logger.DefaultLogger()
-		if err := applySavedPlan(context.Background(), args[0]); err != nil {
+		options, err := applySavedPlanOptionsFromCommand(cmd)
+		if err != nil {
+			l.Error("Unable to read apply options", "error", err)
+			os.Exit(1)
+		}
+		if err := applySavedPlanWithOptions(context.Background(), args[0], nil, options); err != nil {
 			l.Error("Unable to apply saved workflow plan", "error", err)
 			os.Exit(1)
 		}
@@ -145,6 +150,12 @@ var planFeedCmd = &cobra.Command{
 type savedPlan struct {
 	Workflow string          `json:"workflow"`
 	Plan     json.RawMessage `json:"plan"`
+}
+
+type applySavedPlanOptions struct {
+	JustMaster bool
+	Yes        bool
+	Force      bool
 }
 
 type episodeWorkflowPlan struct {
@@ -283,6 +294,10 @@ func applySavedPlan(ctx context.Context, path string) error {
 }
 
 func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRunner blenderaddon.Runner) error {
+	return applySavedPlanWithOptions(ctx, path, blenderRunner, applySavedPlanOptions{})
+}
+
+func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner blenderaddon.Runner, options applySavedPlanOptions) error {
 	saved, err := loadSavedPlan(path)
 	if err != nil {
 		return err
@@ -334,6 +349,15 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
 			return err
 		}
+		decision, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
+			JustMaster: options.JustMaster,
+			Yes:        options.Yes,
+			Force:      options.Force,
+		}, nil)
+		if err != nil {
+			return err
+		}
+		writeWorkflowDecision(os.Stdout, decision)
 		return applyNewEpisodeWorkflow(ctx, &plan)
 	case "preprocess":
 		var plan preprocess.Plan
@@ -347,6 +371,22 @@ func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRu
 	default:
 		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
 	}
+}
+
+func applySavedPlanOptionsFromCommand(cmd *cobra.Command) (applySavedPlanOptions, error) {
+	justMaster, err := cmd.Flags().GetBool("just-master")
+	if err != nil {
+		return applySavedPlanOptions{}, err
+	}
+	yes, err := cmd.Flags().GetBool("yes")
+	if err != nil {
+		return applySavedPlanOptions{}, err
+	}
+	force, err := cmd.Flags().GetBool("force")
+	if err != nil {
+		return applySavedPlanOptions{}, err
+	}
+	return applySavedPlanOptions{JustMaster: justMaster, Yes: yes, Force: force}, nil
 }
 
 func inspectSavedPlan(path string) error {
@@ -379,6 +419,12 @@ func inspectSavedPlan(path string) error {
 			return err
 		}
 		printNewEpisodePlan(&plan)
+		decision, err := buildNewEpisodeApplyDecision(context.Background(), &plan, applyPreflightOptions{}, nil)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(os.Stdout)
+		writeWorkflowDecision(os.Stdout, decision)
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -848,6 +894,10 @@ func printRemoteObjectPlan(label string, plan remoteObjectPlan) {
 func init() {
 	rootCmd.AddCommand(applyCmd)
 	rootCmd.AddCommand(inspectCmd)
+
+	applyCmd.Flags().Bool("just-master", false, "Apply only podspec metadata, master media sync, and encode-time artifact sync")
+	applyCmd.Flags().BoolP("yes", "y", false, "Answer yes to non-destructive upfront apply decisions")
+	applyCmd.Flags().BoolP("force", "f", false, "Force overwrite decisions; local source files must already exist")
 
 	planCmd.AddCommand(planBlenderCmd)
 	planCmd.AddCommand(planPreprocessCmd)

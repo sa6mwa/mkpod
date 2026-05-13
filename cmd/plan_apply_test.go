@@ -74,6 +74,11 @@ func TestApplyCommandHasNoWorkflowSubcommands(t *testing.T) {
 	if got, want := applyCmd.Use, "apply <plan.json>"; got != want {
 		t.Fatalf("apply Use = %q, want %q", got, want)
 	}
+	for _, flag := range []string{"just-master", "yes", "force"} {
+		if applyCmd.Flags().Lookup(flag) == nil {
+			t.Fatalf("apply flag %q is missing", flag)
+		}
+	}
 }
 
 func TestInspectSavedNewEpisodePlan(t *testing.T) {
