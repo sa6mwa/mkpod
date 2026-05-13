@@ -657,3 +657,44 @@ That component should:
 
 This should keep invariants in one place. The command layer should not duplicate
 the same remote/local safety rules in multiple branches.
+
+### Renew Existing Episodes
+
+Some workflows need to re-apply, repair, or re-encode episodes that already
+exist in `podspec.yaml` and no longer have an original `new.plan.json`.
+
+`mkpod renew` should create saved plans from existing episode metadata:
+
+```sh
+mkpod renew 34
+mkpod renew all
+mkpod inspect renew-34.plan.json
+mkpod apply renew-34.plan.json
+```
+
+`renew` should not mutate by itself. It should only read `podspec.yaml`, build
+one or more saved plans, and let `mkpod apply <plan.json>` execute them.
+
+Command shape:
+
+- `mkpod renew <uid>` creates a plan for one existing episode.
+- `mkpod renew all` creates plans for all existing episodes.
+
+Use the positional `all` form rather than `--all`, because the command already
+takes a positional episode selector and `all` is the natural selector value.
+
+The generated renew plan should use the same `internal/workflow` state machine
+as new episode plans. It should support the same apply behavior:
+
+- upfront validation and decisions,
+- idempotent resume/no-op behavior,
+- master sync,
+- encode-time artifact sync,
+- production audio repair/sync,
+- optional encode,
+- one final local RSS regeneration decision,
+- no RSS upload from apply.
+
+Conceptually, `renew <uid|all>` replaces the old habit of directly running
+`mkpod encode <uid>` or `mkpod encode --all` when the desired operation is to
+bring existing episode artifacts back into the expected state.
