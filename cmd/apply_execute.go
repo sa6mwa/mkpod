@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/sa6mwa/mkpod/internal/app/model"
+	logger "github.com/sa6mwa/mkpod/internal/logging"
 	"github.com/sa6mwa/mkpod/internal/prompt"
+	"github.com/sa6mwa/mkpod/internal/rss"
 	"github.com/sa6mwa/mkpod/internal/spec"
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 	workflow "github.com/sa6mwa/mkpod/internal/workflow"
@@ -19,6 +22,7 @@ import (
 type applyWorkflowStorage interface {
 	applyRemoteInspector
 	DownloadFile(context.Context, string, string) error
+	FileExists(context.Context, string, string) (bool, error)
 	UploadFile(context.Context, string, string, string, *s3store.UploadOptions) error
 }
 
@@ -56,6 +60,66 @@ func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decisi
 	return nil
 }
 
+func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision workflow.Decision, options applySavedPlanOptions, storage applyWorkflowStorage) error {
+	if err := requireApplyDecisionProceed(decision, options); err != nil {
+		return err
+	}
+	if err := applyNewEpisodePlan(ctx, plan); err != nil {
+		return err
+	}
+	atom, err := spec.New(plan.SpecFile).Load(ctx)
+	if err != nil {
+		return err
+	}
+	for _, operation := range decision.Operations {
+		switch operation.Kind {
+		case workflow.OperationWriteMetadata:
+			continue
+		case workflow.OperationUploadMaster, workflow.OperationUploadArtifact:
+			if storage == nil {
+				continue
+			}
+			if err := uploadApplyObject(ctx, atom, storage, operation); err != nil {
+				return err
+			}
+		case workflow.OperationDownloadMaster, workflow.OperationDownloadArtifact, workflow.OperationDownloadProduction:
+			if storage == nil {
+				continue
+			}
+			if err := storage.DownloadFile(ctx, operation.Bucket, operation.Key); err != nil {
+				return fmt.Errorf("download %s %s from bucket %s: %w", operation.Label, operation.Key, operation.Bucket, err)
+			}
+		case workflow.OperationUploadProduction:
+			if storage == nil {
+				continue
+			}
+			if err := uploadApplyObject(ctx, atom, storage, operation); err != nil {
+				return err
+			}
+		case workflow.OperationEncode, workflow.OperationRepairMetadata:
+			if err := runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.Episode.UID, 10)}, encodeWorkflowOptions{
+				SpecFile:              plan.SpecFile,
+				All:                   false,
+				AskNoQuestions:        true,
+				LocalOnly:             storage == nil,
+				PreserveLastBuildDate: true,
+			}); err != nil {
+				return err
+			}
+		case workflow.OperationRegenerateRSS:
+			if err := regenerateApplyRSS(ctx, plan.SpecFile); err != nil {
+				return err
+			}
+		case workflow.OperationNoop:
+			continue
+		default:
+			return fmt.Errorf("unexpected apply operation %q", operation.Kind)
+		}
+	}
+	printPostApplyPublishHint(plan.SpecFile)
+	return nil
+}
+
 func uploadApplyObject(ctx context.Context, atom *model.Podcast, storage applyWorkflowStorage, operation workflow.Operation) error {
 	if operation.LocalPath == "" {
 		return fmt.Errorf("upload %s: local path is empty", operation.Label)
@@ -65,6 +129,14 @@ func uploadApplyObject(ctx context.Context, atom *model.Podcast, storage applyWo
 		return fmt.Errorf("upload %s %s to bucket %s: %w", operation.Label, operation.Key, operation.Bucket, err)
 	}
 	return nil
+}
+
+func regenerateApplyRSS(ctx context.Context, specFile string) error {
+	atom, err := spec.New(specFile).Load(ctx)
+	if err != nil {
+		return err
+	}
+	return rss.New().WriteRSS(ctx, atom)
 }
 
 func requireApplyDecisionProceed(decision workflow.Decision, options applySavedPlanOptions) error {

@@ -806,7 +806,7 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 		Episode:  episodeFixtureForNewPlan(2),
 	})
 
-	if err := applySavedPlan(context.Background(), planPath); err != nil {
+	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{Yes: true}); err != nil {
 		t.Fatalf("applySavedPlan() error = %v", err)
 	}
 	atom, err = specStoreLoadForTest(t, specFile)
@@ -824,6 +824,9 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 	}
 	if _, err := os.Stat(atom.FeedFilePath()); err != nil {
 		t.Fatalf("generated RSS missing: %v", err)
+	}
+	if !atom.LastBuildDate.IsZero() {
+		t.Fatalf("lastBuildDate = %s, want unchanged by apply", atom.LastBuildDate.Time)
 	}
 }
 
@@ -845,7 +848,7 @@ func TestApplySavedNewEpisodePlanResumesExistingMetadataAndEncodes(t *testing.T)
 		Episode:  episode,
 	})
 
-	if err := applySavedPlan(context.Background(), planPath); err != nil {
+	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{Yes: true}); err != nil {
 		t.Fatalf("applySavedPlan() error = %v", err)
 	}
 	atom, err = specStoreLoadForTest(t, specFile)

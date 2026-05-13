@@ -68,12 +68,20 @@ func newEpisodeMetadataState(atom *model.Podcast, episode *model.Episode) workfl
 
 func newEpisodeWorkflowArtifacts(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) []workflow.ObjectState {
 	artifacts := make([]workflow.ObjectState, 0, 2)
-	if strings.TrimSpace(atom.Encoding.Coverfront) != "" {
-		artifacts = append(artifacts, newWorkflowObjectInBuckets(ctx, atom, inspector, workflow.ObjectEncodeArtifact, "cover image", []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}, atom.Encoding.Coverfront, true))
+	seen := make(map[string]struct{})
+	appendArtifact := func(label, rawKey string) {
+		key := normalizeStorageKey(atom, rawKey)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		artifacts = append(artifacts, newWorkflowObjectInBuckets(ctx, atom, inspector, workflow.ObjectEncodeArtifact, label, []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}, key, true))
 	}
-	if image := spec.EffectiveEpisodeImage(atom, episode); strings.TrimSpace(image) != "" {
-		artifacts = append(artifacts, newWorkflowObjectInBuckets(ctx, atom, inspector, workflow.ObjectEncodeArtifact, "episode image", []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}, image, true))
-	}
+	appendArtifact("cover image", atom.Encoding.Coverfront)
+	appendArtifact("episode image", spec.EffectiveEpisodeImage(atom, episode))
 	return artifacts
 }
 

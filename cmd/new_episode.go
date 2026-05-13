@@ -518,30 +518,6 @@ func newEpisodePlanMatchesExisting(planned, existing *model.Episode) bool {
 	return true
 }
 
-func applyNewEpisodeWorkflow(ctx context.Context, plan *newEpisodePlan) error {
-	if err := applyNewEpisodePlan(ctx, plan); err != nil {
-		return err
-	}
-	if err := runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.Episode.UID, 10)}, encodeWorkflowOptions{
-		SpecFile:       plan.SpecFile,
-		All:            false,
-		AskNoQuestions: false,
-		LocalOnly:      true,
-	}); err != nil {
-		return err
-	}
-	if err := runFeedWorkflow(logger.WithDefaultLogger(ctx), nil, feedWorkflowOptions{
-		SpecFile:       plan.SpecFile,
-		AskNoQuestions: false,
-		DryRun:         false,
-		Upload:         false,
-	}); err != nil {
-		return err
-	}
-	printPostApplyPublishHint(plan.SpecFile)
-	return nil
-}
-
 func printPostApplyPublishHint(specFile string) {
 	if specFile == spec.DefaultSpecfile {
 		fmt.Println("Publish with: mkpod publish")

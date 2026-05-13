@@ -76,11 +76,12 @@ Use --all --force to re-encode all episodes regardless.`,
 }
 
 type encodeWorkflowOptions struct {
-	SpecFile           string
-	All                bool
-	AskNoQuestions     bool
-	RemoveRemoteMaster bool
-	LocalOnly          bool
+	SpecFile              string
+	All                   bool
+	AskNoQuestions        bool
+	RemoveRemoteMaster    bool
+	LocalOnly             bool
+	PreserveLastBuildDate bool
 }
 
 func encodeWorkflowOptionsFromFlags(cmd *cobra.Command) (encodeWorkflowOptions, error) {
@@ -212,6 +213,12 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 		shouldSave = prompter.Ask(ctx, "Podcast metadata changed, rewrite %s?", options.SpecFile)
 	}
 	if shouldSave {
+		if options.PreserveLastBuildDate {
+			if err := savePodcastSpec(options.SpecFile, atom); err != nil {
+				return fmt.Errorf("unable to save configuration %s: %w", options.SpecFile, err)
+			}
+			return nil
+		}
 		atom.LastBuildDate.Time = time.Now().UTC()
 		if err := config.Save(ctx, atom); err != nil {
 			return fmt.Errorf("unable to save configuration %s: %w", options.SpecFile, err)

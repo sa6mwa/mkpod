@@ -388,7 +388,7 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 			}
 			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage)
 		}
-		return applyNewEpisodeWorkflow(ctx, &plan)
+		return applyNewEpisodeFull(ctx, &plan, decision, options, storage)
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {

@@ -60,6 +60,14 @@ func (f *fakeApplyStorage) DownloadFile(_ context.Context, bucket, key string) e
 	return nil
 }
 
+func (f *fakeApplyStorage) FileExists(_ context.Context, bucket, key string) (bool, error) {
+	info, err := f.GetFileInfo(context.Background(), bucket, key)
+	if err != nil {
+		return false, err
+	}
+	return info.Exists, nil
+}
+
 func (f *fakeApplyStorage) UploadFile(_ context.Context, bucket, key, filename string, _ *s3store.UploadOptions) error {
 	f.uploads = append(f.uploads, bucket+"/"+key+"="+filename)
 	return nil
