@@ -372,20 +372,20 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 			return err
 		}
 		writeWorkflowDecision(os.Stdout, decision)
-		if options.JustMaster {
-			if inspector != nil {
-				rechecked, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
-					JustMaster: options.JustMaster,
-					Yes:        options.Yes,
-					Force:      options.Force,
-				}, inspector)
-				if err != nil {
-					return err
-				}
-				if !sameWorkflowDecision(decision, rechecked) {
-					return errors.New("apply preflight changed before execution; rerun mkpod apply")
-				}
+		if inspector != nil {
+			rechecked, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
+				JustMaster: options.JustMaster,
+				Yes:        options.Yes,
+				Force:      options.Force,
+			}, inspector)
+			if err != nil {
+				return err
 			}
+			if !sameWorkflowDecision(decision, rechecked) {
+				return errors.New("apply preflight changed before execution; rerun mkpod apply")
+			}
+		}
+		if options.JustMaster {
 			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage)
 		}
 		return applyNewEpisodeFull(ctx, &plan, decision, options, storage)
