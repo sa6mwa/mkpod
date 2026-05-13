@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,9 +16,15 @@ import (
 
 type applyPreflightRemote struct {
 	infos map[string]*s3store.FileInfo
+	errs  map[string]error
 }
 
 func (r *applyPreflightRemote) GetFileInfo(_ context.Context, bucket, key string) (*s3store.FileInfo, error) {
+	if r.errs != nil {
+		if err, ok := r.errs[bucket+"/"+key]; ok {
+			return nil, err
+		}
+	}
 	if r.infos == nil {
 		return &s3store.FileInfo{Exists: false}, nil
 	}
@@ -54,6 +61,26 @@ func TestBuildNewEpisodeApplyDecisionJustMasterUploadsLocalMaster(t *testing.T) 
 	}
 	if hasWorkflowOperation(decision, workflow.OperationEncode) {
 		t.Fatalf("just-master decision included encode: %+v", decision.Operations)
+	}
+}
+
+func TestBuildNewEpisodeApplyDecisionPropagatesRemoteInspectionError(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	plan.Episode.Input = "masters/new.wav"
+	remote := &applyPreflightRemote{errs: map[string]error{
+		"input/masters/new.wav": errors.New("head denied"),
+	}}
+
+	_, err := buildNewEpisodeApplyDecision(context.Background(), plan, applyPreflightOptions{}, remote)
+	if err == nil {
+		t.Fatal("buildNewEpisodeApplyDecision() error = nil, want remote inspection error")
+	}
+	if !strings.Contains(err.Error(), "inspect remote episode master masters/new.wav in bucket input") || !strings.Contains(err.Error(), "head denied") {
+		t.Fatalf("buildNewEpisodeApplyDecision() error = %v", err)
 	}
 }
 

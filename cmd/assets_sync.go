@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	logger "github.com/sa6mwa/mkpod/internal/logging"
@@ -68,6 +69,10 @@ func syncLocalAssetFromBuckets(ctx context.Context, atom *model.Podcast, client 
 }
 
 func collectReferencedImages(atom *model.Podcast) []referencedImage {
+	return collectReferencedImagesAt(atom, time.Now())
+}
+
+func collectReferencedImagesAt(atom *model.Podcast, now time.Time) []referencedImage {
 	seen := make(map[string]struct{})
 	images := make([]referencedImage, 0)
 	appendImage := func(key, label string) {
@@ -87,8 +92,11 @@ func collectReferencedImages(atom *model.Podcast) []referencedImage {
 	}
 
 	appendImage(atom.Config.Image, "podcast")
-	appendImage(atom.Encoding.Coverfront, "cover")
-	for _, episode := range atom.Episodes {
+	renderable, _ := spec.RenderableEpisodes(atom, atom.Episodes)
+	for _, episode := range renderable {
+		if episode.PubDate.Time.IsZero() || episode.PubDate.Time.After(now) {
+			continue
+		}
 		appendImage(spec.EffectiveEpisodeImage(atom, &episode), fmt.Sprintf("episode %d", episode.UID))
 	}
 	return images

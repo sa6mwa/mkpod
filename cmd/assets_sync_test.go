@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
@@ -51,7 +53,19 @@ func TestSyncReferencedImagesForPublishDownloadsRemoteEpisodeImage(t *testing.T)
 			LocalStorageDir: workdir,
 			Aws:             model.AwsConfig{Region: "us-east-1", Buckets: model.Buckets{Output: "bucket"}},
 		},
-		Episodes: []model.Episode{{UID: 1, Image: "artwork/episode.jpg"}},
+		Author: "Host",
+		Episodes: []model.Episode{{
+			UID:         1,
+			Title:       "Published",
+			PubDate:     model.ItunesTime{Time: time.Now().Add(-time.Hour)},
+			Link:        "https://example.com/1",
+			Duration:    model.ItunesDuration{Duration: time.Minute},
+			Description: "Published episode",
+			Type:        "audio/mpeg",
+			Length:      10,
+			Image:       "artwork/episode.jpg",
+			Output:      "episode.mp3",
+		}},
 	}
 	mkdirAll(t, filepath.Join(workdir, "artwork"))
 	writeFile(t, filepath.Join(workdir, "artwork", "show.jpg"), []byte("jpeg"))
@@ -74,21 +88,74 @@ func TestSyncReferencedImagesForPublishFailsWhenImageMissingEverywhere(t *testin
 	atom := &model.Podcast{
 		Config: model.Config{
 			BaseURL:         "https://bucket.s3.us-east-1.amazonaws.com",
-			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/show.jpg",
+			Image:           "https://bucket.s3.us-east-1.amazonaws.com/artwork/missing-show.jpg",
 			LocalStorageDir: workdir,
 			Aws:             model.AwsConfig{Region: "us-east-1", Buckets: model.Buckets{Output: "bucket"}},
 		},
-		Episodes: []model.Episode{{UID: 1, Image: "artwork/missing.jpg"}},
 	}
-	mkdirAll(t, filepath.Join(workdir, "artwork"))
-	writeFile(t, filepath.Join(workdir, "artwork", "show.jpg"), []byte("jpeg"))
 	storage := &fakeStorageClient{infoResponses: map[string]*s3store.FileInfo{
-		"artwork/show.jpg":    {Exists: true, Size: int64(len("jpeg"))},
-		"artwork/missing.jpg": {Exists: false},
+		"artwork/missing-show.jpg": {Exists: false},
 	}}
 
 	if err := syncReferencedImagesForPublish(ctx, atom, &parseTestAsker{answer: true}, storage); err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestCollectReferencedImagesMatchesGeneratedRSSReferences(t *testing.T) {
+	now := time.Date(2026, 5, 14, 12, 0, 0, 0, time.UTC)
+	atom := &model.Podcast{
+		Config: model.Config{
+			Image:           "artwork/show.jpg",
+			DefaultPodImage: "artwork/default.jpg",
+		},
+	}
+	atom.Encoding.Coverfront = "artwork/coverfront.jpg"
+	atom.Episodes = []model.Episode{
+		{
+			UID:         1,
+			Title:       "Published",
+			PubDate:     model.ItunesTime{Time: now.Add(-time.Hour)},
+			Link:        "https://example.com/1",
+			Duration:    model.ItunesDuration{Duration: time.Minute},
+			Author:      "Host",
+			Description: "Published description",
+			Type:        "audio/mpeg",
+			Length:      10,
+			Image:       "artwork/published.jpg",
+			Output:      "published.mp3",
+		},
+		{
+			UID:         2,
+			Title:       "Future",
+			PubDate:     model.ItunesTime{Time: now.Add(time.Hour)},
+			Link:        "https://example.com/2",
+			Duration:    model.ItunesDuration{Duration: time.Minute},
+			Author:      "Host",
+			Description: "Future description",
+			Type:        "audio/mpeg",
+			Length:      10,
+			Image:       "artwork/future.jpg",
+			Output:      "future.mp3",
+		},
+		{
+			UID:         3,
+			Title:       "Invalid",
+			PubDate:     model.ItunesTime{Time: now.Add(-time.Hour)},
+			Author:      "Host",
+			Description: "Invalid description",
+			Image:       "artwork/invalid.jpg",
+		},
+	}
+
+	images := collectReferencedImagesAt(atom, now)
+	got := make([]string, 0, len(images))
+	for _, image := range images {
+		got = append(got, image.Key)
+	}
+	want := []string{"artwork/show.jpg", "artwork/published.jpg"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("referenced image keys = %v, want %v", got, want)
 	}
 }
 

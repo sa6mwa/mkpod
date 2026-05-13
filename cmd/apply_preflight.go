@@ -51,11 +51,20 @@ func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, option
 	}
 	input := workflow.EpisodeInput{
 		Metadata:        episodeMetadataState(atom, &episode, renew),
-		Master:          newWorkflowObject(ctx, atom, inspector, workflow.ObjectMaster, "episode master", atom.Config.Aws.Buckets.Input, episode.Input, true),
-		Artifacts:       newEpisodeWorkflowArtifacts(ctx, atom, inspector, &episode),
-		ProductionAudio: newEpisodeWorkflowProduction(ctx, atom, inspector, &episode),
 		ProductionKnown: len(spec.MissingFieldsForRSS(atom, &episode)) == 0,
 		RSSDirty:        !options.JustMaster,
+	}
+	input.Master, err = newWorkflowObject(ctx, atom, inspector, workflow.ObjectMaster, "episode master", atom.Config.Aws.Buckets.Input, episode.Input, true)
+	if err != nil {
+		return workflow.Decision{}, err
+	}
+	input.Artifacts, err = newEpisodeWorkflowArtifacts(ctx, atom, inspector, &episode)
+	if err != nil {
+		return workflow.Decision{}, err
+	}
+	input.ProductionAudio, err = newEpisodeWorkflowProduction(ctx, atom, inspector, &episode)
+	if err != nil {
+		return workflow.Decision{}, err
 	}
 	return workflow.DecideEpisode(input, workflow.Options{Mode: mode, Yes: options.Yes, Force: options.Force, Reencode: options.Reencode}), nil
 }
@@ -83,26 +92,35 @@ func episodeMetadataState(atom *model.Podcast, episode *model.Episode, renew boo
 	return state
 }
 
-func newEpisodeWorkflowArtifacts(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) []workflow.ObjectState {
+func newEpisodeWorkflowArtifacts(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) ([]workflow.ObjectState, error) {
 	artifacts := make([]workflow.ObjectState, 0, 2)
 	seen := make(map[string]struct{})
-	appendArtifact := func(label, rawKey string) {
+	appendArtifact := func(label, rawKey string) error {
 		key := normalizeStorageKey(atom, rawKey)
 		if key == "" {
-			return
+			return nil
 		}
 		if _, ok := seen[key]; ok {
-			return
+			return nil
 		}
 		seen[key] = struct{}{}
-		artifacts = append(artifacts, newWorkflowObjectInBuckets(ctx, atom, inspector, workflow.ObjectEncodeArtifact, label, []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}, key, true))
+		artifact, err := newWorkflowObjectInBuckets(ctx, atom, inspector, workflow.ObjectEncodeArtifact, label, []string{atom.Config.Aws.Buckets.Input, atom.Config.Aws.Buckets.Output}, key, true)
+		if err != nil {
+			return err
+		}
+		artifacts = append(artifacts, artifact)
+		return nil
 	}
-	appendArtifact("cover image", atom.Encoding.Coverfront)
-	appendArtifact("episode image", spec.EffectiveEpisodeImage(atom, episode))
-	return artifacts
+	if err := appendArtifact("cover image", atom.Encoding.Coverfront); err != nil {
+		return nil, err
+	}
+	if err := appendArtifact("episode image", spec.EffectiveEpisodeImage(atom, episode)); err != nil {
+		return nil, err
+	}
+	return artifacts, nil
 }
 
-func newEpisodeWorkflowProduction(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) workflow.ObjectState {
+func newEpisodeWorkflowProduction(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) (workflow.ObjectState, error) {
 	output := strings.TrimSpace(episode.Output)
 	if output == "" {
 		output = plannedEpisodeOutput(atom, episode)
@@ -129,11 +147,11 @@ func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode) string {
 	return planned.Output
 }
 
-func newWorkflowObject(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, kind workflow.ObjectKind, label, bucket, rawKey string, required bool) workflow.ObjectState {
+func newWorkflowObject(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, kind workflow.ObjectKind, label, bucket, rawKey string, required bool) (workflow.ObjectState, error) {
 	return newWorkflowObjectInBuckets(ctx, atom, inspector, kind, label, []string{bucket}, rawKey, required)
 }
 
-func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, kind workflow.ObjectKind, label string, buckets []string, rawKey string, required bool) workflow.ObjectState {
+func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, kind workflow.ObjectKind, label string, buckets []string, rawKey string, required bool) (workflow.ObjectState, error) {
 	key := normalizeStorageKey(atom, rawKey)
 	object := workflow.ObjectState{
 		Kind:      kind,
@@ -143,14 +161,14 @@ func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspec
 		Required:  required,
 	}
 	if key == "" {
-		return object
+		return object, nil
 	}
 	if info, err := os.Stat(object.LocalPath); err == nil {
 		object.Local.Exists = true
 		object.Local.Size = info.Size()
 	}
 	if inspector == nil {
-		return object
+		return object, nil
 	}
 	for _, bucket := range buckets {
 		bucket = strings.TrimSpace(bucket)
@@ -159,7 +177,7 @@ func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspec
 		}
 		remote, err := inspector.GetFileInfo(ctx, bucket, key)
 		if err != nil {
-			continue
+			return workflow.ObjectState{}, fmt.Errorf("inspect remote %s %s in bucket %s: %w", label, key, bucket, err)
 		}
 		object.Remote.Checked = true
 		if remote != nil && remote.Exists {
@@ -169,13 +187,13 @@ func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspec
 			object.Remote.ETag = remote.ETag
 			object.Remote.ContentType = remote.ContentType
 			object.Remote.LastModified = remote.LastModified
-			return object
+			return object, nil
 		}
 		if object.Bucket == "" {
 			object.Bucket = bucket
 		}
 	}
-	return object
+	return object, nil
 }
 
 func writeWorkflowDecision(w io.Writer, decision workflow.Decision) {
