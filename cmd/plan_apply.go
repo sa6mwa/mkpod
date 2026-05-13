@@ -22,11 +22,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var planCmd = &cobra.Command{
-	Use:   "plan <workflow>",
-	Short: "Preview mkpod workflow operations",
-}
-
 var applyCmd = &cobra.Command{
 	Use:   "apply <plan.json>",
 	Short: "Apply a saved mkpod workflow plan",
@@ -65,86 +60,6 @@ var inspectCmd = &cobra.Command{
 			l.Error("Unable to inspect saved workflow plan", "error", err)
 			os.Exit(1)
 		}
-	},
-}
-
-var planBlenderCmd = &cobra.Command{
-	Use:   "blender",
-	Short: "Preview Blender marker exporter installation",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		blender, err := cmd.Flags().GetString("blender")
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-		repo, err := cmd.Flags().GetString("repo")
-		if err != nil {
-			l.Error("Internal error", "error", err)
-			os.Exit(1)
-		}
-
-		plan, err := blenderaddon.BuildPlan(blenderaddon.Options{Blender: blender, Repo: repo})
-		if err != nil {
-			l.Error("Unable to plan Blender marker exporter installation", "error", err)
-			os.Exit(1)
-		}
-
-		printBlenderPlan(plan)
-		writePlan(cmd, "blender", plan, defaultPlanPath("blender", ""))
-	},
-}
-
-var planPreprocessCmd = &cobra.Command{
-	Use:     "preprocess [flags] audiofiles...",
-	Aliases: []string{"pre"},
-	Short:   "Preview audio preprocessing operations",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		plan, err := buildPreprocessPlan(cmd, args)
-		if err != nil {
-			l.Error("Unable to plan preprocessing", "error", err)
-			os.Exit(1)
-		}
-		printPreprocessPlan(plan)
-		writePlan(cmd, "preprocess", plan, defaultPlanPath("preprocess", ""))
-	},
-}
-
-var planEpisodeCmd = &cobra.Command{
-	Use:   "episode <uid>",
-	Short: "Preview episode encoding workflow",
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) != 1 {
-			return fmt.Errorf("provide exactly one episode UID")
-		}
-		_, err := strconv.ParseInt(args[0], 10, 64)
-		return err
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		plan, err := buildEpisodePlan(context.Background(), cmd, args[0])
-		if err != nil {
-			l.Error("Unable to plan episode workflow", "error", err)
-			os.Exit(1)
-		}
-		printEpisodePlan(plan)
-		writePlan(cmd, "episode", plan, defaultPlanPath("episode", mustGetStringFlag(cmd, "spec")))
-	},
-}
-
-var planFeedCmd = &cobra.Command{
-	Use:   "feed",
-	Short: "Preview RSS feed generation workflow",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		plan, err := buildFeedPlan(context.Background(), cmd, args)
-		if err != nil {
-			l.Error("Unable to plan feed workflow", "error", err)
-			os.Exit(1)
-		}
-		printFeedPlan(plan)
-		writePlan(cmd, "feed", plan, defaultPlanPath("feed", mustGetStringFlag(cmd, "spec")))
 	},
 }
 
@@ -208,28 +123,6 @@ type remoteObjectPlan struct {
 	Key    string
 	Exists string
 	Error  string
-}
-
-func buildPreprocessPlan(cmd *cobra.Command, args []string) (*preprocess.Plan, error) {
-	prefix, err := cmd.Flags().GetString("prefix")
-	if err != nil {
-		return nil, err
-	}
-	preset, err := cmd.Flags().GetString("preset")
-	if err != nil {
-		return nil, err
-	}
-	tool, err := cmd.Flags().GetString("ffmpeg")
-	if err != nil {
-		return nil, err
-	}
-
-	processor := preprocess.New(&preprocess.Config{
-		Prefix: prefix,
-		Preset: preset,
-		Tool:   tool,
-	})
-	return processor.Plan(args)
 }
 
 func writePlan(cmd *cobra.Command, workflow string, plan any, defaultPath string) string {
@@ -884,27 +777,6 @@ func init() {
 	applyCmd.Flags().BoolP("yes", "y", false, "Answer yes to non-destructive upfront apply decisions")
 	applyCmd.Flags().BoolP("force", "f", false, "Force overwrite decisions; local source files must already exist")
 
-	planCmd.AddCommand(planBlenderCmd)
-	planCmd.AddCommand(planPreprocessCmd)
-	planCmd.AddCommand(planEpisodeCmd)
-	planCmd.AddCommand(planFeedCmd)
-
-	planBlenderCmd.Flags().String("blender", "", "Blender executable path or name; defaults to blender on PATH")
-	planBlenderCmd.Flags().String("repo", "", "Blender extension repository identifier; defaults to user_default")
-	addPlanOutputFlag(planBlenderCmd)
-
-	addPreprocessWorkflowFlags(planPreprocessCmd)
-	addPlanOutputFlag(planPreprocessCmd)
-
-	planEpisodeCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
-	planEpisodeCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for planned remote objects")
-	planEpisodeCmd.Flags().BoolP("remove-remote-master", "R", false, "Preview remote input master removal after safety checks")
-	addPlanOutputFlag(planEpisodeCmd)
-
-	planFeedCmd.Flags().StringP("spec", "s", spec.DefaultSpecfile, "Podcast specification file")
-	planFeedCmd.Flags().Bool("remote", false, "Perform read-only S3 checks for the planned remote feed")
-	planFeedCmd.Flags().BoolP("upload", "u", false, "Preview podcast.rss upload and referenced image publish operations")
-	addPlanOutputFlag(planFeedCmd)
 }
 
 func addPlanOutputFlag(cmd *cobra.Command) {

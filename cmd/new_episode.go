@@ -65,26 +65,6 @@ var editCmd = &cobra.Command{
 	},
 }
 
-var planNewCmd = &cobra.Command{
-	Use:   "new",
-	Short: "Preview adding a new podcast episode",
-	Run: func(cmd *cobra.Command, args []string) {
-		l := logger.DefaultLogger()
-		plan, err := buildNewEpisodePlan(context.Background(), cmd, args, "")
-		if err != nil {
-			if errors.Is(err, errNewEpisodeFormCancelled) {
-				os.Exit(130)
-			}
-			l.Error("Unable to plan new episode", "error", err)
-			os.Exit(1)
-		}
-		printNewEpisodePlan(plan)
-		specFile := mustGetStringFlag(cmd, "spec")
-		planPath := writePlan(cmd, "new", plan, defaultPlanPath("new", specFile))
-		printNewEpisodeApplyHint(planPath)
-	},
-}
-
 type newEpisodePlan struct {
 	SpecFile string        `json:"specFile"`
 	Episode  model.Episode `json:"episode"`
@@ -695,13 +675,10 @@ func printEpisodeMutationPlan(workflow string, plan *newEpisodePlan) {
 func init() {
 	rootCmd.AddCommand(newCmd)
 	rootCmd.AddCommand(editCmd)
-	planCmd.AddCommand(planNewCmd)
 	addNewEpisodeFlags(newCmd)
 	addNewEpisodeFlags(editCmd)
-	addNewEpisodeFlags(planNewCmd)
 	addPlanOutputFlag(newCmd)
 	addPlanOutputFlag(editCmd)
-	addPlanOutputFlag(planNewCmd)
 	newCmd.Flags().StringP("edit", "e", "", "Edit a saved new episode plan JSON file")
 }
 
