@@ -806,7 +806,7 @@ func TestApplySavedNewEpisodePlan(t *testing.T) {
 		Episode:  episodeFixtureForNewPlan(2),
 	})
 
-	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{Yes: true}); err != nil {
+	if err := applySavedPlanWithOptions(context.Background(), planPath, applySavedPlanOptions{Yes: true}); err != nil {
 		t.Fatalf("applySavedPlan() error = %v", err)
 	}
 	atom, err = specStoreLoadForTest(t, specFile)
@@ -848,7 +848,7 @@ func TestApplySavedNewEpisodePlanResumesExistingMetadataAndEncodes(t *testing.T)
 		Episode:  episode,
 	})
 
-	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{Yes: true}); err != nil {
+	if err := applySavedPlanWithOptions(context.Background(), planPath, applySavedPlanOptions{Yes: true}); err != nil {
 		t.Fatalf("applySavedPlan() error = %v", err)
 	}
 	atom, err = specStoreLoadForTest(t, specFile)

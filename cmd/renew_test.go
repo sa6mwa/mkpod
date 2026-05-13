@@ -82,7 +82,7 @@ func TestApplyRenewPlanRejectsMissingExistingEpisode(t *testing.T) {
 		Episode:  episodeFixtureForNewPlan(2),
 	})
 
-	err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{JustMaster: true, Yes: true, Storage: &fakeApplyStorage{}})
+	err := applySavedPlanWithOptions(context.Background(), planPath, applySavedPlanOptions{JustMaster: true, Yes: true, Storage: &fakeApplyStorage{}})
 	if err == nil {
 		t.Fatal("applySavedPlanWithOptions() error = nil, want missing existing episode error")
 	}

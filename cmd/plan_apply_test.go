@@ -5,13 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/sa6mwa/mkpod/internal/blenderaddon"
-	"github.com/sa6mwa/mkpod/internal/media/preprocess"
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 )
 
@@ -143,7 +140,7 @@ func TestApplySavedNewEpisodePlanJustMasterWritesMetadataAndSyncsAssets(t *testi
 	})
 	storage := &fakeApplyStorage{}
 
-	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{JustMaster: true, Yes: true, Storage: storage}); err != nil {
+	if err := applySavedPlanWithOptions(context.Background(), planPath, applySavedPlanOptions{JustMaster: true, Yes: true, Storage: storage}); err != nil {
 		t.Fatalf("applySavedPlanWithOptions() error = %v", err)
 	}
 	atom, err = specStoreLoadForTest(t, specFile)
@@ -178,7 +175,7 @@ func TestApplySavedNewEpisodePlanJustMasterForceMissingLocalMasterDoesNotWriteMe
 		"input/masters/new.wav": {Exists: true, Size: 100},
 	}}
 
-	err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{JustMaster: true, Force: true, Storage: storage})
+	err := applySavedPlanWithOptions(context.Background(), planPath, applySavedPlanOptions{JustMaster: true, Force: true, Storage: storage})
 	if err == nil {
 		t.Fatal("applySavedPlanWithOptions() error = nil, want forced missing local master error")
 	}
@@ -194,73 +191,16 @@ func TestApplySavedNewEpisodePlanJustMasterForceMissingLocalMasterDoesNotWriteMe
 	}
 }
 
-func TestApplySavedPreprocessPlanRejectsStalePlan(t *testing.T) {
-	plan := preprocessPlanFixture(t)
-	plan.Prefix = "changed-"
+func TestApplySavedUnsupportedWorkflowRejects(t *testing.T) {
 	planPath := filepath.Join(t.TempDir(), "plan.json")
-	writeSavedPlanFixture(t, planPath, "preprocess", plan)
+	writeSavedPlanFixture(t, planPath, "preprocess", map[string]string{"input": "raw.wav"})
 
 	err := applySavedPlan(context.Background(), planPath)
 	if err == nil {
-		t.Fatal("applySavedPlan() error = nil, want stale plan error")
+		t.Fatal("applySavedPlan() error = nil, want unsupported workflow error")
 	}
-	if !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("applySavedPlan() error = %v, want stale plan error", err)
-	}
-}
-
-func TestApplySavedBlenderPlanRunsInstaller(t *testing.T) {
-	tool, err := exec.LookPath("sh")
-	if err != nil {
-		t.Fatalf("test requires sh on PATH: %v", err)
-	}
-	plan, err := blenderaddon.BuildPlan(blenderaddon.Options{Blender: tool})
-	if err != nil {
-		t.Fatalf("BuildPlan() error = %v", err)
-	}
-	planPath := filepath.Join(t.TempDir(), "plan.json")
-	writeSavedPlanFixture(t, planPath, "blender", plan)
-	runner := &savedBlenderRunner{}
-
-	if err := applySavedPlanWithBlenderRunner(context.Background(), planPath, runner); err != nil {
-		t.Fatalf("applySavedPlanWithBlenderRunner() error = %v", err)
-	}
-	if runner.name != tool {
-		t.Fatalf("runner name = %q, want %q", runner.name, tool)
-	}
-	wantPrefix := []string{"--command", "extension", "install-file", "-r", "user_default", "-e"}
-	if len(runner.args) != len(wantPrefix)+1 {
-		t.Fatalf("runner args = %v, want %v <package>", runner.args, wantPrefix)
-	}
-	for i := range wantPrefix {
-		if runner.args[i] != wantPrefix[i] {
-			t.Fatalf("runner args = %v, want %v <package>", runner.args, wantPrefix)
-		}
-	}
-	if !strings.HasSuffix(runner.args[len(runner.args)-1], ".zip") {
-		t.Fatalf("runner package arg = %q, want zip package", runner.args[len(runner.args)-1])
-	}
-}
-
-func TestApplySavedBlenderPlanRejectsStalePlan(t *testing.T) {
-	tool, err := exec.LookPath("sh")
-	if err != nil {
-		t.Fatalf("test requires sh on PATH: %v", err)
-	}
-	plan, err := blenderaddon.BuildPlan(blenderaddon.Options{Blender: tool})
-	if err != nil {
-		t.Fatalf("BuildPlan() error = %v", err)
-	}
-	plan.AddonModule = "changed"
-	planPath := filepath.Join(t.TempDir(), "plan.json")
-	writeSavedPlanFixture(t, planPath, "blender", plan)
-
-	err = applySavedPlanWithBlenderRunner(context.Background(), planPath, &savedBlenderRunner{})
-	if err == nil {
-		t.Fatal("applySavedPlanWithBlenderRunner() error = nil, want stale plan error")
-	}
-	if !strings.Contains(err.Error(), "stale") {
-		t.Fatalf("applySavedPlanWithBlenderRunner() error = %v, want stale plan error", err)
+	if !strings.Contains(err.Error(), "not supported by apply") {
+		t.Fatalf("applySavedPlan() error = %v, want unsupported workflow error", err)
 	}
 }
 
@@ -281,23 +221,6 @@ func TestValidateSavedEpisodePlanRejectsStalePlan(t *testing.T) {
 	}
 }
 
-func TestApplySavedFeedPlanWritesFeed(t *testing.T) {
-	specFile := writeWorkflowSpecFixture(t)
-	plan, err := buildFeedPlanFromOptions(context.Background(), specFile, false, false)
-	if err != nil {
-		t.Fatalf("buildFeedPlanFromOptions() error = %v", err)
-	}
-	planPath := filepath.Join(t.TempDir(), "feed.plan.json")
-	writeSavedPlanFixture(t, planPath, "feed", plan)
-
-	if err := applySavedPlan(context.Background(), planPath); err != nil {
-		t.Fatalf("applySavedPlan() error = %v", err)
-	}
-	if _, err := os.Stat(plan.FeedPath); err != nil {
-		t.Fatalf("expected feed to be written at %s: %v", plan.FeedPath, err)
-	}
-}
-
 func TestValidateSavedFeedPlanRejectsStalePlan(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	plan, err := buildFeedPlanFromOptions(context.Background(), specFile, false, false)
@@ -313,26 +236,6 @@ func TestValidateSavedFeedPlanRejectsStalePlan(t *testing.T) {
 	if !strings.Contains(err.Error(), "stale") {
 		t.Fatalf("validateSavedFeedPlan() error = %v, want stale plan error", err)
 	}
-}
-
-type savedBlenderRunner struct {
-	name string
-	args []string
-}
-
-func (r *savedBlenderRunner) Run(_ context.Context, name string, args ...string) error {
-	r.name = name
-	r.args = append([]string(nil), args...)
-	return nil
-}
-
-func preprocessPlanFixture(t *testing.T) *preprocess.Plan {
-	t.Helper()
-	plan, err := preprocess.New(&preprocess.Config{Tool: "sh", Preset: "sm7b", Prefix: "pre-"}).Plan([]string{"raw.wav"})
-	if err != nil {
-		t.Fatalf("Plan() error = %v", err)
-	}
-	return plan
 }
 
 func writeSavedPlanFixture(t *testing.T, path, workflow string, plan any) {

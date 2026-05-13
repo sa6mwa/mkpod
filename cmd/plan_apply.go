@@ -43,7 +43,7 @@ var applyCmd = &cobra.Command{
 			l.Error("Unable to read apply options", "error", err)
 			os.Exit(1)
 		}
-		if err := applySavedPlanWithOptions(context.Background(), args[0], nil, options); err != nil {
+		if err := applySavedPlanWithOptions(context.Background(), args[0], options); err != nil {
 			l.Error("Unable to apply saved workflow plan", "error", err)
 			os.Exit(1)
 		}
@@ -293,60 +293,15 @@ func loadSavedPlan(path string) (*savedPlan, error) {
 }
 
 func applySavedPlan(ctx context.Context, path string) error {
-	return applySavedPlanWithBlenderRunner(ctx, path, nil)
+	return applySavedPlanWithOptions(ctx, path, applySavedPlanOptions{})
 }
 
-func applySavedPlanWithBlenderRunner(ctx context.Context, path string, blenderRunner blenderaddon.Runner) error {
-	return applySavedPlanWithOptions(ctx, path, blenderRunner, applySavedPlanOptions{})
-}
-
-func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner blenderaddon.Runner, options applySavedPlanOptions) error {
+func applySavedPlanWithOptions(ctx context.Context, path string, options applySavedPlanOptions) error {
 	saved, err := loadSavedPlan(path)
 	if err != nil {
 		return err
 	}
 	switch saved.Workflow {
-	case "blender":
-		var plan blenderaddon.Plan
-		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
-			return err
-		}
-		if err := validateSavedBlenderPlan(&plan); err != nil {
-			return err
-		}
-		_, err := blenderaddon.Apply(ctx, blenderaddon.Options{
-			Blender: plan.BlenderPath,
-			Repo:    plan.Repo,
-		}, blenderRunner)
-		return err
-	case "episode":
-		var plan episodeWorkflowPlan
-		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
-			return err
-		}
-		if err := validateSavedEpisodePlan(ctx, &plan); err != nil {
-			return err
-		}
-		return runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.UID, 10)}, encodeWorkflowOptions{
-			SpecFile:           plan.SpecFile,
-			All:                false,
-			AskNoQuestions:     false,
-			RemoveRemoteMaster: plan.RemoveRemoteMaster,
-		})
-	case "feed":
-		var plan feedWorkflowPlan
-		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
-			return err
-		}
-		if err := validateSavedFeedPlan(ctx, &plan); err != nil {
-			return err
-		}
-		return runFeedWorkflow(logger.WithDefaultLogger(ctx), nil, feedWorkflowOptions{
-			SpecFile:       plan.SpecFile,
-			AskNoQuestions: false,
-			DryRun:         false,
-			Upload:         plan.Upload,
-		})
 	case "new", "renew":
 		var plan newEpisodePlan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -391,17 +346,8 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage, renew)
 		}
 		return applyNewEpisodeFull(ctx, &plan, decision, options, storage, renew)
-	case "preprocess":
-		var plan preprocess.Plan
-		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
-			return err
-		}
-		if err := validateSavedPreprocessPlan(&plan); err != nil {
-			return err
-		}
-		return preprocess.ExecutePlan(ctx, &plan)
 	default:
-		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
+		return fmt.Errorf("saved plan workflow %q is not supported by apply; use mkpod new or mkpod renew to create apply plans", saved.Workflow)
 	}
 }
 
