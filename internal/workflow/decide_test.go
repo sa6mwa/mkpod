@@ -60,6 +60,27 @@ func TestDecideEpisodeForceRequiresLocalMaster(t *testing.T) {
 	}
 }
 
+func TestDecideEpisodeYesCanDownloadMissingLocalMaster(t *testing.T) {
+	decision := DecideEpisode(EpisodeInput{
+		Metadata: appliedMetadata(),
+		Master: ObjectState{
+			Label:     "episode master",
+			Bucket:    "input",
+			Key:       "masters/episode.flac",
+			LocalPath: "/pod/masters/episode.flac",
+			Remote:    RemoteState{Checked: true, Exists: true, Size: 100},
+		},
+	}, Options{Mode: ModeJustMaster, Yes: true})
+
+	if decision.State == StateBlocked {
+		t.Fatalf("State = blocked, want downloadable master decision: %+v", decision)
+	}
+	operation := requireOperation(t, decision, OperationDownloadMaster)
+	if operation.RequiresPrompt {
+		t.Fatalf("download operation still requires prompt with --yes: %+v", operation)
+	}
+}
+
 func TestDecideEpisodeRemoteProductionAudioWithCompleteMetadataDoesNotDownload(t *testing.T) {
 	decision := DecideEpisode(EpisodeInput{
 		Metadata: appliedMetadata(),

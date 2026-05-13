@@ -109,7 +109,7 @@ func decideMetadata(metadata MetadataState, addCheck func(string, string, bool, 
 
 func decideMaster(master ObjectState, options Options, addCheck func(string, string, bool, string), addOperation func(Operation)) bool {
 	label := objectLabel(master, "master")
-	if options.autoYes() && !master.Local.Exists {
+	if options.Force && !master.Local.Exists {
 		addCheck("master", label, false, "forced master sync requires local master")
 		return false
 	}
