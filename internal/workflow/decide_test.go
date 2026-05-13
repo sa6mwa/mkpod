@@ -34,6 +34,32 @@ func TestDecideEpisodeJustMasterUploadsMissingRemoteMaster(t *testing.T) {
 	}
 }
 
+func TestDecideEpisodeJustMasterSyncsEncodeArtifacts(t *testing.T) {
+	decision := DecideEpisode(EpisodeInput{
+		Metadata: appliedMetadata(),
+		Master:   syncedMaster(),
+		Artifacts: []ObjectState{
+			{
+				Kind:      ObjectEncodeArtifact,
+				Label:     "episode image",
+				Bucket:    "input",
+				Key:       "artwork/episode.jpg",
+				LocalPath: "/pod/artwork/episode.jpg",
+				Local:     FileState{Exists: true, Size: 50},
+				Remote:    RemoteState{Checked: true, Exists: false},
+			},
+		},
+	}, Options{Mode: ModeJustMaster})
+
+	if decision.State != StateMasterSynced {
+		t.Fatalf("State = %q, want %q", decision.State, StateMasterSynced)
+	}
+	requireOperation(t, decision, OperationUploadArtifact)
+	if hasOperation(decision, OperationEncode) {
+		t.Fatalf("just-master decision included encode operation: %+v", decision.Operations)
+	}
+}
+
 func TestDecideEpisodeForceRequiresLocalMaster(t *testing.T) {
 	decision := DecideEpisode(EpisodeInput{
 		Metadata: appliedMetadata(),

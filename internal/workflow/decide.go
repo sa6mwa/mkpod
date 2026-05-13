@@ -32,11 +32,18 @@ func DecideEpisode(input EpisodeInput, options Options) Decision {
 	metadataApplied := decideMetadata(input.Metadata, addCheck, addOperation)
 	masterSynced := decideMaster(input.Master, options, addCheck, addOperation)
 
+	artifactsReady := true
+	for _, artifact := range input.Artifacts {
+		if !decideArtifact(artifact, addCheck, addOperation) {
+			artifactsReady = false
+		}
+	}
+
 	if mode == ModeJustMaster {
 		if decision.State == StateBlocked {
 			return decision
 		}
-		if metadataApplied && masterSynced {
+		if metadataApplied && masterSynced && artifactsReady {
 			decision.State = StateMasterSynced
 		} else if metadataApplied {
 			decision.State = StateMetadataApplied
@@ -44,13 +51,6 @@ func DecideEpisode(input EpisodeInput, options Options) Decision {
 			decision.State = StateNotStarted
 		}
 		return decision
-	}
-
-	artifactsReady := true
-	for _, artifact := range input.Artifacts {
-		if !decideArtifact(artifact, addCheck, addOperation) {
-			artifactsReady = false
-		}
 	}
 
 	productionSynced := decideProduction(input.ProductionAudio, input.ProductionKnown, masterSynced, addCheck, addOperation)
@@ -165,8 +165,36 @@ func decideMaster(master ObjectState, options Options, addCheck func(string, str
 
 func decideArtifact(artifact ObjectState, addCheck func(string, string, bool, string), addOperation func(Operation)) bool {
 	label := objectLabel(artifact, "artifact")
-	if artifact.Local.Exists {
-		addCheck("artifact", label, true, "local encode-time artifact exists")
+	if artifact.Local.Exists && !artifact.Remote.Exists {
+		addCheck("artifact", label, true, "local encode-time artifact exists and remote is missing")
+		addOperation(Operation{
+			Kind:           OperationUploadArtifact,
+			ObjectKind:     ObjectEncodeArtifact,
+			Label:          label,
+			Bucket:         artifact.Bucket,
+			Key:            artifact.Key,
+			LocalPath:      artifact.LocalPath,
+			Reason:         "remote encode-time artifact is missing",
+			RequiresPrompt: true,
+		})
+		return true
+	}
+	if artifact.Local.Exists && artifact.Remote.Exists {
+		if equivalent(artifact.Local, artifact.Remote) {
+			addCheck("artifact", label, true, "local and remote encode-time artifact match")
+			return true
+		}
+		addCheck("artifact", label, true, "local and remote encode-time artifact differ")
+		addOperation(Operation{
+			Kind:           OperationUploadArtifact,
+			ObjectKind:     ObjectEncodeArtifact,
+			Label:          label,
+			Bucket:         artifact.Bucket,
+			Key:            artifact.Key,
+			LocalPath:      artifact.LocalPath,
+			Reason:         "local and remote encode-time artifact differ",
+			RequiresPrompt: true,
+		})
 		return true
 	}
 	if artifact.Remote.Exists {
