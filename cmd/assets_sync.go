@@ -125,6 +125,34 @@ func syncReferencedImagesForPublish(ctx context.Context, atom *model.Podcast, pr
 	return nil
 }
 
+func previewReferencedImagesForPublish(ctx context.Context, atom *model.Podcast, client publishAssetClient) error {
+	l := logger.FromContext(ctx)
+	if atom == nil {
+		return fmt.Errorf("podcast is nil")
+	}
+	for _, image := range collectReferencedImages(atom) {
+		operation, err := decidePublishImage(ctx, atom, image, client)
+		if err != nil {
+			return err
+		}
+		switch operation.Kind {
+		case "check-image-upload":
+			l.Info("Would publish local image", "label", image.Label, "key", image.Key, "path", operation.LocalPath, "reason", operation.Reason)
+		case "skip-image-upload":
+			l.Info("Image already published", "label", image.Label, "key", image.Key, "path", operation.LocalPath, "reason", operation.Reason)
+		case "download-image":
+			l.Info("Would download published image", "label", image.Label, "key", image.Key, "path", operation.LocalPath, "reason", operation.Reason)
+		case "upload-image":
+			if operation.RemoteExists == "true" {
+				l.Info("Would overwrite remote image", "label", image.Label, "key", image.Key, "path", operation.LocalPath, "reason", operation.Reason)
+			} else {
+				l.Info("Would publish local image", "label", image.Label, "key", image.Key, "path", operation.LocalPath, "reason", operation.Reason)
+			}
+		}
+	}
+	return nil
+}
+
 func prepareEpisodeAssetsForEncode(ctx context.Context, atom *model.Podcast, episode *model.Episode, client assetInfoClient) error {
 	if atom == nil || episode == nil {
 		return fmt.Errorf("podcast and episode are required")

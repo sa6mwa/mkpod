@@ -93,13 +93,25 @@ func (c *Client) UploadFile(ctx context.Context, bucket, key, filename string, o
 // DiffTextObject downloads the current S3 object and prints a unified diff
 // against the given local file.
 func (c *Client) DiffTextObject(ctx context.Context, bucket, key, fileToDiff string) error {
-	l := logger.FromContext(ctx)
-	if err := c.ensureClient(ctx); err != nil {
-		return err
-	}
-
 	fileContent, err := os.ReadFile(fileToDiff)
 	if err != nil {
+		return err
+	}
+	return c.diffTextObjectContent(ctx, bucket, key, fileToDiff, fileContent)
+}
+
+// DiffTextObjectBytes downloads the current S3 object and prints a unified diff
+// against the given in-memory content.
+func (c *Client) DiffTextObjectBytes(ctx context.Context, bucket, key, label string, content []byte) error {
+	if strings.TrimSpace(label) == "" {
+		label = "<generated>"
+	}
+	return c.diffTextObjectContent(ctx, bucket, key, label, content)
+}
+
+func (c *Client) diffTextObjectContent(ctx context.Context, bucket, key, label string, content []byte) error {
+	l := logger.FromContext(ctx)
+	if err := c.ensureClient(ctx); err != nil {
 		return err
 	}
 
@@ -111,17 +123,17 @@ func (c *Client) DiffTextObject(ctx context.Context, bucket, key, fileToDiff str
 	})
 	if err != nil {
 		if isNotFoundError(err) {
-			l.Info("Skipping diff", "file", fileToDiff, "path", "s3://"+path.Join(bucket, key), "error", err)
+			l.Info("Skipping diff", "file", label, "path", "s3://"+path.Join(bucket, key), "error", err)
 			return nil
 		}
 		return err
 	}
 
 	l.Info("Buffered successfully", "path", "s3://"+path.Join(bucket, key), "bytes", size)
-	l.Info("Diff follows", "to", fileToDiff, "from", "s3://"+path.Join(bucket, key))
+	l.Info("Diff follows", "to", label, "from", "s3://"+path.Join(bucket, key))
 
-	edits := myers.ComputeEdits(span.URIFromPath("s3://"+path.Join(bucket, key)), string(buf.Bytes()), string(fileContent))
-	diff := fmt.Sprint(gotextdiff.ToUnified("s3://"+path.Join(bucket, key), fileToDiff, string(buf.Bytes()), edits))
+	edits := myers.ComputeEdits(span.URIFromPath("s3://"+path.Join(bucket, key)), string(buf.Bytes()), string(content))
+	diff := fmt.Sprint(gotextdiff.ToUnified("s3://"+path.Join(bucket, key), label, string(buf.Bytes()), edits))
 	fmt.Println(diff)
 	return nil
 }

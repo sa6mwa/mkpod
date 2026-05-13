@@ -2,8 +2,12 @@ package cmd
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
 )
@@ -40,8 +44,10 @@ func decidePublishImage(ctx context.Context, atom *model.Podcast, image referenc
 	}
 	remoteExists := info != nil && info.Exists
 	remoteSize := int64(0)
+	remoteETag := ""
 	if info != nil {
 		remoteSize = info.Size
+		remoteETag = info.ETag
 	}
 
 	if !localExists {
@@ -55,30 +61,72 @@ func decidePublishImage(ctx context.Context, atom *model.Podcast, image referenc
 				Reason:       "local image is missing and remote image exists",
 				RemoteExists: "true",
 				RemoteSize:   remoteSize,
+				RemoteETag:   remoteETag,
 			}, nil
 		}
 		return workflowOperation{}, fmt.Errorf("missing %s image %s locally and in output bucket %s", image.Label, image.Key, atom.Config.Aws.Buckets.Output)
 	}
 
-	operation := workflowOperation{
-		Kind:         "skip-image-upload",
-		Label:        image.Label,
-		Bucket:       atom.Config.Aws.Buckets.Output,
-		Key:          image.Key,
-		LocalPath:    localPath,
-		Reason:       "remote image exists with matching size",
-		LocalExists:  true,
-		LocalSize:    fi.Size(),
-		RemoteExists: boolText(remoteExists),
-		RemoteSize:   remoteSize,
+	localChecksum, err := fileMD5Hex(localPath)
+	if err != nil {
+		return workflowOperation{}, fmt.Errorf("failed to checksum local %s image %s: %w", image.Label, localPath, err)
 	}
-	if remoteExists && remoteSize == fi.Size() {
+	operation := workflowOperation{
+		Kind:          "skip-image-upload",
+		Label:         image.Label,
+		Bucket:        atom.Config.Aws.Buckets.Output,
+		Key:           image.Key,
+		LocalPath:     localPath,
+		Reason:        "remote image exists with matching size",
+		LocalExists:   true,
+		LocalSize:     fi.Size(),
+		LocalChecksum: localChecksum,
+		RemoteExists:  boolText(remoteExists),
+		RemoteSize:    remoteSize,
+		RemoteETag:    remoteETag,
+	}
+	if remoteExists && publishImageMatches(fi.Size(), localChecksum, remoteSize, remoteETag) {
+		if usableS3ETag(remoteETag) != "" {
+			operation.Reason = "remote image exists with matching checksum"
+		}
 		return operation, nil
 	}
 	operation.Kind = "upload-image"
 	operation.Reason = "local image exists but remote image is missing or differs"
 	operation.RequiresPrompt = true
 	return operation, nil
+}
+
+func fileMD5Hex(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := md5.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+func publishImageMatches(localSize int64, localChecksum string, remoteSize int64, remoteETag string) bool {
+	if localSize != remoteSize {
+		return false
+	}
+	if etag := usableS3ETag(remoteETag); etag != "" && localChecksum != "" {
+		return strings.EqualFold(localChecksum, etag)
+	}
+	return true
+}
+
+func usableS3ETag(etag string) string {
+	etag = strings.Trim(strings.TrimSpace(etag), `"`)
+	if etag == "" || strings.Contains(etag, "-") {
+		return ""
+	}
+	return etag
 }
 
 func decideFeedUpload(ctx context.Context, atom *model.Podcast, feedPath string, client assetInfoClient) (workflowOperation, error) {

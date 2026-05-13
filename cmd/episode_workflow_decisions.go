@@ -20,8 +20,10 @@ type workflowOperation struct {
 	Reason         string `json:"reason"`
 	LocalExists    bool   `json:"localExists,omitempty"`
 	LocalSize      int64  `json:"localSize,omitempty"`
+	LocalChecksum  string `json:"localChecksum,omitempty"`
 	RemoteExists   string `json:"remoteExists,omitempty"`
 	RemoteSize     int64  `json:"remoteSize,omitempty"`
+	RemoteETag     string `json:"remoteETag,omitempty"`
 	RequiresPrompt bool   `json:"requiresPrompt,omitempty"`
 	DefaultAnswer  bool   `json:"defaultAnswer,omitempty"`
 	SafetyStatus   string `json:"safetyStatus,omitempty"`

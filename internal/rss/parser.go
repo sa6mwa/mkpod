@@ -1,6 +1,7 @@
 package rss
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
@@ -49,6 +50,14 @@ func (p *Renderer) WriteRSS(ctx context.Context, atom *model.Podcast) error {
 	}
 	defer f.Close()
 	return writeRSS(ctx, f, p, atom)
+}
+
+func (p *Renderer) RenderRSS(ctx context.Context, atom *model.Podcast) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := writeRSS(ctx, &buf, p, atom); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (p *Renderer) WriteRSSToStdout(ctx context.Context, atom *model.Podcast) error {

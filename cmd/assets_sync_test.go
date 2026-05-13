@@ -92,6 +92,36 @@ func TestSyncReferencedImagesForPublishFailsWhenImageMissingEverywhere(t *testin
 	}
 }
 
+func TestPreviewReferencedImagesForPublishChecksRemoteWithoutMutating(t *testing.T) {
+	ctx := context.Background()
+	workdir := t.TempDir()
+	atom := &model.Podcast{
+		Config: model.Config{
+			Image:           "artwork/show.jpg",
+			LocalStorageDir: workdir,
+			Aws:             model.AwsConfig{Buckets: model.Buckets{Output: "bucket"}},
+		},
+	}
+	mkdirAll(t, filepath.Join(workdir, "artwork"))
+	writeFile(t, filepath.Join(workdir, "artwork", "show.jpg"), []byte("jpeg"))
+	storage := &fakeStorageClient{infoResponses: map[string]*s3store.FileInfo{
+		"artwork/show.jpg": {Exists: true, Size: int64(len("jpeg")), ETag: `"ab4f3ccba74857c5f2ba0d5b7dbf65e1"`},
+	}}
+
+	if err := previewReferencedImagesForPublish(ctx, atom, storage); err != nil {
+		t.Fatalf("previewReferencedImagesForPublish() error = %v", err)
+	}
+	if len(storage.checkedKeys) != 1 || storage.checkedKeys[0] != "artwork/show.jpg" {
+		t.Fatalf("checkedKeys = %v, want remote image check", storage.checkedKeys)
+	}
+	if len(storage.uploads) != 0 {
+		t.Fatalf("uploads = %v, want dry-run preview to avoid uploads", storage.uploads)
+	}
+	if len(storage.downloads) != 0 {
+		t.Fatalf("downloads = %v, want dry-run preview to avoid downloads", storage.downloads)
+	}
+}
+
 func TestLocalAssetPathNormalizesSlashes(t *testing.T) {
 	atom := &model.Podcast{Config: model.Config{LocalStorageDir: t.TempDir()}}
 	got := localAssetPath(atom, "artwork/cover.jpg")

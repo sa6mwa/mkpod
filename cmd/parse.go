@@ -144,6 +144,7 @@ func runFeedWorkflow(ctx context.Context, args []string, options feedWorkflowOpt
 	feedPath := atom.FeedFilePath()
 	prompter := prompt.New(options.DryRun, options.AskNoQuestions)
 	renderer := rss.New()
+	var dryRunFeed []byte
 
 	if prompter.Ask(ctx, "Refresh lastBuildDate (will update %s and optionally %s)?", feedPath, options.SpecFile) {
 		atom.LastBuildDate.Time = time.Now().UTC()
@@ -155,7 +156,11 @@ func runFeedWorkflow(ctx context.Context, args []string, options feedWorkflowOpt
 	}
 
 	if options.DryRun {
-		if err := renderer.WriteRSSToStdout(ctx, atom); err != nil {
+		dryRunFeed, err = renderer.RenderRSS(ctx, atom)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Stdout.Write(dryRunFeed); err != nil {
 			return err
 		}
 	} else {
@@ -183,8 +188,16 @@ func runFeedWorkflow(ctx context.Context, args []string, options feedWorkflowOpt
 			}
 		}
 	} else if options.Upload && options.DryRun {
-		l.Info("Dry run: would upload RSS", "file", feedPath, "bucket", atom.Config.Aws.Buckets.Output)
-		if err := checkAndUploadPodcastImage(ctx, atom, prompter, nil); err != nil {
+		storageClient := s3store.New(atom, prompter)
+		feedOperation, err := decideFeedUpload(ctx, atom, feedPath, storageClient)
+		if err != nil {
+			return err
+		}
+		l.Info("Dry run: would upload RSS", "file", feedPath, "bucket", feedOperation.Bucket, "remoteExists", feedOperation.RemoteExists, "remoteSize", feedOperation.RemoteSize)
+		if err := storageClient.DiffTextObjectBytes(ctx, feedOperation.Bucket, feedOperation.Key, feedPath, dryRunFeed); err != nil {
+			l.Error("Failed to show diff", "error", err)
+		}
+		if err := previewReferencedImagesForPublish(ctx, atom, storageClient); err != nil {
 			l.Warn("Failed to check podcast image (dry run)", "error", err)
 		}
 	}

@@ -17,7 +17,7 @@ func TestDecidePublishImageSkipsMatchingRemoteImage(t *testing.T) {
 	writeFile(t, localPath, []byte("jpeg"))
 	atom := feedDecisionPodcast(workdir)
 	storage := &fakeStorageClient{infoResponses: map[string]*s3store.FileInfo{
-		image.Key: {Exists: true, Size: int64(len("jpeg"))},
+		image.Key: {Exists: true, Size: int64(len("jpeg")), ETag: `"ab4f3ccba74857c5f2ba0d5b7dbf65e1"`},
 	}}
 
 	operation, err := decidePublishImage(context.Background(), atom, image, storage)
@@ -26,6 +26,9 @@ func TestDecidePublishImageSkipsMatchingRemoteImage(t *testing.T) {
 	}
 	if operation.Kind != "skip-image-upload" || operation.RequiresPrompt {
 		t.Fatalf("operation = %+v, want skip without prompt", operation)
+	}
+	if operation.Reason != "remote image exists with matching checksum" {
+		t.Fatalf("operation reason = %q, want checksum match", operation.Reason)
 	}
 }
 
@@ -46,6 +49,46 @@ func TestDecidePublishImageUploadsDifferentRemoteImage(t *testing.T) {
 	}
 	if operation.Kind != "upload-image" || !operation.RequiresPrompt {
 		t.Fatalf("operation = %+v, want prompted image upload", operation)
+	}
+}
+
+func TestDecidePublishImageUploadsSameSizeDifferentRemoteETag(t *testing.T) {
+	workdir := t.TempDir()
+	image := referencedImage{Key: filepath.ToSlash(filepath.Join("artwork", "cover.jpg")), Label: "podcast", ContentType: "image/jpeg"}
+	localPath := filepath.Join(workdir, filepath.FromSlash(image.Key))
+	mkdirAll(t, filepath.Dir(localPath))
+	writeFile(t, localPath, []byte("jpeg"))
+	atom := feedDecisionPodcast(workdir)
+	storage := &fakeStorageClient{infoResponses: map[string]*s3store.FileInfo{
+		image.Key: {Exists: true, Size: int64(len("jpeg")), ETag: `"00000000000000000000000000000000"`},
+	}}
+
+	operation, err := decidePublishImage(context.Background(), atom, image, storage)
+	if err != nil {
+		t.Fatalf("decidePublishImage() error = %v", err)
+	}
+	if operation.Kind != "upload-image" || !operation.RequiresPrompt {
+		t.Fatalf("operation = %+v, want prompted image upload", operation)
+	}
+}
+
+func TestDecidePublishImageFallsBackToSizeForMultipartETag(t *testing.T) {
+	workdir := t.TempDir()
+	image := referencedImage{Key: filepath.ToSlash(filepath.Join("artwork", "cover.jpg")), Label: "podcast", ContentType: "image/jpeg"}
+	localPath := filepath.Join(workdir, filepath.FromSlash(image.Key))
+	mkdirAll(t, filepath.Dir(localPath))
+	writeFile(t, localPath, []byte("jpeg"))
+	atom := feedDecisionPodcast(workdir)
+	storage := &fakeStorageClient{infoResponses: map[string]*s3store.FileInfo{
+		image.Key: {Exists: true, Size: int64(len("jpeg")), ETag: `"not-a-single-part-md5-2"`},
+	}}
+
+	operation, err := decidePublishImage(context.Background(), atom, image, storage)
+	if err != nil {
+		t.Fatalf("decidePublishImage() error = %v", err)
+	}
+	if operation.Kind != "skip-image-upload" || operation.RequiresPrompt {
+		t.Fatalf("operation = %+v, want size fallback skip without prompt", operation)
 	}
 }
 
