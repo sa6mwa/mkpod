@@ -26,6 +26,14 @@ type applyRemoteInspector interface {
 }
 
 func buildNewEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, options applyPreflightOptions, inspector applyRemoteInspector) (workflow.Decision, error) {
+	return buildEpisodeApplyDecision(ctx, plan, options, inspector, false)
+}
+
+func buildRenewEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, options applyPreflightOptions, inspector applyRemoteInspector) (workflow.Decision, error) {
+	return buildEpisodeApplyDecision(ctx, plan, options, inspector, true)
+}
+
+func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, options applyPreflightOptions, inspector applyRemoteInspector, renew bool) (workflow.Decision, error) {
 	config := spec.New(plan.SpecFile)
 	atom, err := config.Load(ctx)
 	if err != nil {
@@ -41,7 +49,7 @@ func buildNewEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, opt
 		mode = workflow.ModeJustMaster
 	}
 	input := workflow.EpisodeInput{
-		Metadata:        newEpisodeMetadataState(atom, &episode),
+		Metadata:        episodeMetadataState(atom, &episode, renew),
 		Master:          newWorkflowObject(ctx, atom, inspector, workflow.ObjectMaster, "episode master", atom.Config.Aws.Buckets.Input, episode.Input, true),
 		Artifacts:       newEpisodeWorkflowArtifacts(ctx, atom, inspector, &episode),
 		ProductionAudio: newEpisodeWorkflowProduction(ctx, atom, inspector, &episode),
@@ -52,9 +60,17 @@ func buildNewEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, opt
 }
 
 func newEpisodeMetadataState(atom *model.Podcast, episode *model.Episode) workflow.MetadataState {
+	return episodeMetadataState(atom, episode, false)
+}
+
+func episodeMetadataState(atom *model.Podcast, episode *model.Episode, renew bool) workflow.MetadataState {
 	state := workflow.MetadataState{Planned: true, Complete: true}
 	index := atom.ContainsEpisode(episode.UID)
 	if index < 0 {
+		if renew {
+			state.Planned = false
+			state.Conflicts = true
+		}
 		return state
 	}
 	state.Applied = true

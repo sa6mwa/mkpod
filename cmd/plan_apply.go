@@ -18,6 +18,7 @@ import (
 	"github.com/sa6mwa/mkpod/internal/prompt"
 	"github.com/sa6mwa/mkpod/internal/spec"
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
+	workflow "github.com/sa6mwa/mkpod/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -346,11 +347,12 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 			DryRun:         false,
 			Upload:         plan.Upload,
 		})
-	case "new":
+	case "new", "renew":
 		var plan newEpisodePlan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
 			return err
 		}
+		renew := saved.Workflow == "renew"
 		inspector := applyRemoteInspector(nil)
 		storage := options.Storage
 		if storage == nil && options.CheckRemote {
@@ -363,21 +365,21 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 		if storage != nil {
 			inspector = storage
 		}
-		decision, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
+		decision, err := buildSavedEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
 			JustMaster: options.JustMaster,
 			Yes:        options.Yes,
 			Force:      options.Force,
-		}, inspector)
+		}, inspector, renew)
 		if err != nil {
 			return err
 		}
 		writeWorkflowDecision(os.Stdout, decision)
 		if inspector != nil {
-			rechecked, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
+			rechecked, err := buildSavedEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
 				JustMaster: options.JustMaster,
 				Yes:        options.Yes,
 				Force:      options.Force,
-			}, inspector)
+			}, inspector, renew)
 			if err != nil {
 				return err
 			}
@@ -386,9 +388,9 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 			}
 		}
 		if options.JustMaster {
-			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage)
+			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage, renew)
 		}
-		return applyNewEpisodeFull(ctx, &plan, decision, options, storage)
+		return applyNewEpisodeFull(ctx, &plan, decision, options, storage, renew)
 	case "preprocess":
 		var plan preprocess.Plan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
@@ -401,6 +403,13 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 	default:
 		return fmt.Errorf("saved plan workflow %q is not replayable yet", saved.Workflow)
 	}
+}
+
+func buildSavedEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, options applyPreflightOptions, inspector applyRemoteInspector, renew bool) (workflow.Decision, error) {
+	if renew {
+		return buildRenewEpisodeApplyDecision(ctx, plan, options, inspector)
+	}
+	return buildNewEpisodeApplyDecision(ctx, plan, options, inspector)
 }
 
 func applySavedPlanOptionsFromCommand(cmd *cobra.Command) (applySavedPlanOptions, error) {
@@ -443,13 +452,13 @@ func inspectSavedPlan(path string) error {
 			return err
 		}
 		printFeedPlan(&plan)
-	case "new":
+	case "new", "renew":
 		var plan newEpisodePlan
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
 			return err
 		}
-		printNewEpisodePlan(&plan)
-		decision, err := buildNewEpisodeApplyDecision(context.Background(), &plan, applyPreflightOptions{}, nil)
+		printEpisodeMutationPlan(saved.Workflow, &plan)
+		decision, err := buildSavedEpisodeApplyDecision(context.Background(), &plan, applyPreflightOptions{}, nil, saved.Workflow == "renew")
 		if err != nil {
 			return err
 		}

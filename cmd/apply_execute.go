@@ -26,7 +26,7 @@ type applyWorkflowStorage interface {
 	UploadFile(context.Context, string, string, string, *s3store.UploadOptions) error
 }
 
-func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decision workflow.Decision, options applySavedPlanOptions, storage applyWorkflowStorage) error {
+func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decision workflow.Decision, options applySavedPlanOptions, storage applyWorkflowStorage, renew bool) error {
 	if err := requireApplyDecisionProceed(decision, options); err != nil {
 		return err
 	}
@@ -37,7 +37,7 @@ func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decisi
 	if storage == nil {
 		return errors.New("apply requires remote storage access")
 	}
-	if err := applyNewEpisodePlan(ctx, plan); err != nil {
+	if err := applyEpisodePlanMetadata(ctx, plan, renew); err != nil {
 		return err
 	}
 	for _, operation := range decision.Operations {
@@ -60,11 +60,11 @@ func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decisi
 	return nil
 }
 
-func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision workflow.Decision, options applySavedPlanOptions, storage applyWorkflowStorage) error {
+func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision workflow.Decision, options applySavedPlanOptions, storage applyWorkflowStorage, renew bool) error {
 	if err := requireApplyDecisionProceed(decision, options); err != nil {
 		return err
 	}
-	if err := applyNewEpisodePlan(ctx, plan); err != nil {
+	if err := applyEpisodePlanMetadata(ctx, plan, renew); err != nil {
 		return err
 	}
 	atom, err := spec.New(plan.SpecFile).Load(ctx)
@@ -118,6 +118,13 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 	}
 	printPostApplyPublishHint(plan.SpecFile)
 	return nil
+}
+
+func applyEpisodePlanMetadata(ctx context.Context, plan *newEpisodePlan, renew bool) error {
+	if renew {
+		return applyRenewEpisodePlan(ctx, plan)
+	}
+	return applyNewEpisodePlan(ctx, plan)
 }
 
 func uploadApplyObject(ctx context.Context, atom *model.Podcast, storage applyWorkflowStorage, operation workflow.Operation) error {

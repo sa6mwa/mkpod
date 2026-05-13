@@ -491,6 +491,28 @@ func applyNewEpisodePlan(ctx context.Context, plan *newEpisodePlan) error {
 	return savePodcastSpec(plan.SpecFile, atom)
 }
 
+func applyRenewEpisodePlan(ctx context.Context, plan *newEpisodePlan) error {
+	if strings.TrimSpace(plan.SpecFile) == "" {
+		return errors.New("stale or invalid renew episode plan: specFile is required")
+	}
+	atom, err := spec.New(plan.SpecFile).Load(ctx)
+	if err != nil {
+		return err
+	}
+	episode := plan.Episode
+	if err := validateNewEpisodeFields(atom, &episode); err != nil {
+		return err
+	}
+	index := atom.ContainsEpisode(episode.UID)
+	if index < 0 {
+		return fmt.Errorf("episode UID %d does not exist in podcast specification", episode.UID)
+	}
+	if !newEpisodePlanMatchesExisting(&episode, &atom.Episodes[index]) {
+		return fmt.Errorf("episode UID %d already exists with different metadata", episode.UID)
+	}
+	return nil
+}
+
 func newEpisodePlanMatchesExisting(planned, existing *model.Episode) bool {
 	if planned == nil || existing == nil {
 		return false
@@ -655,7 +677,11 @@ func validateInt64String(value string) error {
 }
 
 func printNewEpisodePlan(plan *newEpisodePlan) {
-	fmt.Println("Workflow: new")
+	printEpisodeMutationPlan("new", plan)
+}
+
+func printEpisodeMutationPlan(workflow string, plan *newEpisodePlan) {
+	fmt.Printf("Workflow: %s\n", workflow)
 	fmt.Printf("Spec: %s\n", plan.SpecFile)
 	fmt.Printf("Episode: %d\n", plan.Episode.UID)
 	fmt.Printf("Title: %s\n", plan.Episode.Title)
