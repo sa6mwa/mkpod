@@ -462,13 +462,15 @@ running `apply`. Execution should then follow the planned decisions exactly.
 4. Treat already-applied identical metadata as a resumable/idempotent state.
 5. Inspect local master state.
 6. Inspect remote master state.
-7. Inspect local production audio state.
-8. Inspect remote production audio state.
-9. Decide whether encoding is needed.
-10. Decide whether production audio upload or overwrite is needed.
-11. Decide whether `podspec.yaml` needs to be written.
-12. Decide whether `podcast.rss` needs to be regenerated.
-13. Present the complete set of pending side effects before making changes,
+7. Inspect local encode-time image/artifact state.
+8. Inspect remote encode-time image/artifact state.
+9. Inspect local production audio state.
+10. Inspect remote production audio state.
+11. Decide whether encoding is needed.
+12. Decide whether production audio upload or overwrite is needed.
+13. Decide whether `podspec.yaml` needs to be written.
+14. Decide whether `podcast.rss` needs to be regenerated.
+15. Present the complete set of pending side effects before making changes,
     unless `--yes` / `--force` is used.
 
 After that preflight, execution should be one pass over those decisions.
@@ -488,6 +490,12 @@ For apply, this means it can forcefully upgrade:
 This should not blur destructive boundaries. Remote master deletion remains a
 separate explicit operation unless the workflow later defines otherwise.
 
+`--force` does not manufacture missing local inputs. If a forced operation needs
+to upload a local master or production artifact and that local file does not
+exist, apply must fail. In particular, `--force` should not download a remote
+master and then treat that downloaded file as the local source for a forced
+remote-master overwrite.
+
 ### Master Sync
 
 Masters are special because they are the source artifacts used to encode
@@ -506,22 +514,32 @@ Master sync rules:
    - download remote master.
 4. If both local and remote master are missing:
    - fail before mutating anything that depends on the master.
+5. If `--yes` / `--force` is set and local master is missing:
+   - fail instead of downloading, because force means "use my local source to
+     upgrade remote", not "download remote and re-upload it".
 
 This master behavior should be explicit in the workflow layer, not hidden as a
 side effect of `DownloadFile`.
 
-### `--just-master`
+Master sync should run before encoding in plain apply and before exit in
+`--just-master` / `--preflight` mode. A local master that does not exist
+remotely should be uploaded regardless of whether the run is only applying the
+master portion or continuing through encoding.
+
+### `--just-master` / `--preflight`
 
 `apply --just-master <plan.json>` should apply only the master-related pieces of
-the workflow.
+the workflow. `--preflight` may be an alias for this, or `--just-master` may be
+an alias for `--preflight`; the naming is still open.
 
 For a new episode plan, `--just-master` should:
 
 1. Apply or resume the non-production episode metadata in `podspec.yaml`.
 2. Sync the master according to the master sync rules.
-3. Not encode production audio.
-4. Not upload production audio.
-5. Not regenerate `podcast.rss`.
+3. Sync local encode-time images/artifacts needed to later encode.
+4. Not encode production audio.
+5. Not upload production audio.
+6. Not regenerate `podcast.rss`.
 
 The resulting `podspec.yaml` may contain the new episode metadata but should not
 gain encoded-output metadata such as:
@@ -533,12 +551,32 @@ gain encoded-output metadata such as:
 - generated production-audio fields.
 
 `apply --just-master --yes` or `apply --just-master --force` should overwrite
-the remote master without asking when the preflight says overwrite is needed.
+the remote master without asking when the preflight says overwrite is needed,
+but only if the local master exists and passed validation.
 
 The operation must be idempotently resumable. After `--just-master`, a later
 plain `mkpod apply <plan.json>` should see that metadata is already applied and
 masters are already synced, then continue with the remaining encode/output/RSS
 steps.
+
+### Encode-Time Images And Artifacts
+
+Apply also needs to reason about images and other local artifacts needed for
+encoding, such as cover art used for tags.
+
+These are similar to master sync in that encode may need them locally, but they
+are not production audio. Apply should therefore:
+
+1. Ensure required encode-time local artifacts exist before encoding.
+2. Download them from remote if local is missing and remote exists.
+3. Fail before encoding if a required artifact exists neither locally nor
+   remotely.
+4. Avoid treating publish-time image refresh as part of apply unless the image
+   is required locally to encode.
+
+Uploading or refreshing RSS-referenced images in the output bucket is primarily
+part of `publish`, together with RSS upload. Apply only needs the local artifact
+availability required to perform encoding.
 
 ### Production Audio Sync
 
@@ -567,7 +605,12 @@ Rules:
    - if `podspec.yaml` has the correct output metadata for RSS, remote audio can
      be treated as already publishable.
 5. If production audio metadata is missing and local production audio is also
-   missing, encoding is needed unless remote metadata can be proven sufficient.
+   missing:
+   - if remote production audio exists and remote metadata is enough to repair
+     `podspec.yaml`, repair metadata without downloading when possible,
+   - otherwise download/sync the production audio locally only when needed to
+     derive missing metadata,
+   - otherwise encode from the master.
 
 Only masters need local sync by default because only masters are required as
 inputs for encoding.
@@ -588,7 +631,29 @@ Rules:
    - encoding,
    - output metadata updates,
    - final `podspec.yaml` write.
-5. RSS upload remains outside `apply` unless a later design explicitly moves it.
+5. Apply should not refresh `lastBuildDate`; that belongs to `publish`.
+6. RSS upload remains outside `apply` unless a later design explicitly moves it.
 
 This avoids the current behavior where `podspec.yaml` and `podcast.rss` can be
 rewritten repeatedly during one apply.
+
+### State Machine / Comparison Package
+
+The idempotent workflow needs a central comparison and decision component rather
+than scattered checks in command handlers.
+
+That component should:
+
+1. Read plan state, `podspec.yaml`, local filesystem state, and remote object
+   state.
+2. Classify the workflow state with explicit states such as not started,
+   metadata applied, master synced, artifacts ready, encoded, production audio
+   synced, RSS ready, and complete.
+3. Decide whether each transition is safe.
+4. Produce the complete list of pending operations and prompts.
+5. Re-check critical local/remote facts immediately before mutating.
+6. Fail deterministically if the execution-time facts no longer match the
+   preflight decision.
+
+This should keep invariants in one place. The command layer should not duplicate
+the same remote/local safety rules in multiple branches.
