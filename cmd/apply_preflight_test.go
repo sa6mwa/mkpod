@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +112,49 @@ func TestBuildNewEpisodeApplyDecisionRemoteProductionWithCompleteMetadataDoesNot
 	}
 	if hasWorkflowOperation(decision, workflow.OperationEncode) {
 		t.Fatalf("decision encoded despite remote complete production audio: %+v", decision.Operations)
+	}
+}
+
+func TestWriteWorkflowDecisionShowsChecksOperationsAndPrompts(t *testing.T) {
+	decision := workflow.Decision{
+		State: workflow.StateMasterSynced,
+		Checks: []workflow.Check{
+			{Label: "metadata", Passed: true, Reason: "already matches"},
+			{Label: "production audio", Passed: false, Reason: "local and remote differ"},
+		},
+		Operations: []workflow.Operation{
+			{
+				Kind:           workflow.OperationUploadMaster,
+				Label:          "episode master",
+				Bucket:         "input",
+				Key:            "masters/new.flac",
+				LocalPath:      "/tmp/pod/masters/new.flac",
+				Reason:         "remote is missing",
+				RequiresPrompt: true,
+			},
+		},
+	}
+	var out bytes.Buffer
+	writeWorkflowDecision(&out, decision)
+	got := out.String()
+	for _, want := range []string{
+		"Workflow state: master-synced",
+		"- ok: metadata (already matches)",
+		"- blocked: production audio (local and remote differ)",
+		"- upload-master: episode master s3://input/masters/new.flac <= /tmp/pod/masters/new.flac (remote is missing) [prompt]",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("decision output missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestWriteWorkflowDecisionShowsNoOperations(t *testing.T) {
+	decision := workflow.Decision{State: workflow.StateComplete}
+	var out bytes.Buffer
+	writeWorkflowDecision(&out, decision)
+	if got := out.String(); !strings.Contains(got, "Operations: none") {
+		t.Fatalf("decision output = %q, want no operations", got)
 	}
 }
 

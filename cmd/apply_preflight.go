@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,4 +151,51 @@ func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspec
 		}
 	}
 	return object
+}
+
+func writeWorkflowDecision(w io.Writer, decision workflow.Decision) {
+	fmt.Fprintf(w, "Workflow state: %s\n", decision.State)
+	if len(decision.Checks) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Checks:")
+		for _, check := range decision.Checks {
+			marker := "ok"
+			if !check.Passed {
+				marker = "blocked"
+			}
+			fmt.Fprintf(w, "- %s: %s", marker, check.Label)
+			if strings.TrimSpace(check.Reason) != "" {
+				fmt.Fprintf(w, " (%s)", check.Reason)
+			}
+			fmt.Fprintln(w)
+		}
+	}
+	if len(decision.Operations) > 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Operations:")
+		for _, operation := range decision.Operations {
+			fmt.Fprintf(w, "- %s: %s", operation.Kind, operation.Label)
+			if operation.Bucket != "" && operation.Key != "" {
+				fmt.Fprintf(w, " s3://%s/%s", operation.Bucket, operation.Key)
+			} else if operation.Key != "" {
+				fmt.Fprintf(w, " %s", operation.Key)
+			}
+			if operation.LocalPath != "" {
+				fmt.Fprintf(w, " <= %s", operation.LocalPath)
+			}
+			if strings.TrimSpace(operation.Reason) != "" {
+				fmt.Fprintf(w, " (%s)", operation.Reason)
+			}
+			if operation.RequiresPrompt {
+				fmt.Fprint(w, " [prompt]")
+			}
+			if operation.Destructive {
+				fmt.Fprint(w, " [destructive]")
+			}
+			fmt.Fprintln(w)
+		}
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Operations: none")
 }
