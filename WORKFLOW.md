@@ -445,3 +445,150 @@ These are not solved here; they are the points to decide before redesigning
    with generated metadata?
 7. What is the exact production boundary for `publish`: RSS only, RSS plus
    images, or all remote artifacts?
+
+## Proposed Apply Direction
+
+This section records a proposed direction for the redesigned `mkpod apply`
+workflow. It is not yet implemented.
+
+Core idea: all validation and all yes/no decisions should happen up front when
+running `apply`. Execution should then follow the planned decisions exactly.
+
+`apply` should:
+
+1. Load the saved plan.
+2. Load current `podspec.yaml`.
+3. Compare the saved plan with the current metadata state.
+4. Treat already-applied identical metadata as a resumable/idempotent state.
+5. Inspect local master state.
+6. Inspect remote master state.
+7. Inspect local production audio state.
+8. Inspect remote production audio state.
+9. Decide whether encoding is needed.
+10. Decide whether production audio upload or overwrite is needed.
+11. Decide whether `podspec.yaml` needs to be written.
+12. Decide whether `podcast.rss` needs to be regenerated.
+13. Present the complete set of pending side effects before making changes,
+    unless `--yes` / `--force` is used.
+
+After that preflight, execution should be one pass over those decisions.
+
+### `--yes` / `--force`
+
+`apply --yes` or `apply --force` should answer yes to all non-destructive or
+explicitly requested upgrades in the apply plan.
+
+For apply, this means it can forcefully upgrade:
+
+- remote master,
+- production/rendered audio,
+- local generated metadata,
+- local RSS regeneration when applicable.
+
+This should not blur destructive boundaries. Remote master deletion remains a
+separate explicit operation unless the workflow later defines otherwise.
+
+### Master Sync
+
+Masters are special because they are the source artifacts used to encode
+production audio.
+
+Master sync rules:
+
+1. If local master exists and remote master is missing:
+   - prompt to upload local master,
+   - upload automatically with `--yes` / `--force`.
+2. If local master exists and remote master exists:
+   - compare remote/local state up front,
+   - if different, prompt before overwrite,
+   - overwrite automatically with `--yes` / `--force`.
+3. If local master is missing and remote master exists:
+   - download remote master.
+4. If both local and remote master are missing:
+   - fail before mutating anything that depends on the master.
+
+This master behavior should be explicit in the workflow layer, not hidden as a
+side effect of `DownloadFile`.
+
+### `--just-master`
+
+`apply --just-master <plan.json>` should apply only the master-related pieces of
+the workflow.
+
+For a new episode plan, `--just-master` should:
+
+1. Apply or resume the non-production episode metadata in `podspec.yaml`.
+2. Sync the master according to the master sync rules.
+3. Not encode production audio.
+4. Not upload production audio.
+5. Not regenerate `podcast.rss`.
+
+The resulting `podspec.yaml` may contain the new episode metadata but should not
+gain encoded-output metadata such as:
+
+- `output`,
+- `type`,
+- `length`,
+- `duration`,
+- generated production-audio fields.
+
+`apply --just-master --yes` or `apply --just-master --force` should overwrite
+the remote master without asking when the preflight says overwrite is needed.
+
+The operation must be idempotently resumable. After `--just-master`, a later
+plain `mkpod apply <plan.json>` should see that metadata is already applied and
+masters are already synced, then continue with the remaining encode/output/RSS
+steps.
+
+### Production Audio Sync
+
+Production audio means the rendered/encoded podcast media such as `.m4a`,
+`.m4b`, `.mp3`, or `.mp4`.
+
+Production audio differs from masters:
+
+- masters are needed locally to encode,
+- production audio is needed remotely for streaming,
+- local production audio is useful but not always required if remote production
+  audio already exists and metadata can point to it.
+
+Rules:
+
+1. If encoding is needed, local master must exist first.
+2. If local production audio exists and remote production audio is missing:
+   - prompt to upload,
+   - upload automatically with `--yes` / `--force`.
+3. If local production audio exists and remote production audio exists:
+   - compare up front,
+   - prompt before overwrite if the apply plan says this run upgrades it,
+   - overwrite automatically with `--yes` / `--force`.
+4. If local production audio is missing but remote production audio exists:
+   - do not download it just to regenerate RSS,
+   - if `podspec.yaml` has the correct output metadata for RSS, remote audio can
+     be treated as already publishable.
+5. If production audio metadata is missing and local production audio is also
+   missing, encoding is needed unless remote metadata can be proven sufficient.
+
+Only masters need local sync by default because only masters are required as
+inputs for encoding.
+
+### RSS Regeneration
+
+RSS regeneration should be decided up front and performed at most once.
+
+Rules:
+
+1. `--just-master` should not regenerate `podcast.rss`.
+2. Plain `apply` may regenerate local `podcast.rss` if episode metadata changed
+   or encoded metadata was produced/repaired.
+3. The prompt for RSS regeneration should happen during preflight.
+4. If accepted, RSS should be regenerated once at the very end, after:
+   - metadata application,
+   - pubDate/default repairs,
+   - encoding,
+   - output metadata updates,
+   - final `podspec.yaml` write.
+5. RSS upload remains outside `apply` unless a later design explicitly moves it.
+
+This avoids the current behavior where `podspec.yaml` and `podcast.rss` can be
+rewritten repeatedly during one apply.
