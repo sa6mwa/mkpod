@@ -657,8 +657,8 @@ func TestCompiledBinaryEncodePersistsMetadataForParse(t *testing.T) {
 	if len(feed.Channel.Items) != 1 {
 		t.Fatalf("expected 1 RSS item, got %d", len(feed.Channel.Items))
 	}
-	if feed.Channel.Items[0].Summary == "" {
-		t.Fatalf("expected RSS item summary to be present")
+	if feed.Channel.Items[0].Description == "" {
+		t.Fatalf("expected RSS item description to be present")
 	}
 	if feed.Channel.Items[0].Enclosure.Type != "audio/mpeg" {
 		t.Fatalf("expected enclosure type audio/mpeg, got %q", feed.Channel.Items[0].Enclosure.Type)
@@ -702,7 +702,6 @@ type compiledBinaryRSSFeed struct {
 
 type compiledBinaryRSSItem struct {
 	Title       string `xml:"title"`
-	Summary     string `xml:"summary"`
 	Description string `xml:"description"`
 	Enclosure   struct {
 		Type string `xml:"type,attr"`

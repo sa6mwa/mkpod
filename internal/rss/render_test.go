@@ -173,7 +173,6 @@ type parsedRSSFeed struct {
 type parsedRSSItem struct {
 	Title       string `xml:"title"`
 	PubDate     string `xml:"pubDate"`
-	Summary     string `xml:"summary"`
 	Description string `xml:"description"`
 	Subtitle    string `xml:"subtitle"`
 	Enclosure   struct {
@@ -280,8 +279,8 @@ func TestWriteRSSExcludesFutureEpisodesAndKeepsInputOrder(t *testing.T) {
 		if item.Title == "Future Episode" {
 			t.Fatalf("future episode should not be published")
 		}
-		if item.Summary == "" {
-			t.Fatalf("expected itunes summary for item %q", item.Title)
+		if item.Description == "" {
+			t.Fatalf("expected description for item %q", item.Title)
 		}
 	}
 }
