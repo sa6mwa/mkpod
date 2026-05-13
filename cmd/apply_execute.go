@@ -71,6 +71,8 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 	if err != nil {
 		return err
 	}
+	encodedThisRun := false
+	planUploadsProduction := decisionHasOperation(decision, workflow.OperationUploadProduction)
 	for _, operation := range decision.Operations {
 		switch operation.Kind {
 		case workflow.OperationWriteMetadata:
@@ -93,6 +95,13 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 			if storage == nil {
 				continue
 			}
+			if encodedThisRun {
+				atom, err = spec.New(plan.SpecFile).Load(ctx)
+				if err != nil {
+					return err
+				}
+				operation = refreshedProductionUploadOperation(atom, plan.Episode.UID, operation)
+			}
 			if err := uploadApplyObject(ctx, atom, storage, operation); err != nil {
 				return err
 			}
@@ -101,10 +110,15 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 				SpecFile:              plan.SpecFile,
 				All:                   false,
 				AskNoQuestions:        true,
+				ForceReencode:         operation.Kind == workflow.OperationEncode && options.Reencode,
+				SkipOutputUpload:      options.Reencode && planUploadsProduction,
 				LocalOnly:             storage == nil,
 				PreserveLastBuildDate: true,
 			}); err != nil {
 				return err
+			}
+			if operation.Kind == workflow.OperationEncode {
+				encodedThisRun = true
 			}
 		case workflow.OperationRegenerateRSS:
 			if err := regenerateApplyRSS(ctx, plan.SpecFile); err != nil {
@@ -138,6 +152,20 @@ func uploadApplyObject(ctx context.Context, atom *model.Podcast, storage applyWo
 	return nil
 }
 
+func refreshedProductionUploadOperation(atom *model.Podcast, uid int64, operation workflow.Operation) workflow.Operation {
+	if atom == nil || operation.ObjectKind != workflow.ObjectProductionAudio {
+		return operation
+	}
+	for i := range atom.Episodes {
+		if atom.Episodes[i].UID == uid && atom.Episodes[i].Output != "" {
+			operation.LocalPath = localAssetPath(atom, atom.Episodes[i].Output)
+			operation.Key = atom.Episodes[i].Output
+			return operation
+		}
+	}
+	return operation
+}
+
 func regenerateApplyRSS(ctx context.Context, specFile string) error {
 	atom, err := spec.New(specFile).Load(ctx)
 	if err != nil {
@@ -161,22 +189,36 @@ func requireApplyDecisionProceed(decision workflow.Decision, options applySavedP
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return errors.New("apply requires confirmation; rerun with --yes or --force")
 	}
-	proceed := false
-	if err := survey.AskOne(&survey.Confirm{
+	choice := ""
+	if err := survey.AskOne(&survey.Select{
 		Message: "Proceed with these apply operations?",
-		Default: false,
-	}, &proceed); err != nil {
+		Options: []string{"No", "Yes", "Exit program"},
+		Default: "No",
+	}, &choice); err != nil {
 		return err
 	}
-	if !proceed {
+	switch choice {
+	case "Yes":
+		return nil
+	case "Exit program":
+		return errors.New("apply cancelled")
+	default:
 		return errors.New("apply cancelled")
 	}
-	return nil
 }
 
 func decisionRequiresPrompt(decision workflow.Decision) bool {
 	for _, operation := range decision.Operations {
 		if operation.RequiresPrompt {
+			return true
+		}
+	}
+	return false
+}
+
+func decisionHasOperation(decision workflow.Decision, kind workflow.OperationKind) bool {
+	for _, operation := range decision.Operations {
+		if operation.Kind == kind {
 			return true
 		}
 	}

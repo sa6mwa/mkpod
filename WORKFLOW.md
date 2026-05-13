@@ -695,6 +695,11 @@ as new episode plans. It should support the same apply behavior:
 - one final local RSS regeneration decision,
 - no RSS upload from apply.
 
+When local production audio should be regenerated even though output already
+exists, `mkpod apply --reencode <plan.json>` turns the production step into an
+explicit encode operation and then syncs the regenerated production audio
+according to the same upfront apply decision.
+
 Conceptually, `renew <uid|all>` replaces the old habit of directly running
 `mkpod encode <uid>` or `mkpod encode --all` when the desired operation is to
 bring existing episode artifacts back into the expected state.

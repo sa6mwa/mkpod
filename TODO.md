@@ -254,7 +254,7 @@ Current workflow slices:
   - [x] Reuse the same apply/inspect workflow decision model as new plans.
 - [x] `mkpod apply <plan.json>`
   - [x] Apply saved new and renew plans through upfront workflow decisions.
-  - [x] Support `--just-master`, `--yes`, and `--force`.
+  - [x] Support `--just-master`, `--reencode`, `--yes`, and `--force`.
   - [x] Sync masters and encode-time artifacts before encoding.
   - [x] Encode or repair production audio as needed.
   - [x] Regenerate local RSS once at the end without refreshing

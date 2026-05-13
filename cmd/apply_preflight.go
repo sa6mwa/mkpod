@@ -19,6 +19,7 @@ type applyPreflightOptions struct {
 	JustMaster bool
 	Yes        bool
 	Force      bool
+	Reencode   bool
 }
 
 type applyRemoteInspector interface {
@@ -56,7 +57,7 @@ func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, option
 		ProductionKnown: len(spec.MissingFieldsForRSS(atom, &episode)) == 0,
 		RSSDirty:        !options.JustMaster,
 	}
-	return workflow.DecideEpisode(input, workflow.Options{Mode: mode, Yes: options.Yes, Force: options.Force}), nil
+	return workflow.DecideEpisode(input, workflow.Options{Mode: mode, Yes: options.Yes, Force: options.Force, Reencode: options.Reencode}), nil
 }
 
 func newEpisodeMetadataState(atom *model.Podcast, episode *model.Episode) workflow.MetadataState {

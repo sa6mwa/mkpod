@@ -54,9 +54,10 @@ const (
 )
 
 type Options struct {
-	Mode  PlanMode
-	Force bool
-	Yes   bool
+	Mode     PlanMode
+	Force    bool
+	Yes      bool
+	Reencode bool
 }
 
 type Decision struct {

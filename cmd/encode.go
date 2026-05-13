@@ -82,6 +82,8 @@ type encodeWorkflowOptions struct {
 	RemoveRemoteMaster    bool
 	LocalOnly             bool
 	PreserveLastBuildDate bool
+	ForceReencode         bool
+	SkipOutputUpload      bool
 }
 
 func encodeWorkflowOptionsFromFlags(cmd *cobra.Command) (encodeWorkflowOptions, error) {
@@ -150,7 +152,7 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 			}
 		}
 
-		if episode.Output != "" {
+		if episode.Output != "" && !options.SkipOutputUpload {
 			operation, err := decideOutputUpload(ctx, atom, episode, storageClient, wasEncoded)
 			if err != nil {
 				return fmt.Errorf("failed to check for missing output file: %w", err)
@@ -192,6 +194,7 @@ func runEncodeWorkflow(ctx context.Context, args []string, options encodeWorkflo
 			}
 			result, err := encoderService.Encode(ctx, atom, encode.EncodeOptions{
 				EpisodeUID:     &uid,
+				ForceReencode:  options.ForceReencode,
 				PrepareEpisode: prepareEpisode,
 			}, postEncodeFunc)
 			if err != nil {

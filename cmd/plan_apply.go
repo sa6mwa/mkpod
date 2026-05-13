@@ -72,6 +72,7 @@ type applySavedPlanOptions struct {
 	JustMaster  bool
 	Yes         bool
 	Force       bool
+	Reencode    bool
 	CheckRemote bool
 	Storage     applyWorkflowStorage
 }
@@ -217,6 +218,7 @@ func applySavedPlanWithOptions(ctx context.Context, path string, options applySa
 			JustMaster: options.JustMaster,
 			Yes:        options.Yes,
 			Force:      options.Force,
+			Reencode:   options.Reencode,
 		}, inspector, renew)
 		if err != nil {
 			return err
@@ -227,6 +229,7 @@ func applySavedPlanWithOptions(ctx context.Context, path string, options applySa
 				JustMaster: options.JustMaster,
 				Yes:        options.Yes,
 				Force:      options.Force,
+				Reencode:   options.Reencode,
 			}, inspector, renew)
 			if err != nil {
 				return err
@@ -264,7 +267,14 @@ func applySavedPlanOptionsFromCommand(cmd *cobra.Command) (applySavedPlanOptions
 	if err != nil {
 		return applySavedPlanOptions{}, err
 	}
-	return applySavedPlanOptions{JustMaster: justMaster, Yes: yes, Force: force, CheckRemote: true}, nil
+	reencode, err := cmd.Flags().GetBool("reencode")
+	if err != nil {
+		return applySavedPlanOptions{}, err
+	}
+	if justMaster && reencode {
+		return applySavedPlanOptions{}, fmt.Errorf("--reencode cannot be combined with --just-master")
+	}
+	return applySavedPlanOptions{JustMaster: justMaster, Yes: yes, Force: force, Reencode: reencode, CheckRemote: true}, nil
 }
 
 func inspectSavedPlan(path string) error {
@@ -774,6 +784,7 @@ func init() {
 	rootCmd.AddCommand(inspectCmd)
 
 	applyCmd.Flags().Bool("just-master", false, "Apply only podspec metadata, master media sync, and encode-time artifact sync")
+	applyCmd.Flags().Bool("reencode", false, "Regenerate local production audio from the master before syncing output")
 	applyCmd.Flags().BoolP("yes", "y", false, "Answer yes to non-destructive upfront apply decisions")
 	applyCmd.Flags().BoolP("force", "f", false, "Force overwrite decisions; local source files must already exist")
 

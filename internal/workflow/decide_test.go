@@ -170,6 +170,51 @@ func TestDecideEpisodeFullApplySchedulesEncodeAndSingleRSSRegeneration(t *testin
 	}
 }
 
+func TestDecideEpisodeReencodeRegeneratesExistingProductionAudio(t *testing.T) {
+	decision := DecideEpisode(EpisodeInput{
+		Metadata: appliedMetadata(),
+		Master:   syncedMaster(),
+		ProductionAudio: ObjectState{
+			Label:     "episode output",
+			Bucket:    "output",
+			Key:       "episode.m4a",
+			LocalPath: "/pod/episode.m4a",
+			Local:     FileState{Exists: true, Size: 200},
+			Remote:    RemoteState{Checked: true, Exists: false},
+		},
+		RSSDirty: true,
+	}, Options{Reencode: true})
+
+	requireOperation(t, decision, OperationEncode)
+	upload := requireOperation(t, decision, OperationUploadProduction)
+	if upload.Reason != "newly encoded production audio will be uploaded" {
+		t.Fatalf("upload reason = %q", upload.Reason)
+	}
+}
+
+func TestDecideEpisodeReencodeMarksRemoteOverwriteDestructive(t *testing.T) {
+	decision := DecideEpisode(EpisodeInput{
+		Metadata: appliedMetadata(),
+		Master:   syncedMaster(),
+		ProductionAudio: ObjectState{
+			Label:     "episode output",
+			Bucket:    "output",
+			Key:       "episode.m4a",
+			LocalPath: "/pod/episode.m4a",
+			Local:     FileState{Exists: true, Size: 200},
+			Remote:    RemoteState{Checked: true, Exists: true, Size: 200},
+		},
+	}, Options{Reencode: true})
+
+	upload := requireOperation(t, decision, OperationUploadProduction)
+	if !upload.Destructive {
+		t.Fatalf("upload operation = %+v, want destructive remote overwrite", upload)
+	}
+	if upload.Reason != "remote production audio will be overwritten by re-encoded output" {
+		t.Fatalf("upload reason = %q", upload.Reason)
+	}
+}
+
 func TestEquivalentUsesSizeAndChecksumOrETag(t *testing.T) {
 	if !equivalent(FileState{Exists: true, Size: 10, Checksum: "ABC"}, RemoteState{Exists: true, Size: 10, Checksum: "abc"}) {
 		t.Fatal("checksum-equivalent objects did not match")

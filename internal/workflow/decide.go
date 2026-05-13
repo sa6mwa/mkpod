@@ -53,7 +53,7 @@ func DecideEpisode(input EpisodeInput, options Options) Decision {
 		return decision
 	}
 
-	productionSynced := decideProduction(input.ProductionAudio, input.ProductionKnown, masterSynced, addCheck, addOperation)
+	productionSynced := decideProduction(input.ProductionAudio, input.ProductionKnown, masterSynced, options.Reencode, addCheck, addOperation)
 	if input.RSSDirty {
 		addOperation(Operation{
 			Kind:           OperationRegenerateRSS,
@@ -219,8 +219,42 @@ func decideArtifact(artifact ObjectState, addCheck func(string, string, bool, st
 	return true
 }
 
-func decideProduction(production ObjectState, productionKnown, masterSynced bool, addCheck func(string, string, bool, string), addOperation func(Operation)) bool {
+func decideProduction(production ObjectState, productionKnown, masterSynced, reencode bool, addCheck func(string, string, bool, string), addOperation func(Operation)) bool {
 	label := objectLabel(production, "production audio")
+	if reencode {
+		if !masterSynced {
+			addCheck("production", label, false, "production audio re-encode requested but master is not ready")
+			return false
+		}
+		addCheck("production", label, true, "production audio will be regenerated from master")
+		addOperation(Operation{
+			Kind:       OperationEncode,
+			ObjectKind: ObjectProductionAudio,
+			Label:      label,
+			Reason:     "re-encode requested",
+			DefaultYes: true,
+		})
+		if production.Key != "" {
+			reason := "newly encoded production audio will be uploaded"
+			destructive := false
+			if production.Remote.Exists {
+				reason = "remote production audio will be overwritten by re-encoded output"
+				destructive = true
+			}
+			addOperation(Operation{
+				Kind:           OperationUploadProduction,
+				ObjectKind:     ObjectProductionAudio,
+				Label:          label,
+				Bucket:         production.Bucket,
+				Key:            production.Key,
+				LocalPath:      production.LocalPath,
+				Reason:         reason,
+				RequiresPrompt: true,
+				Destructive:    destructive,
+			})
+		}
+		return false
+	}
 	if productionKnown && production.Remote.Exists && !production.Local.Exists {
 		addCheck("production", label, true, "remote production audio exists and metadata is complete")
 		return true

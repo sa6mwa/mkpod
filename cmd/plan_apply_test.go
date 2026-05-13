@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
+	"github.com/spf13/cobra"
 )
 
 func TestPlannedContentType(t *testing.T) {
@@ -106,10 +107,26 @@ func TestApplyCommandHasNoWorkflowSubcommands(t *testing.T) {
 	if got, want := applyCmd.Use, "apply <plan.json>"; got != want {
 		t.Fatalf("apply Use = %q, want %q", got, want)
 	}
-	for _, flag := range []string{"just-master", "yes", "force"} {
+	for _, flag := range []string{"just-master", "reencode", "yes", "force"} {
 		if applyCmd.Flags().Lookup(flag) == nil {
 			t.Fatalf("apply flag %q is missing", flag)
 		}
+	}
+}
+
+func TestApplyOptionsRejectJustMasterWithReencode(t *testing.T) {
+	cmd := &cobra.Command{}
+	cmd.Flags().Bool("just-master", true, "")
+	cmd.Flags().Bool("reencode", true, "")
+	cmd.Flags().BoolP("yes", "y", false, "")
+	cmd.Flags().BoolP("force", "f", false, "")
+
+	_, err := applySavedPlanOptionsFromCommand(cmd)
+	if err == nil {
+		t.Fatal("applySavedPlanOptionsFromCommand() error = nil, want invalid flag combination")
+	}
+	if !strings.Contains(err.Error(), "--reencode cannot be combined with --just-master") {
+		t.Fatalf("applySavedPlanOptionsFromCommand() error = %v", err)
 	}
 }
 

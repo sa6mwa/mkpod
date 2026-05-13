@@ -64,13 +64,16 @@ master, and encode-time artifact portion of a plan. A later plain
 `mkpod apply <plan.json>` resumes from that state and continues through encode,
 production audio sync, and local RSS regeneration.
 
+Use `mkpod apply --reencode <plan.json>` when the local production audio should
+be regenerated from the master even if an output file already exists.
+
 ```console
 $ mkpod new --non-interactive --title "Episode" --link https://example.com/episode --subtitle "Subtitle" --description "Description" --input masters/episode.flac
 $ mkpod edit new.plan.json
 $ mkpod inspect new.plan.json
 $ mkpod apply new.plan.json
 $ mkpod renew 34
-$ mkpod apply renew-34.plan.json
+$ mkpod apply --reencode renew-34.plan.json
 $ mkpod publish
 ```
 
