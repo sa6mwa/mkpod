@@ -12,6 +12,7 @@ import (
 
 	"github.com/sa6mwa/mkpod/internal/blenderaddon"
 	"github.com/sa6mwa/mkpod/internal/media/preprocess"
+	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
 )
 
 func TestPlannedContentType(t *testing.T) {
@@ -36,6 +37,32 @@ type fakeRemoteChecker struct {
 
 func (f fakeRemoteChecker) FileExists(context.Context, string, string) (bool, error) {
 	return f.exists, f.err
+}
+
+type fakeApplyStorage struct {
+	infos     map[string]*s3store.FileInfo
+	uploads   []string
+	downloads []string
+}
+
+func (f *fakeApplyStorage) GetFileInfo(_ context.Context, bucket, key string) (*s3store.FileInfo, error) {
+	if f.infos == nil {
+		return &s3store.FileInfo{Exists: false}, nil
+	}
+	if info, ok := f.infos[bucket+"/"+key]; ok {
+		return info, nil
+	}
+	return &s3store.FileInfo{Exists: false}, nil
+}
+
+func (f *fakeApplyStorage) DownloadFile(_ context.Context, bucket, key string) error {
+	f.downloads = append(f.downloads, bucket+"/"+key)
+	return nil
+}
+
+func (f *fakeApplyStorage) UploadFile(_ context.Context, bucket, key, filename string, _ *s3store.UploadOptions) error {
+	f.uploads = append(f.uploads, bucket+"/"+key+"="+filename)
+	return nil
 }
 
 func TestFillRemoteObjectPlan(t *testing.T) {
@@ -91,6 +118,71 @@ func TestInspectSavedNewEpisodePlan(t *testing.T) {
 
 	if err := inspectSavedPlan(planPath); err != nil {
 		t.Fatalf("inspectSavedPlan() error = %v", err)
+	}
+}
+
+func TestApplySavedNewEpisodePlanJustMasterWritesMetadataAndSyncsAssets(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	writeFile(t, filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav"), []byte("master"))
+	planPath := filepath.Join(t.TempDir(), "new.plan.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	})
+	storage := &fakeApplyStorage{}
+
+	if err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{JustMaster: true, Yes: true, Storage: storage}); err != nil {
+		t.Fatalf("applySavedPlanWithOptions() error = %v", err)
+	}
+	atom, err = specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if got := atom.ContainsEpisode(2); got != 0 {
+		t.Fatalf("new episode index = %d, want 0", got)
+	}
+	if atom.Episodes[0].Output != "" {
+		t.Fatalf("just-master output = %q, want empty before encode", atom.Episodes[0].Output)
+	}
+	joinedUploads := strings.Join(storage.uploads, "\n")
+	for _, want := range []string{"input/masters/new.wav=", "input/artwork/cover.jpg="} {
+		if !strings.Contains(joinedUploads, want) {
+			t.Fatalf("uploads = %v, want %q", storage.uploads, want)
+		}
+	}
+	if _, err := os.Stat(atom.FeedFilePath()); !os.IsNotExist(err) {
+		t.Fatalf("just-master RSS stat error = %v, want missing RSS", err)
+	}
+}
+
+func TestApplySavedNewEpisodePlanJustMasterForceMissingLocalMasterDoesNotWriteMetadata(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	planPath := filepath.Join(t.TempDir(), "new.plan.json")
+	writeSavedPlanFixture(t, planPath, "new", &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	})
+	storage := &fakeApplyStorage{infos: map[string]*s3store.FileInfo{
+		"input/masters/new.wav": {Exists: true, Size: 100},
+	}}
+
+	err := applySavedPlanWithOptions(context.Background(), planPath, nil, applySavedPlanOptions{JustMaster: true, Force: true, Storage: storage})
+	if err == nil {
+		t.Fatal("applySavedPlanWithOptions() error = nil, want forced missing local master error")
+	}
+	if !strings.Contains(err.Error(), "forced master sync requires local master") {
+		t.Fatalf("applySavedPlanWithOptions() error = %v, want forced local master error", err)
+	}
+	atom, loadErr := specStoreLoadForTest(t, specFile)
+	if loadErr != nil {
+		t.Fatalf("reload spec fixture: %v", loadErr)
+	}
+	if atom.ContainsEpisode(2) >= 0 {
+		t.Fatal("new episode metadata was written despite blocked preflight")
 	}
 }
 

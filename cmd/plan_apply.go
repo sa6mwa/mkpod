@@ -153,9 +153,11 @@ type savedPlan struct {
 }
 
 type applySavedPlanOptions struct {
-	JustMaster bool
-	Yes        bool
-	Force      bool
+	JustMaster  bool
+	Yes         bool
+	Force       bool
+	CheckRemote bool
+	Storage     applyWorkflowStorage
 }
 
 type episodeWorkflowPlan struct {
@@ -349,15 +351,43 @@ func applySavedPlanWithOptions(ctx context.Context, path string, blenderRunner b
 		if err := json.Unmarshal(saved.Plan, &plan); err != nil {
 			return err
 		}
+		inspector := applyRemoteInspector(nil)
+		storage := options.Storage
+		if storage == nil && options.CheckRemote {
+			var err error
+			storage, err = newApplyStorage(ctx, plan.SpecFile, options)
+			if err != nil {
+				return err
+			}
+		}
+		if storage != nil {
+			inspector = storage
+		}
 		decision, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
 			JustMaster: options.JustMaster,
 			Yes:        options.Yes,
 			Force:      options.Force,
-		}, nil)
+		}, inspector)
 		if err != nil {
 			return err
 		}
 		writeWorkflowDecision(os.Stdout, decision)
+		if options.JustMaster {
+			if inspector != nil {
+				rechecked, err := buildNewEpisodeApplyDecision(ctx, &plan, applyPreflightOptions{
+					JustMaster: options.JustMaster,
+					Yes:        options.Yes,
+					Force:      options.Force,
+				}, inspector)
+				if err != nil {
+					return err
+				}
+				if !sameWorkflowDecision(decision, rechecked) {
+					return errors.New("apply preflight changed before execution; rerun mkpod apply")
+				}
+			}
+			return applyNewEpisodeJustMaster(ctx, &plan, decision, options, storage)
+		}
 		return applyNewEpisodeWorkflow(ctx, &plan)
 	case "preprocess":
 		var plan preprocess.Plan
@@ -386,7 +416,7 @@ func applySavedPlanOptionsFromCommand(cmd *cobra.Command) (applySavedPlanOptions
 	if err != nil {
 		return applySavedPlanOptions{}, err
 	}
-	return applySavedPlanOptions{JustMaster: justMaster, Yes: yes, Force: force}, nil
+	return applySavedPlanOptions{JustMaster: justMaster, Yes: yes, Force: force, CheckRemote: true}, nil
 }
 
 func inspectSavedPlan(path string) error {
