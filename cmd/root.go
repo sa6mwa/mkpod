@@ -23,16 +23,20 @@ The main workflow is:
   3. mkpod apply new.plan.json
   4. mkpod publish
 
-Legacy encode/parse/preprocess commands remain available during the
-workflow migration, but are hidden from the primary help surface.
+Existing episodes can be repaired or re-encoded by creating a renew plan:
+  mkpod renew <uid|all>
+  mkpod inspect renew-<uid>.plan.json
+  mkpod apply renew-<uid>.plan.json
 
-mkpod preprocess remains available as an optional thin utility for raw
-microphone cleanup before editing; it is not required for the main publish
-pipeline.`,
+Legacy encode/parse commands remain available during the cutover, but are
+hidden from the primary help surface. mkpod preprocess remains available as an
+optional thin utility for raw microphone cleanup before editing.`,
 	Example: `  mkpod init ./podcast
   mkpod new
   mkpod inspect new.plan.json
   mkpod apply new.plan.json
+  mkpod renew 34
+  mkpod apply renew-34.plan.json
   mkpod publish
   mkpod publish --spec ./podcast/podspec.yaml`,
 }
