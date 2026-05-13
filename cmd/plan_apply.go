@@ -371,7 +371,7 @@ func requireSamePlan(expected, actual any, workflow string) error {
 		return err
 	}
 	if string(expectedJSON) != string(actualJSON) {
-		return fmt.Errorf("saved %s plan is stale; rerun mkpod plan %s", workflow, workflow)
+		return fmt.Errorf("saved %s plan is stale; recreate the saved plan", workflow)
 	}
 	return nil
 }

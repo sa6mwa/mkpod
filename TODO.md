@@ -220,60 +220,27 @@ Principles:
 - [x] Remove or hide the old command surface once replacement workflows exist;
   backward CLI compatibility is not a goal for this refactor.
 
-Initial workflow slices:
+Current workflow slices:
 
-- [x] `mkpod plan preprocess <audio-file...>`
+- [x] `mkpod preprocess <audio-file...>`
   - [x] Resolve output paths.
   - [x] Resolve preset and exact ffmpeg filter chain.
-  - [x] Check required tools.
-  - [x] Report generated artifacts without running ffmpeg.
-- [x] `mkpod apply preprocess <audio-file...>`
-  - [x] Execute the planned ffmpeg preprocessing operations.
+  - [x] Execute preprocessing directly; preprocessing is not part of
+    plan/apply.
   - [x] Preserve `sm7b-original` as the backup preset.
   - [x] Keep `sm7b` as the default iterative preset.
-- [x] Embed the Blender marker exporter currently stored at
-  `scripts/export_markers.py`.
-- [x] `mkpod plan blender`
+- [x] `mkpod blender`
+  - [x] Embed the Blender marker exporter formerly stored at
+    `scripts/export_markers.py`.
   - [x] Detect `blender` on `PATH` first.
   - [x] Optionally search common install paths only if needed.
-  - [x] Preview the add-on installation/enabling operation.
-- [x] `mkpod apply blender`
   - [x] Install and enable the embedded marker exporter in Blender.
   - [x] Prefer Blender's official extension CLI, for example
     `blender --command extension install-file -r user_default -e <package>`.
-  - [x] Report where Blender installed the add-on.
-  - [x] Replay `blender.plan.json` through `mkpod apply --from`.
-- [x] `mkpod plan episode <uid>`
-  - [x] Load the podcast spec.
-  - [x] Select and validate the episode.
-  - [x] Resolve local asset paths.
-  - [x] Detect media type and planned output format.
-  - [x] Preview encode/skip/re-encode decisions.
-  - [x] Preview metadata and podspec changes.
-  - [x] Preview RSS rendering.
-  - [x] Use read-only S3 checks to preview upload/overwrite/skip/remove
-    decisions.
-  - [x] Use the same decision helpers as apply for asset sync, output upload,
-    and remote-master deletion safety.
-- [x] `mkpod plan feed`
-  - [x] Load the podcast spec.
-  - [x] Preview feed path and local feed state.
-  - [x] Preview valid/skipped RSS episode counts.
-  - [x] Use optional read-only S3 checks for remote feed state.
-  - [x] Preview upload image sync and RSS upload decisions through the same
-    helpers as apply.
-- [x] `mkpod apply feed`
-  - [x] Execute the existing parse/feed workflow.
-  - [x] Preserve upload prompts and image sync behavior.
-  - [x] Execute image sync and RSS upload through shared workflow decision
-    helpers.
-- [x] `mkpod apply episode <uid>`
-  - [x] Execute the planned episode workflow with the same automatic behavior
-    mkpod has today.
-  - [x] Preserve remote-master deletion safety checks.
-  - [x] Preserve prompts where decisions remain interactive.
-  - [x] Execute asset sync, output upload, and remote-master deletion through
-    the shared workflow decision helpers.
+- [x] Legacy `encode` and `parse` commands
+  - [x] Remain available for manual podspec workflows.
+  - [x] Stay hidden from the primary help surface.
+  - [x] Are not exposed as `mkpod apply` subcommands.
 - [x] `mkpod new`
   - [x] Use a Bubble Tea form interactively.
   - [x] Infer UID, author, image, format, encoding language, and input
