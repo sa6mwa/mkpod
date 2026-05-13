@@ -196,27 +196,27 @@ without turning it into a set of disconnected low-level utilities.
 Target CLI shape:
 
 ```console
-mkpod plan <workflow> [selectors...]
-mkpod apply <workflow> [selectors...]
+mkpod new
+mkpod renew <uid|all>
+mkpod inspect <plan.json>
+mkpod apply <plan.json>
+mkpod publish
 ```
 
 Principles:
 
 - [x] Keep mkpod opinionated and automatic: `apply` should still run the
   podcast workflow end to end for the selected target.
-- [x] Make `plan` and `apply` share the same internal decision model.
-- [x] Let `plan` perform read-only inspection, including remote S3 reads where
-  needed to produce an accurate preview.
-- [x] Never let `plan` mutate local files, remote files, generated feeds, or
-  podcast metadata.
-- [x] Make `apply` execute the same planned operations, while accepting that
-  the outside world may have changed since the preview.
-- [x] Prefer live plan rebuilding first.
-- [x] Add `--out plan.json` for machine-readable plan artifacts.
-- [x] Add `apply --from plan.json` for deterministic preprocess plans with
-  stale-plan validation.
-- [x] Extend `apply --from plan.json` to episode/feed only after replay
-  semantics are strict enough to avoid surprising stale-plan execution.
+- [x] Make `inspect` and `apply` share the same internal decision model for
+  new and renewed episode plans.
+- [x] Let `inspect` perform non-mutating plan inspection.
+- [x] Never let inspection mutate local files, remote files, generated feeds,
+  or podcast metadata.
+- [x] Make `apply` execute the preflighted operations, while accepting that
+  the outside world may have changed since inspection.
+- [x] Rebuild and re-check the apply decision immediately before execution.
+- [x] Add `--out plan.json` for machine-readable new/renew plan artifacts.
+- [x] Use `mkpod apply <plan.json>` as the only apply entrypoint.
 - [x] Remove or hide the old command surface once replacement workflows exist;
   backward CLI compatibility is not a goal for this refactor.
 
@@ -275,12 +275,24 @@ Initial workflow slices:
   - [x] Execute asset sync, output upload, and remote-master deletion through
     the shared workflow decision helpers.
 - [x] `mkpod new`
-  - [x] Use a `huh` form interactively.
+  - [x] Use a Bubble Tea form interactively.
   - [x] Infer UID, author, image, format, encoding language, and input
     directory from the previous episode where possible.
   - [x] Support strict non-interactive flag-driven planning.
   - [x] Decode Blender chapter YAML into the typed episode chapter model.
   - [x] Apply the saved plan by appending the episode to `podspec.yaml`.
+- [x] `mkpod renew <uid|all>`
+  - [x] Create saved plans from existing episode metadata.
+  - [x] Keep renew read-only until the saved plan is applied.
+  - [x] Reuse the same apply/inspect workflow decision model as new plans.
+- [x] `mkpod apply <plan.json>`
+  - [x] Apply saved new and renew plans through upfront workflow decisions.
+  - [x] Support `--just-master`, `--yes`, and `--force`.
+  - [x] Sync masters and encode-time artifacts before encoding.
+  - [x] Encode or repair production audio as needed.
+  - [x] Regenerate local RSS once at the end without refreshing
+    `lastBuildDate`.
+  - [x] Leave RSS upload and `lastBuildDate` refresh to `mkpod publish`.
 
 Longer-term direction:
 

@@ -446,10 +446,10 @@ These are not solved here; they are the points to decide before redesigning
 7. What is the exact production boundary for `publish`: RSS only, RSS plus
    images, or all remote artifacts?
 
-## Proposed Apply Direction
+## Apply Direction
 
-This section records a proposed direction for the redesigned `mkpod apply`
-workflow. It is not yet implemented.
+This section records the direction for the redesigned `mkpod apply` workflow.
+The `new` and `renew` plan paths now use this model.
 
 Core idea: all validation and all yes/no decisions should happen up front when
 running `apply`. Execution should then follow the planned decisions exactly.
@@ -526,11 +526,11 @@ Master sync should run before encoding in plain apply and before exit in
 remotely should be uploaded regardless of whether the run is only applying the
 master portion or continuing through encoding.
 
-### `--just-master` / `--preflight`
+### `--just-master`
 
 `apply --just-master <plan.json>` should apply only the master-related pieces of
-the workflow. `--preflight` may be an alias for this, or `--just-master` may be
-an alias for `--preflight`; the naming is still open.
+the workflow. `--preflight` is intentionally not a command alias; use
+`mkpod inspect <plan.json>` for non-mutating inspection.
 
 For a new episode plan, `--just-master` should:
 
@@ -663,7 +663,7 @@ the same remote/local safety rules in multiple branches.
 Some workflows need to re-apply, repair, or re-encode episodes that already
 exist in `podspec.yaml` and no longer have an original `new.plan.json`.
 
-`mkpod renew` should create saved plans from existing episode metadata:
+`mkpod renew` creates saved plans from existing episode metadata:
 
 ```sh
 mkpod renew 34
@@ -672,8 +672,8 @@ mkpod inspect renew-34.plan.json
 mkpod apply renew-34.plan.json
 ```
 
-`renew` should not mutate by itself. It should only read `podspec.yaml`, build
-one or more saved plans, and let `mkpod apply <plan.json>` execute them.
+`renew` does not mutate by itself. It only reads `podspec.yaml`, builds one or
+more saved plans, and lets `mkpod apply <plan.json>` execute them.
 
 Command shape:
 

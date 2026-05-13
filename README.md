@@ -14,10 +14,12 @@ The main commands are:
 
 - `mkpod init <directory>` to create a starter workspace and `podspec.yaml`
 - `mkpod preprocess` for optional raw audio cleanup before editing
+- `mkpod blender` to install the bundled Blender marker exporter add-on
 - `mkpod new` to prepare a saved new episode plan
 - `mkpod edit <plan.json>` or `mkpod new --edit <plan.json>` to revise a saved new episode plan
+- `mkpod renew <uid|all>` to prepare saved plans for existing episodes
 - `mkpod inspect <plan.json>` to inspect a saved plan
-- `mkpod apply <plan.json>` to apply a saved plan locally
+- `mkpod apply <plan.json>` to apply a saved plan and sync the episode artifacts
 - `mkpod publish` to publish the generated feed and referenced assets
 
 See [docs/architecture.md](docs/architecture.md) for the current simplified
@@ -50,15 +52,25 @@ mkpod uses saved plan files for guided changes. `mkpod new` prepares a
 <plan.json>` and `mkpod new --edit <plan.json>` reopen that saved new episode
 plan and save the revised JSON back to the same path unless `--out` is set.
 `mkpod inspect` shows what is in a saved plan, and `mkpod apply <plan.json>`
-applies it. Applying a new episode plan updates `podspec.yaml`, encodes the
-episode locally, and regenerates the local RSS file. Publishing remains an
-explicit step with `mkpod publish`.
+applies it. Applying a new or renewed episode plan updates or resumes
+`podspec.yaml`, syncs the master and encode-time artifacts, encodes or repairs
+production audio when needed, uploads production audio when the apply decision
+requires it, and regenerates the local RSS file once at the end. Publishing the
+feed remains an explicit step with `mkpod publish`, which owns `lastBuildDate`
+refresh and RSS upload.
+
+Use `mkpod apply --just-master <plan.json>` to apply only the metadata,
+master, and encode-time artifact portion of a plan. A later plain
+`mkpod apply <plan.json>` resumes from that state and continues through encode,
+production audio sync, and local RSS regeneration.
 
 ```console
 $ mkpod new --non-interactive --title "Episode" --link https://example.com/episode --subtitle "Subtitle" --description "Description" --input masters/episode.flac
 $ mkpod edit new.plan.json
 $ mkpod inspect new.plan.json
 $ mkpod apply new.plan.json
+$ mkpod renew 34
+$ mkpod apply renew-34.plan.json
 $ mkpod publish
 ```
 
@@ -76,8 +88,10 @@ Generate and encode podcasts and publish to a cloud object store
 $ mkpod init --help
 $ mkpod new --help
 $ mkpod edit --help
+$ mkpod renew --help
 $ mkpod inspect --help
 $ mkpod apply --help
+$ mkpod blender --help
 
 # Optional raw-track cleanup before editing
 $ mkpod preprocess MIC1.WAV
@@ -87,6 +101,11 @@ $ mkpod new
 $ mkpod edit new.plan.json
 $ mkpod inspect new.plan.json
 $ mkpod apply new.plan.json
+
+# Re-apply or repair an existing episode selected by uid
+$ mkpod renew 16
+$ mkpod inspect renew-16.plan.json
+$ mkpod apply renew-16.plan.json
 
 # Encode a single episode selected by the uid field in podspec.yaml
 $ mkpod encode 16
