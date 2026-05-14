@@ -906,6 +906,39 @@ func TestEditSavedNewEpisodePlanWritesBackToSamePath(t *testing.T) {
 	}
 }
 
+func TestBuildAndWriteNewEpisodePlanNonInteractivePreservesDescriptionFlag(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	outPath := filepath.Join(t.TempDir(), "new.plan.json")
+	cmd := newTestNewEpisodeCommand(t)
+	mustSetFlag(t, cmd, "spec", specFile)
+	mustSetFlag(t, cmd, "out", outPath)
+	mustSetFlag(t, cmd, "non-interactive", "true")
+	mustSetFlag(t, cmd, "title", "Flag Episode")
+	mustSetFlag(t, cmd, "link", "https://example.com/flag")
+	mustSetFlag(t, cmd, "subtitle", "Flag subtitle")
+	mustSetFlag(t, cmd, "description", "Description from flag")
+	mustSetFlag(t, cmd, "input", "masters/new.wav")
+
+	plan, writtenPath, err := buildAndWriteNewEpisodePlan(context.Background(), cmd, nil, "")
+	if err != nil {
+		t.Fatalf("buildAndWriteNewEpisodePlan() error = %v", err)
+	}
+	if writtenPath != outPath {
+		t.Fatalf("written path = %q, want %q", writtenPath, outPath)
+	}
+	if plan.Episode.Description != "Description from flag" {
+		t.Fatalf("plan description = %q, want flag value", plan.Episode.Description)
+	}
+
+	saved, err := loadSavedNewEpisodePlan(outPath)
+	if err != nil {
+		t.Fatalf("loadSavedNewEpisodePlan() error = %v", err)
+	}
+	if saved.Episode.Description != "Description from flag" {
+		t.Fatalf("saved description = %q, want flag value", saved.Episode.Description)
+	}
+}
+
 func TestEditSavedNewEpisodePlanCanWriteToOutPath(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	planPath := filepath.Join(t.TempDir(), "new.post.json")
