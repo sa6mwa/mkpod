@@ -8,6 +8,7 @@ import (
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
 	"github.com/sa6mwa/mkpod/internal/spec"
+	workflow "github.com/sa6mwa/mkpod/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -74,6 +75,40 @@ func TestInspectSavedRenewPlanUsesApplyDecision(t *testing.T) {
 	}
 }
 
+func TestRenewApplyDecisionPreservesInheritedMetadata(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec: %v", err)
+	}
+	episode := episodeFixtureFromSpec(t, specFile, 1)
+	episode.Author = ""
+	episode.Image = ""
+	if err := savePodcastSpec(specFile, atom); err != nil {
+		t.Fatalf("save fixture spec: %v", err)
+	}
+	atom.Episodes[0] = episode
+	if err := savePodcastSpec(specFile, atom); err != nil {
+		t.Fatalf("save inherited fixture spec: %v", err)
+	}
+
+	decision, err := buildRenewEpisodeApplyDecision(context.Background(), &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episode,
+	}, applyPreflightOptions{JustMaster: true}, &applyPreflightRemote{})
+	if err != nil {
+		t.Fatalf("buildRenewEpisodeApplyDecision() error = %v", err)
+	}
+	for _, check := range decision.Checks {
+		if check.Label == "podspec metadata" && !check.Passed {
+			t.Fatalf("metadata check = %+v, want inherited raw metadata to match", check)
+		}
+	}
+	if strings.Contains(strings.Join(decisionReasons(decision), "\n"), "current metadata conflicts with plan") {
+		t.Fatalf("decision = %+v, want no metadata conflict", decision)
+	}
+}
+
 func TestApplyRenewPlanRejectsMissingExistingEpisode(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	planPath := filepath.Join(t.TempDir(), "renew.plan.json")
@@ -102,6 +137,17 @@ func episodeFixtureFromSpec(t *testing.T, specFile string, uid int64) model.Epis
 		t.Fatalf("episode %d missing in fixture", uid)
 	}
 	return atom.Episodes[index]
+}
+
+func decisionReasons(decision workflow.Decision) []string {
+	reasons := make([]string, 0, len(decision.Checks)+len(decision.Operations))
+	for _, check := range decision.Checks {
+		reasons = append(reasons, check.Reason)
+	}
+	for _, operation := range decision.Operations {
+		reasons = append(reasons, operation.Reason)
+	}
+	return reasons
 }
 
 func renewCmdForTest(t *testing.T) *cobra.Command {

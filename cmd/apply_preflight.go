@@ -40,8 +40,9 @@ func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, option
 	if err != nil {
 		return workflow.Decision{}, err
 	}
-	episode := plan.Episode
-	if err := spec.ApplyEpisodeDefaultsForEncoding(atom, &episode); err != nil {
+	metadataEpisode := plan.Episode
+	decisionEpisode := plan.Episode
+	if err := spec.ApplyEpisodeDefaultsForEncoding(atom, &decisionEpisode); err != nil {
 		return workflow.Decision{}, err
 	}
 
@@ -50,19 +51,19 @@ func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, option
 		mode = workflow.ModeJustMaster
 	}
 	input := workflow.EpisodeInput{
-		Metadata:        episodeMetadataState(atom, &episode, renew),
-		ProductionKnown: len(spec.MissingFieldsForRSS(atom, &episode)) == 0,
+		Metadata:        episodeMetadataState(atom, &metadataEpisode, renew),
+		ProductionKnown: len(spec.MissingFieldsForRSS(atom, &decisionEpisode)) == 0,
 		RSSDirty:        !options.JustMaster,
 	}
-	input.Master, err = newWorkflowObject(ctx, atom, inspector, workflow.ObjectMaster, "episode master", atom.Config.Aws.Buckets.Input, episode.Input, true)
+	input.Master, err = newWorkflowObject(ctx, atom, inspector, workflow.ObjectMaster, "episode master", atom.Config.Aws.Buckets.Input, decisionEpisode.Input, true)
 	if err != nil {
 		return workflow.Decision{}, err
 	}
-	input.Artifacts, err = newEpisodeWorkflowArtifacts(ctx, atom, inspector, &episode)
+	input.Artifacts, err = newEpisodeWorkflowArtifacts(ctx, atom, inspector, &decisionEpisode)
 	if err != nil {
 		return workflow.Decision{}, err
 	}
-	input.ProductionAudio, err = newEpisodeWorkflowProduction(ctx, atom, inspector, &episode)
+	input.ProductionAudio, err = newEpisodeWorkflowProduction(ctx, atom, inspector, &decisionEpisode)
 	if err != nil {
 		return workflow.Decision{}, err
 	}
