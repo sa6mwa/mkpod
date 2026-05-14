@@ -140,6 +140,18 @@ func TestCollectReferencedImagesMatchesGeneratedRSSReferences(t *testing.T) {
 		},
 		{
 			UID:         3,
+			Title:       "Published With Default Image",
+			PubDate:     model.ItunesTime{Time: now.Add(-time.Hour)},
+			Link:        "https://example.com/3",
+			Duration:    model.ItunesDuration{Duration: time.Minute},
+			Author:      "Host",
+			Description: "Published default image description",
+			Type:        "audio/mpeg",
+			Length:      10,
+			Output:      "published-default.mp3",
+		},
+		{
+			UID:         4,
 			Title:       "Invalid",
 			PubDate:     model.ItunesTime{Time: now.Add(-time.Hour)},
 			Author:      "Host",
@@ -153,7 +165,7 @@ func TestCollectReferencedImagesMatchesGeneratedRSSReferences(t *testing.T) {
 	for _, image := range images {
 		got = append(got, image.Key)
 	}
-	want := []string{"artwork/show.jpg", "artwork/published.jpg"}
+	want := []string{"artwork/show.jpg", "artwork/published.jpg", "artwork/default.jpg"}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("referenced image keys = %v, want %v", got, want)
 	}

@@ -94,6 +94,10 @@ func (p *Renderer) mkFuncMapWithContext(ctx context.Context, atom *model.Podcast
 		return spec.EffectiveEpisodeExplicit(atom, &episode)
 	}
 
+	funcMap["episodeImage"] = func(episode model.Episode) string {
+		return spec.EffectiveEpisodeImage(atom, &episode)
+	}
+
 	return funcMap
 }
 

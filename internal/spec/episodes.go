@@ -93,7 +93,8 @@ func MissingFieldsForRSS(atom *model.Podcast, episode *model.Episode) []string {
 	if strings.TrimSpace(episode.Type) == "" {
 		missingFields = append(missingFields, "type")
 	}
-	if strings.TrimSpace(episode.Image) == "" {
+	effectiveImage := EffectiveEpisodeImage(atom, episode)
+	if strings.TrimSpace(effectiveImage) == "" {
 		missingFields = append(missingFields, "image")
 	}
 	if episode.PubDate.IsZero() {

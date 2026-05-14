@@ -54,7 +54,7 @@
 {{- end }}
       <description><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></description>
       <enclosure type="{{.Type}}" url="{{$.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
-      <itunes:image href="{{$.Config.BaseURL}}/{{.Image}}"/>
+      <itunes:image href="{{$.Config.BaseURL}}/{{episodeImage .}}"/>
     </item>
 {{- end }}
 {{- end }}

@@ -87,6 +87,56 @@ func TestWriteRSSRendersValidEpisodesOnly(t *testing.T) {
 	}
 }
 
+func TestWriteRSSRendersInheritedEpisodeImage(t *testing.T) {
+	renderer := New()
+	now := time.Now().UTC()
+
+	atom := &model.Podcast{
+		Config: model.Config{
+			BaseURL:         "https://example.com/podcast",
+			Image:           "https://example.com/podcast/artwork/show.jpg",
+			DefaultPodImage: "artwork/default.jpg",
+		},
+		FeedFile:      "podcast.rss",
+		Title:         "Example Show",
+		Link:          "https://example.com/show",
+		PubDate:       model.ItunesTime{Time: now},
+		LastBuildDate: model.ItunesTime{Time: now},
+		TTL:           60,
+		Language:      "en",
+		Copyright:     "Copyright Example",
+		WebMaster:     "webmaster@example.com",
+		Description:   "Show description",
+		Subtitle:      "Show subtitle",
+		OwnerName:     "Owner",
+		OwnerEmail:    "owner@example.com",
+		Author:        "Host",
+		Explicit:      model.ItunesExplicit{S: "no"},
+		Episodes: []model.Episode{{
+			UID:         1,
+			Title:       "Inherited Image Episode",
+			PubDate:     model.ItunesTime{Time: now},
+			Link:        "https://example.com/show/episodes/1",
+			Duration:    model.ItunesDuration{Duration: 5 * time.Minute},
+			Description: "Episode description",
+			Type:        "audio/mpeg",
+			Length:      12345,
+			Output:      "episode1.mp3",
+		}},
+	}
+
+	var buf bytes.Buffer
+	if err := writeRSS(context.Background(), &buf, renderer, atom); err != nil {
+		t.Fatalf("writeRSS() error = %v", err)
+	}
+
+	output := buf.String()
+	assertWellFormedRSSXML(t, []byte(output))
+	if !strings.Contains(output, `<itunes:image href="https://example.com/podcast/artwork/default.jpg"/>`) {
+		t.Fatalf("expected inherited default episode image in RSS output: %s", output)
+	}
+}
+
 func TestWriteRSSMatchesGoldenFile(t *testing.T) {
 	renderer := New()
 	pubDate := time.Date(2022, 3, 25, 16, 0, 13, 0, time.UTC)

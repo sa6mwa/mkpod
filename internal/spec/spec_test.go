@@ -208,6 +208,16 @@ func TestMissingFieldsForRSS(t *testing.T) {
 		t.Fatalf("MissingFieldsForRSS(valid) = %v, want none", got)
 	}
 
+	inheritedImage := *valid
+	inheritedImage.Image = ""
+	atomWithDefaultImage := &model.Podcast{
+		Author: "Host",
+		Config: model.Config{DefaultPodImage: "artwork/default.jpg"},
+	}
+	if got := MissingFieldsForRSS(atomWithDefaultImage, &inheritedImage); len(got) != 0 {
+		t.Fatalf("MissingFieldsForRSS(inherited image) = %v, want none", got)
+	}
+
 	missing := &model.Episode{}
 	got := MissingFieldsForRSS(&model.Podcast{}, missing)
 	for _, field := range []string{"title", "output", "duration", "length", "type", "image", "pubDate", "author"} {
@@ -219,7 +229,10 @@ func TestMissingFieldsForRSS(t *testing.T) {
 
 func TestRenderableEpisodesSkipsInvalidEpisodes(t *testing.T) {
 	now := time.Now().UTC()
-	atom := &model.Podcast{Author: "Host"}
+	atom := &model.Podcast{
+		Author: "Host",
+		Config: model.Config{DefaultPodImage: "default.jpg"},
+	}
 	episodes := []model.Episode{
 		{
 			UID:      1,
@@ -240,11 +253,20 @@ func TestRenderableEpisodesSkipsInvalidEpisodes(t *testing.T) {
 			Type:     "audio/mpeg",
 			Image:    "cover.jpg",
 		},
+		{
+			UID:      3,
+			Title:    "Inherited Image",
+			PubDate:  model.ItunesTime{Time: now},
+			Output:   "inherited.mp3",
+			Duration: model.ItunesDuration{Duration: time.Minute},
+			Length:   123,
+			Type:     "audio/mpeg",
+		},
 	}
 
 	renderable, issues := RenderableEpisodes(atom, episodes)
-	if len(renderable) != 1 || renderable[0].UID != 1 {
-		t.Fatalf("RenderableEpisodes() renderable = %v, want only UID 1", renderable)
+	if len(renderable) != 2 || renderable[0].UID != 1 || renderable[1].UID != 3 {
+		t.Fatalf("RenderableEpisodes() renderable = %v, want UIDs 1 and 3", renderable)
 	}
 	if len(issues) != 1 {
 		t.Fatalf("RenderableEpisodes() issues = %v, want 1 issue", issues)
