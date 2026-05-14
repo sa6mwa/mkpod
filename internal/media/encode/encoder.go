@@ -67,14 +67,14 @@ func applyEpisodeDefaults(atom *model.Podcast, episode *model.Episode) error {
 
 func (e *Service) shouldEncode(ctx context.Context, options EncodeOptions, filename string) bool {
 	// l := logger.FromContext(ctx)
-	if len(strings.TrimSpace(filename)) < 5 {
+	if options.NeverReencode {
+		return false
+	} else if len(strings.TrimSpace(filename)) < 5 {
 		return true
 	} else if options.ForceReencode {
 		return true
 	} else if _, err := os.Stat(filename); os.IsNotExist(err) {
 		return true
-	} else if options.NeverReencode {
-		return false
 	} else if options.All {
 		return false
 	}
@@ -186,6 +186,17 @@ func (e *Service) Encode(ctx context.Context, atom *model.Podcast, options Encod
 		outputPath := ""
 		if strings.TrimSpace(episode.Output) != "" {
 			outputPath = path.Join(atom.LocalStorageDirExpanded(), episode.Output)
+		}
+		if options.NeverReencode {
+			if strings.TrimSpace(outputPath) == "" {
+				return nil, fmt.Errorf("repair-only encode requires existing episode output metadata for episode %d", episode.UID)
+			}
+			if _, err := os.Stat(outputPath); err != nil {
+				if os.IsNotExist(err) {
+					return nil, fmt.Errorf("repair-only encode requires existing output file %s", outputPath)
+				}
+				return nil, fmt.Errorf("failed to access repair-only output file %s: %w", outputPath, err)
+			}
 		}
 		if changed, err := repairOutputMetadata(ctx, episode, outputPath); err != nil {
 			return nil, err

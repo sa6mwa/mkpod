@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sa6mwa/mkpod/internal/app/model"
@@ -33,8 +34,8 @@ func TestShouldEncodeUsesExplicitOptions(t *testing.T) {
 	if service.shouldEncode(context.Background(), EncodeOptions{NeverReencode: true}, existing) {
 		t.Fatal("NeverReencode should skip existing files")
 	}
-	if !service.shouldEncode(context.Background(), EncodeOptions{NeverReencode: true}, filepath.Join(tempDir, "missing.mp3")) {
-		t.Fatal("NeverReencode should still encode missing output files")
+	if service.shouldEncode(context.Background(), EncodeOptions{NeverReencode: true}, filepath.Join(tempDir, "missing.mp3")) {
+		t.Fatal("NeverReencode should skip missing output files")
 	}
 	if service.shouldEncode(context.Background(), EncodeOptions{All: true}, existing) {
 		t.Fatal("All without force should skip existing files")
@@ -44,6 +45,35 @@ func TestShouldEncodeUsesExplicitOptions(t *testing.T) {
 	}
 	if !service.shouldEncode(context.Background(), EncodeOptions{}, filepath.Join(tempDir, "missing.mp3")) {
 		t.Fatal("missing output file should be encoded")
+	}
+}
+
+func TestEncodeNeverReencodeFailsWhenOutputIsMissing(t *testing.T) {
+	uid := int64(1)
+	tempDir := t.TempDir()
+	atom := &model.Podcast{
+		Author: "Host",
+		Config: model.Config{
+			DefaultPodImage: "artwork/default.jpg",
+			LocalStorageDir: tempDir,
+		},
+		Episodes: []model.Episode{{
+			UID:    uid,
+			Title:  "Episode",
+			Input:  "masters/episode.wav",
+			Output: "missing.mp3",
+		}},
+	}
+
+	_, err := New(stubPrompter{answer: true}).Encode(context.Background(), atom, EncodeOptions{
+		EpisodeUID:    &uid,
+		NeverReencode: true,
+	}, nil)
+	if err == nil {
+		t.Fatal("Encode() error = nil, want repair-only missing output error")
+	}
+	if !strings.Contains(err.Error(), "repair-only encode requires existing output file") {
+		t.Fatalf("Encode() error = %v, want repair-only missing output", err)
 	}
 }
 

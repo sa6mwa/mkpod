@@ -75,6 +75,7 @@ type applySavedPlanOptions struct {
 	Reencode    bool
 	CheckRemote bool
 	Storage     applyWorkflowStorage
+	PlanPath    string
 }
 
 type episodeWorkflowPlan struct {
@@ -191,6 +192,7 @@ func applySavedPlan(ctx context.Context, path string) error {
 }
 
 func applySavedPlanWithOptions(ctx context.Context, path string, options applySavedPlanOptions) error {
+	options.PlanPath = path
 	saved, err := loadSavedPlan(path)
 	if err != nil {
 		return err

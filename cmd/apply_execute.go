@@ -56,7 +56,7 @@ func applyNewEpisodeJustMaster(ctx context.Context, plan *newEpisodePlan, decisi
 			return fmt.Errorf("unexpected just-master operation %q", operation.Kind)
 		}
 	}
-	fmt.Printf("Continue with: mkpod apply %s\n", planApplyPathHint(plan))
+	fmt.Printf("Continue with: mkpod apply %s\n", planApplyPathHint(plan, options.PlanPath))
 	return nil
 }
 
@@ -236,7 +236,10 @@ func sameWorkflowDecision(a, b workflow.Decision) bool {
 	return string(left) == string(right)
 }
 
-func planApplyPathHint(plan *newEpisodePlan) string {
+func planApplyPathHint(plan *newEpisodePlan, planPath string) string {
+	if planPath != "" {
+		return planPath
+	}
 	if plan == nil || plan.SpecFile == "" {
 		return "new.plan.json"
 	}

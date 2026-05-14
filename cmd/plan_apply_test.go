@@ -134,6 +134,13 @@ func TestApplyOptionsRejectJustMasterWithReencode(t *testing.T) {
 	}
 }
 
+func TestPlanApplyPathHintPreservesCurrentPlanPath(t *testing.T) {
+	planPath := filepath.Join(t.TempDir(), "renew-34.plan.json")
+	if got := planApplyPathHint(&newEpisodePlan{SpecFile: "podspec.yaml"}, planPath); got != planPath {
+		t.Fatalf("planApplyPathHint() = %q, want %q", got, planPath)
+	}
+}
+
 func TestInspectSavedNewEpisodePlan(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	planPath := filepath.Join(t.TempDir(), "new.plan.json")
