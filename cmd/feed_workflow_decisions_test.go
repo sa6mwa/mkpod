@@ -72,7 +72,7 @@ func TestDecidePublishImageUploadsSameSizeDifferentRemoteETag(t *testing.T) {
 	}
 }
 
-func TestDecidePublishImageFallsBackToSizeForMultipartETag(t *testing.T) {
+func TestDecidePublishImageUploadsSameSizeUnusableRemoteETag(t *testing.T) {
 	workdir := t.TempDir()
 	image := referencedImage{Key: filepath.ToSlash(filepath.Join("artwork", "cover.jpg")), Label: "podcast", ContentType: "image/jpeg"}
 	localPath := filepath.Join(workdir, filepath.FromSlash(image.Key))
@@ -87,8 +87,8 @@ func TestDecidePublishImageFallsBackToSizeForMultipartETag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decidePublishImage() error = %v", err)
 	}
-	if operation.Kind != "skip-image-upload" || operation.RequiresPrompt {
-		t.Fatalf("operation = %+v, want size fallback skip without prompt", operation)
+	if operation.Kind != "upload-image" || !operation.RequiresPrompt {
+		t.Fatalf("operation = %+v, want prompted upload without checksum proof", operation)
 	}
 }
 

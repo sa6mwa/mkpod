@@ -105,7 +105,7 @@ func TestCheckAndUploadPodcastImageSkipsExistingRemoteImage(t *testing.T) {
 			imageRelPath: true,
 		},
 		infoResponses: map[string]*s3store.FileInfo{
-			imageRelPath: {Exists: true, Size: int64(len("jpeg"))},
+			imageRelPath: {Exists: true, Size: int64(len("jpeg")), ETag: `"ab4f3ccba74857c5f2ba0d5b7dbf65e1"`},
 		},
 	}
 

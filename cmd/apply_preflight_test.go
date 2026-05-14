@@ -142,6 +142,33 @@ func TestBuildNewEpisodeApplyDecisionRemoteProductionWithCompleteMetadataDoesNot
 	}
 }
 
+func TestBuildNewEpisodeApplyDecisionUploadsSameSizeDifferentMaster(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	masterPath := filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.flac")
+	writeFile(t, masterPath, []byte("same"))
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	plan.Episode.Input = "masters/new.flac"
+	remote := &applyPreflightRemote{infos: map[string]*s3store.FileInfo{
+		"input/masters/new.flac": {Exists: true, Size: int64(len("same")), ETag: `"00000000000000000000000000000000"`},
+	}}
+
+	decision, err := buildNewEpisodeApplyDecision(context.Background(), plan, applyPreflightOptions{}, remote)
+	if err != nil {
+		t.Fatalf("buildNewEpisodeApplyDecision() error = %v", err)
+	}
+	upload := requireWorkflowOperation(t, decision, workflow.OperationUploadMaster)
+	if !upload.RequiresPrompt {
+		t.Fatalf("upload operation = %+v, want prompted overwrite", upload)
+	}
+}
+
 func TestBuildNewEpisodeApplyDecisionMissingProductionPlansUploadAfterEncode(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)

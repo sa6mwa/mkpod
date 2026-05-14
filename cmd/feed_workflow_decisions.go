@@ -77,7 +77,7 @@ func decidePublishImage(ctx context.Context, atom *model.Podcast, image referenc
 		Bucket:        atom.Config.Aws.Buckets.Output,
 		Key:           image.Key,
 		LocalPath:     localPath,
-		Reason:        "remote image exists with matching size",
+		Reason:        "remote image exists with matching checksum",
 		LocalExists:   true,
 		LocalSize:     fi.Size(),
 		LocalChecksum: localChecksum,
@@ -86,9 +86,6 @@ func decidePublishImage(ctx context.Context, atom *model.Podcast, image referenc
 		RemoteETag:    remoteETag,
 	}
 	if remoteExists && publishImageMatches(fi.Size(), localChecksum, remoteSize, remoteETag) {
-		if usableS3ETag(remoteETag) != "" {
-			operation.Reason = "remote image exists with matching checksum"
-		}
 		return operation, nil
 	}
 	operation.Kind = "upload-image"
@@ -118,7 +115,7 @@ func publishImageMatches(localSize int64, localChecksum string, remoteSize int64
 	if etag := usableS3ETag(remoteETag); etag != "" && localChecksum != "" {
 		return strings.EqualFold(localChecksum, etag)
 	}
-	return true
+	return false
 }
 
 func usableS3ETag(etag string) string {

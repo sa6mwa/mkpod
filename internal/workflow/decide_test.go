@@ -231,6 +231,9 @@ func TestEquivalentUsesSizeAndChecksumOrETag(t *testing.T) {
 	if !equivalent(FileState{Exists: true, Size: 10, Checksum: "ABC"}, RemoteState{Exists: true, Size: 10, Checksum: "abc"}) {
 		t.Fatal("checksum-equivalent objects did not match")
 	}
+	if !equivalent(FileState{Exists: true, Size: 10, Checksum: "abc"}, RemoteState{Exists: true, Size: 10, ETag: `"abc"`}) {
+		t.Fatal("local checksum did not match usable remote etag")
+	}
 	if !equivalent(FileState{Exists: true, Size: 10, ETag: `"abc"`}, RemoteState{Exists: true, Size: 10, ETag: "abc"}) {
 		t.Fatal("etag-equivalent objects did not match")
 	}
@@ -239,6 +242,12 @@ func TestEquivalentUsesSizeAndChecksumOrETag(t *testing.T) {
 	}
 	if equivalent(FileState{Exists: true, Size: 10}, RemoteState{Exists: true, Size: 11}) {
 		t.Fatal("different sizes matched")
+	}
+	if equivalent(FileState{Exists: true, Size: 10}, RemoteState{Exists: true, Size: 10}) {
+		t.Fatal("size-only objects matched")
+	}
+	if equivalent(FileState{Exists: true, Size: 10, Checksum: "abc"}, RemoteState{Exists: true, Size: 10, ETag: `"multipart-etag-2"`}) {
+		t.Fatal("unusable remote etag matched by size")
 	}
 }
 

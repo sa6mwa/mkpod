@@ -175,6 +175,11 @@ func newWorkflowObjectInBuckets(ctx context.Context, atom *model.Podcast, inspec
 	if info, err := os.Stat(object.LocalPath); err == nil {
 		object.Local.Exists = true
 		object.Local.Size = info.Size()
+		if checksum, err := fileMD5Hex(object.LocalPath); err == nil {
+			object.Local.Checksum = checksum
+		} else {
+			return workflow.ObjectState{}, fmt.Errorf("checksum local %s %s: %w", label, object.LocalPath, err)
+		}
 	}
 	if inspector == nil {
 		return object, nil

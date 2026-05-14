@@ -349,10 +349,25 @@ func equivalent(local FileState, remote RemoteState) bool {
 	if local.Checksum != "" && remote.Checksum != "" {
 		return strings.EqualFold(local.Checksum, remote.Checksum)
 	}
-	if local.ETag != "" && remote.ETag != "" {
-		return strings.EqualFold(strings.Trim(local.ETag, `"`), strings.Trim(remote.ETag, `"`))
+	if local.Checksum != "" {
+		if remoteETag := usableETag(remote.ETag); remoteETag != "" {
+			return strings.EqualFold(local.Checksum, remoteETag)
+		}
 	}
-	return true
+	if localETag := usableETag(local.ETag); localETag != "" {
+		if remoteETag := usableETag(remote.ETag); remoteETag != "" {
+			return strings.EqualFold(localETag, remoteETag)
+		}
+	}
+	return false
+}
+
+func usableETag(etag string) string {
+	etag = strings.Trim(strings.TrimSpace(etag), `"`)
+	if etag == "" || strings.Contains(etag, "-") {
+		return ""
+	}
+	return etag
 }
 
 func objectLabel(object ObjectState, fallback string) string {
