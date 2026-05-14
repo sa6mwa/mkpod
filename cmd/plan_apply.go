@@ -785,7 +785,7 @@ func init() {
 
 	applyCmd.Flags().Bool("just-master", false, "Apply only podspec metadata, master media sync, and encode-time artifact sync")
 	applyCmd.Flags().Bool("reencode", false, "Regenerate local production audio from the master before syncing output")
-	applyCmd.Flags().BoolP("yes", "y", false, "Answer yes to non-destructive upfront apply decisions")
+	applyCmd.Flags().BoolP("yes", "y", false, "Answer yes to all apply decisions, including destructive overwrite decisions; equivalent to --force for prompts")
 	applyCmd.Flags().BoolP("force", "f", false, "Force overwrite decisions; local source files must already exist")
 
 }

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	s3store "github.com/sa6mwa/mkpod/internal/storage/s3"
+	workflow "github.com/sa6mwa/mkpod/internal/workflow"
 	"github.com/spf13/cobra"
 )
 
@@ -112,6 +113,9 @@ func TestApplyCommandHasNoWorkflowSubcommands(t *testing.T) {
 			t.Fatalf("apply flag %q is missing", flag)
 		}
 	}
+	if help := applyCmd.Flags().Lookup("yes").Usage; !strings.Contains(help, "destructive overwrite") || !strings.Contains(help, "--force") {
+		t.Fatalf("apply --yes help = %q, want destructive/force semantics", help)
+	}
 }
 
 func TestApplyOptionsRejectJustMasterWithReencode(t *testing.T) {
@@ -205,6 +209,43 @@ func TestApplySavedNewEpisodePlanJustMasterForceMissingLocalMasterDoesNotWriteMe
 	}
 	if atom.ContainsEpisode(2) >= 0 {
 		t.Fatal("new episode metadata was written despite blocked preflight")
+	}
+}
+
+func TestApplyNewEpisodeFullDoesNotUploadProductionOutsideDecision(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	writeSilentWaveForNewEpisodeTest(t, filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav"))
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	decision := workflow.Decision{
+		State: workflow.StateRSSReady,
+		Operations: []workflow.Operation{
+			{
+				Kind:   workflow.OperationWriteMetadata,
+				Label:  "podspec metadata",
+				Reason: "planned metadata is not yet present",
+			},
+			{
+				Kind:       workflow.OperationEncode,
+				ObjectKind: workflow.ObjectProductionAudio,
+				Label:      "production audio",
+				Reason:     "production audio is missing",
+			},
+		},
+	}
+	storage := &fakeApplyStorage{}
+
+	if err := applyNewEpisodeFull(context.Background(), plan, decision, applySavedPlanOptions{Yes: true}, storage, false); err != nil {
+		t.Fatalf("applyNewEpisodeFull() error = %v", err)
+	}
+	if len(storage.uploads) != 0 {
+		t.Fatalf("uploads = %v, want no uploads without explicit upload-production operation", storage.uploads)
 	}
 }
 

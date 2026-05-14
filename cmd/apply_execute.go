@@ -72,7 +72,6 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 		return err
 	}
 	encodedThisRun := false
-	planUploadsProduction := decisionHasOperation(decision, workflow.OperationUploadProduction)
 	for _, operation := range decision.Operations {
 		switch operation.Kind {
 		case workflow.OperationWriteMetadata:
@@ -112,7 +111,7 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 				AskNoQuestions:        true,
 				ForceReencode:         operation.Kind == workflow.OperationEncode && options.Reencode,
 				NeverReencode:         operation.Kind == workflow.OperationRepairMetadata,
-				SkipOutputUpload:      planUploadsProduction,
+				SkipOutputUpload:      true,
 				LocalOnly:             storage == nil,
 				PreserveLastBuildDate: true,
 			}); err != nil {
@@ -211,15 +210,6 @@ func requireApplyDecisionProceed(decision workflow.Decision, options applySavedP
 func decisionRequiresPrompt(decision workflow.Decision) bool {
 	for _, operation := range decision.Operations {
 		if operation.RequiresPrompt {
-			return true
-		}
-	}
-	return false
-}
-
-func decisionHasOperation(decision workflow.Decision, kind workflow.OperationKind) bool {
-	for _, operation := range decision.Operations {
-		if operation.Kind == kind {
 			return true
 		}
 	}

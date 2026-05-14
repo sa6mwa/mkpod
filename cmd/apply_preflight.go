@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,7 +64,7 @@ func buildEpisodeApplyDecision(ctx context.Context, plan *newEpisodePlan, option
 	if err != nil {
 		return workflow.Decision{}, err
 	}
-	input.ProductionAudio, err = newEpisodeWorkflowProduction(ctx, atom, inspector, &decisionEpisode)
+	input.ProductionAudio, err = newEpisodeWorkflowProduction(ctx, atom, inspector, &decisionEpisode, input.Master.Remote.ContentType)
 	if err != nil {
 		return workflow.Decision{}, err
 	}
@@ -121,27 +122,34 @@ func newEpisodeWorkflowArtifacts(ctx context.Context, atom *model.Podcast, inspe
 	return artifacts, nil
 }
 
-func newEpisodeWorkflowProduction(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode) (workflow.ObjectState, error) {
+func newEpisodeWorkflowProduction(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode, remoteInputContentType string) (workflow.ObjectState, error) {
 	output := strings.TrimSpace(episode.Output)
 	if output == "" {
-		output = plannedEpisodeOutput(atom, episode)
+		output = plannedEpisodeOutput(atom, episode, remoteInputContentType)
 	}
 	return newWorkflowObject(ctx, atom, inspector, workflow.ObjectProductionAudio, "production audio", atom.Config.Aws.Buckets.Output, output, false)
 }
 
-func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode) string {
+func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode, remoteInputContentType string) string {
 	if strings.TrimSpace(episode.Input) == "" {
 		return ""
 	}
+	inputContentType := strings.TrimSpace(remoteInputContentType)
 	inputPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(episode.Input))
-	if _, err := os.Stat(inputPath); err != nil {
+	if _, err := os.Stat(inputPath); err == nil {
+		contentType, err := encode.GetFileContentType(inputPath)
+		if err != nil {
+			return ""
+		}
+		inputContentType = contentType
+	}
+	if inputContentType == "" {
+		inputContentType = mime.TypeByExtension(filepath.Ext(episode.Input))
+	}
+	if inputContentType == "" {
 		return ""
 	}
-	contentType, err := encode.GetFileContentType(inputPath)
-	if err != nil {
-		return ""
-	}
-	planned, err := encode.PlanEpisode(atom, episode, contentType)
+	planned, err := encode.PlanEpisode(atom, episode, inputContentType)
 	if err != nil {
 		return ""
 	}
