@@ -109,6 +109,31 @@ func TestRenewApplyDecisionPreservesInheritedMetadata(t *testing.T) {
 	}
 }
 
+func TestApplyRenewEpisodePlanPreservesInheritedMetadata(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec: %v", err)
+	}
+	episode := atom.Episodes[0]
+	episode.Link = "https://example.com/episode"
+	episode.Subtitle = "Episode subtitle"
+	episode.Description = "Episode description"
+	episode.Author = ""
+	episode.Image = ""
+	atom.Episodes[0] = episode
+	if err := savePodcastSpec(specFile, atom); err != nil {
+		t.Fatalf("save inherited fixture spec: %v", err)
+	}
+
+	if err := applyRenewEpisodePlan(context.Background(), &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episode,
+	}); err != nil {
+		t.Fatalf("applyRenewEpisodePlan() error = %v, want inherited metadata match", err)
+	}
+}
+
 func TestApplyRenewPlanRejectsMissingExistingEpisode(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	planPath := filepath.Join(t.TempDir(), "renew.plan.json")

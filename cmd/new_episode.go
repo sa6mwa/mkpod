@@ -574,8 +574,8 @@ func validateNewEpisodeFields(atom *model.Podcast, episode *model.Episode) error
 	if strings.TrimSpace(spec.EffectiveEpisodeAuthor(atom, episode)) == "" {
 		missing = append(missing, "author")
 	}
-	if err := spec.ApplyEpisodeDefaultsForEncoding(atom, episode); err != nil {
-		missing = append(missing, strings.TrimPrefix(err.Error(), "episode "))
+	if strings.TrimSpace(spec.EffectiveEpisodeImage(atom, episode)) == "" {
+		missing = append(missing, strings.TrimPrefix(spec.ErrMissingEpisodeImage.Error(), "episode "))
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required new episode fields: %s", strings.Join(missing, ", "))

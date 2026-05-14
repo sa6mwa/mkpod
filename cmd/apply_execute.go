@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/sa6mwa/mkpod/internal/app/model"
@@ -105,6 +106,11 @@ func applyNewEpisodeFull(ctx context.Context, plan *newEpisodePlan, decision wor
 				return err
 			}
 		case workflow.OperationEncode, workflow.OperationRepairMetadata:
+			if operation.Kind == workflow.OperationRepairMetadata {
+				if err := persistRepairOutput(ctx, plan.SpecFile, plan.Episode.UID, operation); err != nil {
+					return err
+				}
+			}
 			if err := runEncodeWorkflow(logger.WithDefaultLogger(ctx), []string{strconv.FormatInt(plan.Episode.UID, 10)}, encodeWorkflowOptions{
 				SpecFile:              plan.SpecFile,
 				All:                   false,
@@ -164,6 +170,28 @@ func refreshedProductionUploadOperation(atom *model.Podcast, uid int64, operatio
 		}
 	}
 	return operation
+}
+
+func persistRepairOutput(ctx context.Context, specFile string, uid int64, operation workflow.Operation) error {
+	if strings.TrimSpace(operation.Key) == "" {
+		return fmt.Errorf("repair metadata for episode %d requires production output key", uid)
+	}
+	atom, err := spec.New(specFile).Load(ctx)
+	if err != nil {
+		return err
+	}
+	index := atom.ContainsEpisode(uid)
+	if index < 0 {
+		return fmt.Errorf("episode UID %d does not exist in podcast specification", uid)
+	}
+	if strings.TrimSpace(atom.Episodes[index].Output) == operation.Key {
+		return nil
+	}
+	if strings.TrimSpace(atom.Episodes[index].Output) != "" {
+		return fmt.Errorf("episode UID %d output %q conflicts with repair output %q", uid, atom.Episodes[index].Output, operation.Key)
+	}
+	atom.Episodes[index].Output = operation.Key
+	return savePodcastSpec(specFile, atom)
 }
 
 func regenerateApplyRSS(ctx context.Context, specFile string) error {

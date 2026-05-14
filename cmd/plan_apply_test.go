@@ -256,6 +256,34 @@ func TestApplyNewEpisodeFullDoesNotUploadProductionOutsideDecision(t *testing.T)
 	}
 }
 
+func TestPersistRepairOutputWritesKnownProductionKey(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	atom.Episodes[0].Output = ""
+	if err := savePodcastSpec(specFile, atom); err != nil {
+		t.Fatalf("save spec fixture: %v", err)
+	}
+
+	if err := persistRepairOutput(context.Background(), specFile, 1, workflow.Operation{
+		Kind:       workflow.OperationRepairMetadata,
+		ObjectKind: workflow.ObjectProductionAudio,
+		Key:        "episode.mp3",
+	}); err != nil {
+		t.Fatalf("persistRepairOutput() error = %v", err)
+	}
+
+	atom, err = specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("reload spec fixture: %v", err)
+	}
+	if got := atom.Episodes[0].Output; got != "episode.mp3" {
+		t.Fatalf("Output = %q, want episode.mp3", got)
+	}
+}
+
 func TestApplySavedUnsupportedWorkflowRejects(t *testing.T) {
 	planPath := filepath.Join(t.TempDir(), "plan.json")
 	writeSavedPlanFixture(t, planPath, "preprocess", map[string]string{"input": "raw.wav"})
