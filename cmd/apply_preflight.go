@@ -125,21 +125,25 @@ func newEpisodeWorkflowArtifacts(ctx context.Context, atom *model.Podcast, inspe
 func newEpisodeWorkflowProduction(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, episode *model.Episode, remoteInputContentType string) (workflow.ObjectState, error) {
 	output := strings.TrimSpace(episode.Output)
 	if output == "" {
-		output = plannedEpisodeOutput(atom, episode, remoteInputContentType)
+		var err error
+		output, err = plannedEpisodeOutput(atom, episode, remoteInputContentType)
+		if err != nil {
+			return workflow.ObjectState{}, err
+		}
 	}
 	return newWorkflowObject(ctx, atom, inspector, workflow.ObjectProductionAudio, "production audio", atom.Config.Aws.Buckets.Output, output, false)
 }
 
-func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode, remoteInputContentType string) string {
+func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode, remoteInputContentType string) (string, error) {
 	if strings.TrimSpace(episode.Input) == "" {
-		return ""
+		return "", nil
 	}
 	inputContentType := strings.TrimSpace(remoteInputContentType)
 	inputPath := filepath.Join(atom.LocalStorageDirExpanded(), filepath.FromSlash(episode.Input))
 	if _, err := os.Stat(inputPath); err == nil {
 		contentType, err := encode.GetFileContentType(inputPath)
 		if err != nil {
-			return ""
+			return "", fmt.Errorf("detect input content type for %s: %w", inputPath, err)
 		}
 		inputContentType = contentType
 	}
@@ -147,13 +151,13 @@ func plannedEpisodeOutput(atom *model.Podcast, episode *model.Episode, remoteInp
 		inputContentType = mime.TypeByExtension(filepath.Ext(episode.Input))
 	}
 	if inputContentType == "" {
-		return ""
+		return "", nil
 	}
 	planned, err := encode.PlanEpisode(atom, episode, inputContentType)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("plan production output for input %s: %w", episode.Input, err)
 	}
-	return planned.Output
+	return planned.Output, nil
 }
 
 func newWorkflowObject(ctx context.Context, atom *model.Podcast, inspector applyRemoteInspector, kind workflow.ObjectKind, label, bucket, rawKey string, required bool) (workflow.ObjectState, error) {

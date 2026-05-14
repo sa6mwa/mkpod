@@ -224,6 +224,29 @@ func TestBuildNewEpisodeApplyDecisionRemoteOnlyMasterPlansProductionUpload(t *te
 	}
 }
 
+func TestBuildNewEpisodeApplyDecisionRejectsInvalidFormatBeforeMetadataWrite(t *testing.T) {
+	specFile := writeWorkflowSpecFixture(t)
+	atom, err := specStoreLoadForTest(t, specFile)
+	if err != nil {
+		t.Fatalf("load spec fixture: %v", err)
+	}
+	masterPath := filepath.Join(atom.LocalStorageDirExpanded(), "masters", "new.wav")
+	writeSilentWaveForNewEpisodeTest(t, masterPath)
+	plan := &newEpisodePlan{
+		SpecFile: specFile,
+		Episode:  episodeFixtureForNewPlan(2),
+	}
+	plan.Episode.Format = "bogus"
+
+	_, err = buildNewEpisodeApplyDecision(context.Background(), plan, applyPreflightOptions{}, &applyPreflightRemote{})
+	if err == nil {
+		t.Fatal("buildNewEpisodeApplyDecision() error = nil, want invalid format error")
+	}
+	if !strings.Contains(err.Error(), `invalid or unsupported format "bogus"`) {
+		t.Fatalf("buildNewEpisodeApplyDecision() error = %v, want invalid format", err)
+	}
+}
+
 func TestBuildNewEpisodeApplyDecisionReencodeExistingLocalProduction(t *testing.T) {
 	specFile := writeWorkflowSpecFixture(t)
 	atom, err := specStoreLoadForTest(t, specFile)

@@ -152,6 +152,37 @@ func TestDecideEpisodeMissingProductionMetadataDownloadsForRepairBeforeEncode(t 
 	}
 }
 
+func TestDecideEpisodeMissingProductionMetadataRepairsLocalOutputBeforeUpload(t *testing.T) {
+	decision := DecideEpisode(EpisodeInput{
+		Metadata: appliedMetadata(),
+		Master:   syncedMaster(),
+		ProductionAudio: ObjectState{
+			Label:     "episode output",
+			Bucket:    "output",
+			Key:       "episode.m4a",
+			LocalPath: "/pod/episode.m4a",
+			Local:     FileState{Exists: true, Size: 200, Checksum: "abc"},
+			Remote:    RemoteState{Checked: true, Exists: false},
+		},
+		ProductionKnown: false,
+	}, Options{})
+
+	repair := requireOperation(t, decision, OperationRepairMetadata)
+	upload := requireOperation(t, decision, OperationUploadProduction)
+	if repair.Reason != "production audio metadata is incomplete" {
+		t.Fatalf("repair reason = %q", repair.Reason)
+	}
+	if upload.Reason != "remote production audio is missing" {
+		t.Fatalf("upload reason = %q", upload.Reason)
+	}
+	if operationIndex(decision, OperationRepairMetadata) > operationIndex(decision, OperationUploadProduction) {
+		t.Fatalf("operations = %+v, want repair before upload", decision.Operations)
+	}
+	if hasOperation(decision, OperationEncode) {
+		t.Fatalf("decision encoded instead of repairing local output: %+v", decision.Operations)
+	}
+}
+
 func TestDecideEpisodeFullApplySchedulesEncodeAndSingleRSSRegeneration(t *testing.T) {
 	decision := DecideEpisode(EpisodeInput{
 		Metadata: appliedMetadata(),
@@ -290,6 +321,15 @@ func countOperations(decision Decision, kind OperationKind) int {
 		}
 	}
 	return count
+}
+
+func operationIndex(decision Decision, kind OperationKind) int {
+	for i, operation := range decision.Operations {
+		if operation.Kind == kind {
+			return i
+		}
+	}
+	return -1
 }
 
 func requireCheck(t *testing.T, decision Decision, kind string) Check {

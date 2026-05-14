@@ -260,7 +260,18 @@ func decideProduction(production ObjectState, productionKnown, masterSynced, ree
 		return true
 	}
 	if production.Local.Exists && !production.Remote.Exists {
-		addCheck("production", label, true, "local production audio exists and remote is missing")
+		reason := "local production audio exists and remote is missing"
+		if !productionKnown {
+			reason = "local production audio exists, metadata needs repair, and remote is missing"
+			addOperation(Operation{
+				Kind:       OperationRepairMetadata,
+				ObjectKind: ObjectProductionAudio,
+				Label:      label,
+				Reason:     "production audio metadata is incomplete",
+				DefaultYes: true,
+			})
+		}
+		addCheck("production", label, true, reason)
 		addOperation(Operation{
 			Kind:           OperationUploadProduction,
 			ObjectKind:     ObjectProductionAudio,
@@ -274,11 +285,28 @@ func decideProduction(production ObjectState, productionKnown, masterSynced, ree
 		return true
 	}
 	if production.Local.Exists && production.Remote.Exists {
+		if !productionKnown {
+			addOperation(Operation{
+				Kind:       OperationRepairMetadata,
+				ObjectKind: ObjectProductionAudio,
+				Label:      label,
+				Reason:     "production audio metadata is incomplete",
+				DefaultYes: true,
+			})
+		}
 		if equivalent(production.Local, production.Remote) {
-			addCheck("production", label, true, "local and remote production audio match")
+			reason := "local and remote production audio match"
+			if !productionKnown {
+				reason = "local and remote production audio match but metadata needs repair"
+			}
+			addCheck("production", label, true, reason)
 			return true
 		}
-		addCheck("production", label, true, "local and remote production audio differ")
+		reason := "local and remote production audio differ"
+		if !productionKnown {
+			reason = "local production audio metadata needs repair and local and remote production audio differ"
+		}
+		addCheck("production", label, true, reason)
 		addOperation(Operation{
 			Kind:           OperationUploadProduction,
 			ObjectKind:     ObjectProductionAudio,
