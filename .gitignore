@@ -1,4 +1,20 @@
 *~
 *.swp
+\#*\#
 /mkpod
 /bin
+/dist/
+/stash/
+*.plan.json
+e2e/podcast.rss
+
+# Audio files
+*.flac
+*.mp3
+*.m4a
+*.m4b
+*.wav
+
+# Image files
+*.jpeg
+*.jpg

@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <atom:link href="https://example.com/podcast/podcast.rss" rel="self" type="application/rss+xml"/>
+    <title>Example Show</title>
+    <link>https://example.com/show</link>
+    <pubDate>Fri, 25 Mar 2022 16:00:13 +0000</pubDate>
+    <lastBuildDate>Fri, 25 Mar 2022 16:00:13 +0000</lastBuildDate>
+    <ttl>60</ttl>
+    <language>en</language>
+    <copyright>Copyright Example</copyright>
+    <webMaster>webmaster@example.com</webMaster>
+    <description><![CDATA[<p>Show description</p>
+]]></description>
+    <itunes:subtitle>Show subtitle</itunes:subtitle>
+    <itunes:owner>
+      <itunes:name>Owner</itunes:name>
+      <itunes:email>owner@example.com</itunes:email>
+    </itunes:owner>
+    <itunes:author>Host</itunes:author>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:keywords>podcast,test</itunes:keywords>
+    <itunes:image href="https://example.com/podcast/artwork/show.jpg"/>
+    <image>
+      <url>https://example.com/podcast/artwork/show.jpg</url>
+      <title>Example Show</title>
+      <link>https://example.com/show</link>
+    </image>
+<itunes:category text="Technology" />
+    <item>
+      <guid isPermaLink="true">https://example.com/podcast/episode1.mp3</guid>
+      <title>Episode One</title>
+      <pubDate>Fri, 25 Mar 2022 16:00:13 +0000</pubDate>
+      <link>https://example.com/show/episodes/1</link>
+      <itunes:episode>1</itunes:episode>
+      <itunes:duration>00:05:04</itunes:duration>
+      <itunes:author>Guest Host</itunes:author>
+      <itunes:explicit>no</itunes:explicit>
+      <itunes:subtitle>Episode subtitle</itunes:subtitle>
+      <description><![CDATA[<p>Episode description</p>
+]]></description>
+      <enclosure type="audio/mpeg" url="https://example.com/podcast/episode1.mp3" length="12345"/>
+      <itunes:image href="https://example.com/podcast/artwork/episode1.jpg"/>
+    </item>
+  </channel>
+</rss>

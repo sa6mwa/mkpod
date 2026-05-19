@@ -1,8 +1,7 @@
-{{ with .Atom -}}
 <?xml version='1.0' encoding='UTF-8'?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <atom:link href="{{$.Atom.Config.BaseURL}}/{{.Atom}}" rel="self" type="application/rss+xml"/>
+    <atom:link href="{{.Config.BaseURL}}/{{.FeedFile}}" rel="self" type="application/rss+xml"/>
     <title>{{.Title}}</title>
     <link>{{.Link}}</link>
     <pubDate>{{.PubDate}}</pubDate>
@@ -11,7 +10,7 @@
     <language>{{.Language}}</language>
     <copyright>{{.Copyright}}</copyright>
     <webMaster>{{.WebMaster}}</webMaster>
-    <description>{{.Description}}</description>
+    <description><![CDATA[{{markdown .Description}}]]></description>
 {{- if ne .Subtitle "" }}
     <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
@@ -22,31 +21,42 @@
     <itunes:author>{{.Author}}</itunes:author>
     <itunes:explicit>{{.Explicit}}</itunes:explicit>
     <itunes:keywords>{{.Keywords}}</itunes:keywords>
-    <itunes:image href="{{$.Atom.Config.Image}}"/>
+    <itunes:image href="{{.Config.Image}}"/>
     <image>
-      <url>{{$.Atom.Config.Image}}</url>
+      <url>{{.Config.Image}}</url>
       <title>{{.Title}}</title>
       <link>{{.Link}}</link>
     </image>
-    <itunes:category text="{{.Category}}"/>
-{{- range .Episodes }}
+{{- range .Categories }}
+		{{- if .Subcategories }}
+<itunes:category text="{{ .Name }}">
+      {{- range .Subcategories }}
+<itunes:category text="{{ . }}" />
+			{{- end }}
+</itunes:category>
+    {{- else }}
+<itunes:category text="{{ .Name }}" />
+    {{- end }}
+{{- end }}
+{{- range validEpisodes .Episodes }}
+{{- if isAfter timeNow .PubDate.Time }}
     <item>
-      <guid isPermaLink="true">{{$.Atom.Config.BaseURL}}/{{.Output}}</guid>
+      <guid isPermaLink="true">{{$.Config.BaseURL}}/{{.Output}}</guid>
       <title>{{.Title}}</title>
       <pubDate>{{.PubDate}}</pubDate>
       <link>{{.Link}}</link>
+      <itunes:episode>{{.UID}}</itunes:episode>
       <itunes:duration>{{.Duration}}</itunes:duration>
-      <itunes:author>{{.Author}}</itunes:author>
-      <itunes:explicit>{{.Explicit}}</itunes:explicit>
-      <itunes:summary>{{.Description}}</itunes:summary>
+      <itunes:author>{{episodeAuthor .}}</itunes:author>
+      <itunes:explicit>{{episodeExplicit .}}</itunes:explicit>
 {{- if ne .Subtitle "" }}
       <itunes:subtitle>{{.Subtitle}}</itunes:subtitle>
 {{- end }}
-      <description>{{.Description}}</description>
-      <enclosure type="{{.Type}}" url="{{$.Atom.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
-      <itunes:image href="{{$.Atom.Config.BaseURL}}/{{.Image}}"/>
+      <description><![CDATA[{{markdown .Description}}{{ spotifyChapters .Chapters }}]]></description>
+      <enclosure type="{{.Type}}" url="{{$.Config.BaseURL}}/{{.Output}}" length="{{.Length}}"/>
+      <itunes:image href="{{$.Config.BaseURL}}/{{episodeImage .}}"/>
     </item>
+{{- end }}
 {{- end }}
   </channel>
 </rss>
-{{- end }}
